@@ -20,7 +20,7 @@ class TopicExecutors:
         return {"topics.login": self.login, "topics.sync": self.sync, "topics.industry": self.industry,
                 "topics.recommend": self.recommend, "research.analyze": self.analyze}
 
-    def browser(self, context, action, stage, collection=None, url=None, output=None, wait_seconds=30):
+    def browser(self, context, action, stage, collection=None, url=None, cover_url=None, output=None, wait_seconds=30):
         config = require_agent_enabled(self.service.db_path, "hotspot_agent")
         arguments = [str(self.root / ".venv-topics/bin/python"), str(self.root / "content_workbench/topics/browser_worker.py"),
                      "--action", action, "--profile", str(self.root / "data/topic-browser-profile"),
@@ -29,6 +29,8 @@ class TopicExecutors:
             arguments += ["--collection", collection]
         if url:
             arguments += ["--url", url]
+        if cover_url:
+            arguments += ["--cover-url", cover_url]
         if output:
             arguments += ["--output", str(output)]
         stdout, _ = context.run_process(arguments, timeout=min(config["timeout_seconds"], max(120, wait_seconds + 120)), stage=stage, cwd=self.root)
@@ -51,6 +53,19 @@ class TopicExecutors:
             conn.execute("UPDATE wb_source_accounts SET connection_status='ready' WHERE id='source_douyin_main'")
         return result
 
+    def enrich(self, item_id, context):
+        item = self.service.get_item(item_id)
+        metadata = item["metadata"]
+        directory = self.root / "covers" / "topic-research"
+        directory.mkdir(parents=True, exist_ok=True)
+        output = directory / (item_id + ".jpg")
+        result = self.browser(context, "details", "research_metadata", url=item["url"],
+                              cover_url=metadata.get("cover_url"), output=output, wait_seconds=30)
+        values = result.get("details", {})
+        values["cover_cached"] = bool(output.is_file())
+        self.service.update_metadata(item_id, values)
+        return values
+
     def sync(self, job, context):
         run_id = self.service.start_sync("full", {"sources": ["hot", "featured", "competitor", "high_praise"]})
         settings = self.service.settings()
@@ -72,6 +87,11 @@ class TopicExecutors:
                     title = settings[setting]
                     result = self.browser(context, "favorites", "favorite_" + key, collection=title)
                     item_ids = [self.service.upsert_item(item, key, collection_title=title, run_id=run_id) for item in result["items"]]
+                    for item_id in item_ids:
+                        try:
+                            self.enrich(item_id, context)
+                        except DomainError as error:
+                            stats["errors"].append({"source": "metadata:" + item_id, "code": error.code, "message": error.message})
                     self.service.reconcile_collection(title, item_ids, run_id, complete=True)
                     stats[key] = len(result["items"])
                 except DomainError as error:

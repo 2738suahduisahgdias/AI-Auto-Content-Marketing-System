@@ -27,6 +27,19 @@ class TopicAPI:
         if method == "POST" and path == "/api/topics/recommend":
             agent = (body or {}).get("agent", "douyin")
             return self.app.response(handler, self.jobs.enqueue("topics.recommend", {"agent": agent}, agent, resource_key="cloud_text"), 202)
+        match = re.fullmatch(r"/api/topics/items/([^/]+)/cover", path)
+        if method == "GET" and match:
+            cover = self.service.root / "covers" / "topic-research" / (match.group(1) + ".jpg")
+            if not cover.is_file():
+                raise DomainError("COVER_NOT_FOUND", "封面尚未缓存", 404, "cover", "先同步该作品的封面元数据")
+            body = cover.read_bytes()
+            handler.send_response(200)
+            handler.send_header("Content-Type", "image/jpeg")
+            handler.send_header("Content-Length", str(len(body)))
+            handler.send_header("Cache-Control", "private, max-age=86400")
+            handler.end_headers()
+            handler.wfile.write(body)
+            return True
         match = re.fullmatch(r"/api/topics/items/([^/]+)", path)
         if method == "GET" and match:
             return self.app.response(handler, self.service.get_item(match.group(1)))

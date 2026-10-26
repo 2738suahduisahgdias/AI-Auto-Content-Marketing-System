@@ -107,6 +107,15 @@ class TopicService:
                     (collection_id, item_id, run_id))
         return item_id
 
+    def update_metadata(self, item_id, values):
+        with self.conn() as conn, immediate(conn):
+            row = conn.execute("SELECT metadata_json FROM wb_research_items WHERE id=?", (item_id,)).fetchone()
+            if not row:
+                raise ValueError("研究条目不存在")
+            metadata = loads(row[0], {})
+            metadata.update(values)
+            conn.execute("UPDATE wb_research_items SET metadata_json=?,observed_at=? WHERE id=?", (dumps(metadata), utcnow(), item_id))
+
     def reconcile_collection(self, title, item_ids, run_id, complete):
         if not complete:
             return

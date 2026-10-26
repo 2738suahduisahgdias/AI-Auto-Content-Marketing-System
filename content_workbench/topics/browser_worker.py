@@ -39,7 +39,9 @@ def visible_videos(page, limit=100):
         const lines=box.split('\\n').map(x=>x.trim()).filter(Boolean);
         const title=lines.filter(x=>x.length>1 && !/^\\d+(\\.\\d+)?[万wW]?$/.test(x)).sort((a,b)=>b.length-a.length)[0]||'未读取标题';
         const match=href.match(/(?:video|note)\\/([0-9A-Za-z_-]+)/);
-        seen.add(href); result.push({title,canonical_url:href,platform_item_id:match?match[1]:null,metadata:{title,visible_text:box.slice(0,1000)}});
+        const like_count=lines.find(x=>/^\\d+(\\.\\d+)?[万wW]?$/.test(x))||'';
+        const cover_url=a.querySelector('img')?.src||'';
+        seen.add(href); result.push({title,canonical_url:href,platform_item_id:match?match[1]:null,metadata:{title,visible_text:box.slice(0,1000),cover_url,like_count}});
         if (result.length>=limit) break;
       }
       return result;
@@ -146,12 +148,36 @@ def download_video(context, page, url, output):
     return {"needs_upload": True, "candidate_count": len(candidates)}
 
 
+def video_details(context, page, url, cover_url, output):
+    page.goto(url, wait_until="domcontentloaded", timeout=60000)
+    page.wait_for_selector("body", timeout=30000)
+    page.wait_for_timeout(2500)
+    details = page.evaluate("""() => {
+      const links=[...document.querySelectorAll('a[href*="/user/"]')];
+      const author=links.find(a=>(a.innerText||'').trim() && (a.innerText||'').trim()!=='我的');
+      const body=document.body.innerText;
+      const followers=(body.match(/粉丝\\s*([0-9.]+[万亿]?)/)||[])[1]||'';
+      return {author_name:author?(author.innerText||'').trim():'',author_url:author?author.href:'',author_followers:followers};
+    }""")
+    if output and cover_url:
+        try:
+            response = context.request.get(cover_url, headers={"Referer": page.url}, timeout=30000)
+            if response.ok:
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_bytes(response.body())
+                details["cover_cached"] = True
+        except Exception:
+            details["cover_cached"] = False
+    return details
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--action", choices=("hot", "favorites", "login", "download"), required=True)
+    parser.add_argument("--action", choices=("hot", "favorites", "login", "download", "details"), required=True)
     parser.add_argument("--profile", required=True)
     parser.add_argument("--collection")
     parser.add_argument("--url")
+    parser.add_argument("--cover-url")
     parser.add_argument("--output")
     parser.add_argument("--wait-seconds", type=int, default=30)
     args = parser.parse_args()
@@ -177,6 +203,9 @@ def main():
                 return
             if args.action == "favorites":
                 print(json.dumps({"status": "ok", "items": sync_collection(page, args.collection)}, ensure_ascii=False))
+                return
+            if args.action == "details":
+                print(json.dumps({"status": "ok", "details": video_details(context, page, args.url, args.cover_url, Path(args.output).resolve() if args.output else None)}, ensure_ascii=False))
                 return
             result = download_video(context, page, args.url, Path(args.output).resolve())
             print(json.dumps({"status": "ok", **result}, ensure_ascii=False))
