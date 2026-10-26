@@ -1,0 +1,155 @@
+version: 1
+initial_state: "idea"
+terminal_state: "analyzed"
+
+states:
+  - id: "idea"
+    owner: "选题Agent"
+    action: "形成选题并等待人工确认"
+  - id: "topic_approved"
+    owner: "脚本Agent"
+    action: "准备生成主脚本"
+  - id: "script_drafted"
+    owner: "脚本Agent"
+    action: "主脚本和平台版本已生成，等待人工确认"
+  - id: "script_approved"
+    owner: "用户"
+    action: "等待用户录音"
+  - id: "waiting_audio"
+    owner: "用户"
+    action: "录音文件已放入指定位置，等待检查"
+  - id: "transcribed"
+    owner: "素材规划Agent"
+    action: "字幕和时间轴已生成，开始素材规划"
+  - id: "assets_planned"
+    owner: "素材规划Agent"
+    action: "素材清单已生成，等待授权检查和人工确认"
+  - id: "assets_approved"
+    owner: "视频构建Agent"
+    action: "素材已确认，开始视频渲染"
+  - id: "rendered"
+    owner: "质检Agent"
+    action: "平台版本已渲染，开始自动质检"
+  - id: "quality_checked"
+    owner: "质检Agent"
+    action: "自动质检完成，检查失败则返修"
+  - id: "review_required"
+    owner: "用户"
+    action: "等待人工看成片并确认最终版本"
+  - id: "approved"
+    owner: "发布复盘Agent"
+    action: "成片已批准，等待填写发布信息"
+  - id: "published"
+    owner: "数据分析Agent"
+    action: "已人工确认发布，开始回收数据"
+  - id: "analyzed"
+    owner: "发布复盘Agent"
+    action: "复盘完成，结论进入后续选题"
+
+transitions:
+  - from: "idea"
+    to: "topic_approved"
+    approval: "topic"
+  - from: "topic_approved"
+    to: "script_drafted"
+    required_files:
+      - "narration/{content_id}/master.md"
+  - from: "script_drafted"
+    to: "script_approved"
+    approval: "script"
+  - from: "script_approved"
+    to: "waiting_audio"
+  - from: "waiting_audio"
+    to: "transcribed"
+    required_files:
+      - "voice/{content_id}/source.wav"
+      - "subtitles/{content_id}.srt"
+  - from: "transcribed"
+    to: "assets_planned"
+    required_files:
+      - "assets/{content_id}/plan.yaml"
+  - from: "assets_planned"
+    to: "assets_approved"
+    approval: "assets"
+    required_files:
+      - "assets/{content_id}/license-check.yaml"
+  - from: "assets_approved"
+    to: "rendered"
+    required_any:
+      - "renders/{content_id}/douyin.mp4"
+      - "renders/{content_id}/wechat_channels.mp4"
+      - "renders/{content_id}/xiaohongshu.mp4"
+  - from: "rendered"
+    to: "quality_checked"
+    required_files:
+      - "renders/{content_id}/quality.yaml"
+  - from: "quality_checked"
+    to: "review_required"
+    quality_result: "passed"
+  - from: "review_required"
+    to: "approved"
+    approval: "final"
+  - from: "approved"
+    to: "published"
+    approval: "publish"
+  - from: "published"
+    to: "analyzed"
+    required_files:
+      - "reports/{content_id}/retrospective.md"
+
+revision_transitions:
+  - from: "script_approved"
+    to: "script_drafted"
+    clear_approvals:
+      - "script"
+      - "assets"
+      - "final"
+      - "publish"
+  - from: "assets_approved"
+    to: "assets_planned"
+    clear_approvals:
+      - "assets"
+      - "final"
+      - "publish"
+  - from: "quality_checked"
+    to: "assets_planned"
+    reason: "素材、字幕或授权问题"
+    clear_approvals:
+      - "assets"
+      - "final"
+      - "publish"
+  - from: "quality_checked"
+    to: "assets_approved"
+    reason: "仅渲染或平台规格问题，等待重新渲染"
+    clear_approvals:
+      - "final"
+      - "publish"
+  - from: "review_required"
+    to: "script_drafted"
+    reason: "人工审核要求修改内容"
+    clear_approvals:
+      - "script"
+      - "assets"
+      - "final"
+      - "publish"
+
+approvals:
+  topic:
+    human_required: true
+  script:
+    human_required: true
+  assets:
+    human_required: true
+    requires_license_check: true
+  final:
+    human_required: true
+  publish:
+    human_required: true
+
+automation_rules:
+  - "任何Agent都不能代替用户勾选人工审批"
+  - "自动质检通过不等于人工审核通过"
+  - "最终成片批准和发布确认是两个独立检查点"
+  - "未取得授权或来源不明的素材不得进入渲染"
+  - "扫码、短信、滑块和二次验证由用户本人完成"
+  - "不自动绕过验证码、风控或平台限制"

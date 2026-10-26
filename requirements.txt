@@ -1,0 +1,5 @@
+# Main service and v2: Python 3.9 standard library only.
+# Existing media workers keep their own environments:
+# - .venv-faster-whisper (faster-whisper, Pillow)
+# - vendor/openvoice-venv (OpenVoice/MeloTTS/Torch)
+# Remotion dependencies are locked in remotion-app/package-lock.json.

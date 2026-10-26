@@ -1,0 +1,96 @@
+version: 1
+
+inputs:
+  strategy: "config/account-strategy.yaml"
+  platforms: "config/platforms.yaml"
+  analytics_report: "reports/2026-10-25-cross-platform-analysis.md"
+  content_card: "content_cards/{content_id}.yaml"
+
+outputs:
+  master: "narration/{content_id}/master.md"
+  douyin: "narration/{content_id}/douyin.md"
+  wechat_channels: "narration/{content_id}/wechat_channels.md"
+  xiaohongshu: "narration/{content_id}/xiaohongshu.md"
+  official_account_article: "narration/{content_id}/wechat_official_account.md"
+
+master_script:
+  short_video_duration: "90-180s"
+  one_primary_audience: true
+  one_core_problem: true
+  sections:
+    - id: "hook"
+      purpose: "用具体痛点、冲突或结果让目标用户知道这条内容与自己有关"
+      max_seconds: 8
+    - id: "context"
+      purpose: "交代必要场景，不铺陈行业大背景"
+      max_seconds: 20
+    - id: "core"
+      purpose: "最多3个判断或1个完整实操过程，给出方法、证据和边界"
+    - id: "action"
+      purpose: "总结可执行的下一步或提供清单，不用夸张承诺强迫关注"
+      max_seconds: 15
+  long_guide:
+    duration: "10-30min"
+    required_sections:
+      - "要完成的具体任务"
+      - "适用人群和前置准备"
+      - "分章节实操"
+      - "结果核验"
+      - "常见失败与人工复核"
+      - "清单或模板"
+    rule: "长攻略独立组织内容，不把无剪辑录屏或闲聊当作攻略"
+
+platform_adaptation:
+  douyin:
+    duration: "45-90s"
+    priority: "开头冲突、单一结论、具体场景和观看节奏"
+    rule: "删除非必要背景，保留证据，不用夸张标题替代内容"
+  wechat_channels:
+    duration: "90-180s"
+    priority: "完整判断、真实经历、企业案例和信任"
+    rule: "可以保留必要因果，但每段仍需推进一个问题"
+  xiaohongshu:
+    duration: "60-180s"
+    priority: "搜索关键词、清单、避坑和收藏价值"
+    required_outputs:
+      - "封面关键词"
+      - "笔记标题"
+      - "笔记正文"
+      - "清单或步骤"
+  wechat_official_account:
+    format: "article"
+    priority: "完整方法、图表、模板和长期搜索复用"
+    rule: "不是逐字转录口播，而是补齐上下文、步骤和参考来源"
+
+evidence_rules:
+  - "事实、个人经验、第三方案例和推测必须能区分"
+  - "不编造客户、收入、ROI、案例、数据或用户评价"
+  - "引用第三方数据时保留来源和日期"
+  - "涉及企业资料时先脱敏，不泄露客户、员工或商业敏感信息"
+  - "单条数据只能写成初步信号，不能说成稳定规律"
+  - "对标内容只学习结构，不复制逐字脚本和独特表达"
+
+review_checklist:
+  - "是否只服务一个主要人群并解决一个核心问题"
+  - "前8秒是否出现具体痛点、冲突或结果"
+  - "是否包含可核实证据、真实操作或明确经验边界"
+  - "是否能自然说出口，避免书面套话和连续抽象名词"
+  - "是否给出可执行的下一步"
+  - "平台版本是否独立成立，而不是缺失上下文的片段"
+  - "是否达到目标时长且没有为了凑时长重复表达"
+
+approvals:
+  topic:
+    before: "生成正式母稿"
+    human_required: true
+  script:
+    before: "进入录音和素材规划"
+    human_required: true
+
+natural_language_commands:
+  - command: "选1并生成脚本"
+    action: "确认候选选题，生成母稿和三平台口播版本，等待用户审核"
+  - command: "把开头改得更直接"
+    action: "保留核心观点与证据，只修改开头并重新检查时长"
+  - command: "确认脚本"
+    action: "记录人工审批，进入等待录音，不自动发布"

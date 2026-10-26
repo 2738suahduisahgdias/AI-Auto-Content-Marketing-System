@@ -1,0 +1,20 @@
+schema_version: 1
+captured_at: ""
+platform: ""
+account_name: ""
+account_id: ""
+profile_url: ""
+access:
+  mode: "public"
+  authentication: "none"
+  read_only: true
+profile:
+  followers: null
+  following: null
+  total_likes: null
+  works_count: null
+  biography: null
+content_items: []
+missing_fields: []
+collection_issues: []
+notes: ""

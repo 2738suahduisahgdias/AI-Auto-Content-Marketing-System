@@ -1,0 +1,91 @@
+schema_version: 1
+content_id: "{{content_id}}"
+status: "idea"
+created_at: "{{created_at}}"
+updated_at: "{{updated_at}}"
+
+topic:
+  title: "{{title}}"
+  pillar: "{{pillar}}"
+  audience: "{{audience}}"
+  pain_point: "{{pain_point}}"
+  angle: "{{angle}}"
+  hook: ""
+  target_platforms:
+    - "douyin"
+    - "wechat_channels"
+    - "xiaohongshu"
+  references: []
+
+script:
+  master_file: "narration/{{content_id}}/master.md"
+  douyin_file: "narration/{{content_id}}/douyin.md"
+  wechat_channels_file: "narration/{{content_id}}/wechat_channels.md"
+  xiaohongshu_file: "narration/{{content_id}}/xiaohongshu.md"
+
+audio:
+  source_file: "voice/{{content_id}}/source.wav"
+  subtitle_file: "subtitles/{{content_id}}.srt"
+  duration_seconds: 0
+
+assets:
+  plan_file: "assets/{{content_id}}/plan.yaml"
+  license_check_file: "assets/{{content_id}}/license-check.yaml"
+  source_dir: "assets/{{content_id}}/source"
+  generated_dir: "assets/{{content_id}}/generated"
+  approved_dir: "assets/{{content_id}}/approved"
+
+render:
+  douyin_output: "renders/{{content_id}}/douyin.mp4"
+  wechat_channels_output: "renders/{{content_id}}/wechat_channels.mp4"
+  xiaohongshu_output: "renders/{{content_id}}/xiaohongshu.mp4"
+  cover_dir: "covers/{{content_id}}"
+  quality_file: "renders/{{content_id}}/quality.yaml"
+
+quality:
+  result: "pending"
+  issues: []
+  checks:
+    subtitles: "pending"
+    audio: "pending"
+    visual: "pending"
+    copyright: "pending"
+    platform_specs: "pending"
+
+approvals:
+  topic:
+    approved: false
+    by: ""
+    at: ""
+  script:
+    approved: false
+    by: ""
+    at: ""
+  assets:
+    approved: false
+    by: ""
+    at: ""
+  final:
+    approved: false
+    by: ""
+    at: ""
+  publish:
+    approved: false
+    by: ""
+    at: ""
+
+publish:
+  douyin_status: "not_started"
+  wechat_channels_status: "not_started"
+  xiaohongshu_status: "not_started"
+  wechat_official_account_status: "not_started"
+  published_urls: []
+
+analytics:
+  two_hours: {}
+  one_day: {}
+  three_days: {}
+  seven_days: {}
+  retrospective_file: "reports/{{content_id}}/retrospective.md"
+
+notes: ""

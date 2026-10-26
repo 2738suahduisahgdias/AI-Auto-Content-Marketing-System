@@ -1,0 +1,306 @@
+{
+  "version": 1,
+  "exported_at": "2026-10-25",
+  "topics": [],
+  "accounts": [
+    {
+      "platform": "douyin",
+      "account_name": "示例账号（请导入）",
+      "account_id": null,
+      "captured_at": "",
+      "profile": {},
+      "content_items": [],
+      "collection_issues": [
+        "尚未导入账号数据"
+      ],
+      "missing_fields": []
+    },
+    {
+      "platform": "xiaohongshu",
+      "account_name": "示例账号（请导入）",
+      "account_id": null,
+      "captured_at": "",
+      "profile": {},
+      "content_items": [],
+      "collection_issues": [
+        "尚未导入账号数据"
+      ],
+      "missing_fields": []
+    },
+    {
+      "platform": "wechat_channels",
+      "account_name": "示例账号（请导入）",
+      "account_id": null,
+      "captured_at": "",
+      "profile": {},
+      "content_items": [],
+      "collection_issues": [
+        "尚未导入账号数据"
+      ],
+      "missing_fields": []
+    },
+    {
+      "platform": "wechat_official_account",
+      "account_name": "示例账号（请导入）",
+      "account_id": null,
+      "captured_at": "",
+      "profile": {},
+      "content_items": [],
+      "collection_issues": [
+        "尚未导入账号数据"
+      ],
+      "missing_fields": []
+    }
+  ],
+  "douyin_favorite_collections": {
+    "platform": "douyin",
+    "source": "",
+    "captured_at": "",
+    "collection_mode": "示例收藏夹配置",
+    "items": []
+  },
+  "douyin_hotspots": {
+    "platform": "douyin",
+    "source": "https://creator.douyin.com/creator-micro/home",
+    "source_name": "抖音创作者中心首页热点榜单",
+    "captured_at": "",
+    "collection_mode": "用户登录后只读导入",
+    "refresh_status": "示例快照，未接入自动刷新",
+    "items": []
+  },
+  "strategy": {
+    "version": 1,
+    "brand": {
+      "name": "刘量.",
+      "positioning": "AI落地实战派：帮助企业主找到值得做的AI场景，帮助从业者和FDE学会解决真实业务问题",
+      "content_promise": "不只介绍AI工具，更讲清AI如何进入工作流、如何交付、如何衡量结果",
+      "primary_goal": "沉淀企业AI培训、咨询与落地相关的精准关注和咨询线索",
+      "tone": [
+        "实战",
+        "直接",
+        "有判断",
+        "少讲概念",
+        "不夸大效果",
+        "尊重真实业务约束"
+      ]
+    },
+    "core_pain_points": [
+      {
+        "id": "where_to_start",
+        "title": "知道AI有用，但不知道从哪里开始",
+        "underlying_problem": "不会把业务问题拆成适合AI落地的具体场景"
+      },
+      {
+        "id": "who_can_help",
+        "title": "不知道自己做、找服务商，还是招人",
+        "underlying_problem": "缺少工具、预算、团队和服务商的选择标准"
+      },
+      {
+        "id": "how_to_get_results",
+        "title": "试过AI，但效果不稳定，也无法持续",
+        "underlying_problem": "缺少流程改造、数据治理、员工采用、验收指标和复盘机制"
+      }
+    ],
+    "audiences": {
+      "business_owners": {
+        "priority": 1,
+        "description": "想做AI转型、希望获得实际业务结果的企业主",
+        "pains": [
+          "不知道哪些业务环节值得先用AI",
+          "担心投入没有回报，花冤枉钱买概念",
+          "不知道选工具、找服务商还是自建团队",
+          "不知道项目预算、周期和合理验收标准",
+          "担心数据安全、权限、合规和商业秘密泄露",
+          "现有系统老旧，数据分散，AI接不进业务流程",
+          "员工不会用或不愿用，培训结束就停止",
+          "内部缺少负责人、路线图和持续推进机制"
+        ]
+      },
+      "practitioners": {
+        "priority": 2,
+        "description": "希望把AI变成岗位能力和职业机会的从业者",
+        "pains": [
+          "教程太多太碎，不知道先学什么",
+          "会玩工具，但不会解决完整工作问题",
+          "不知道企业真正愿意为哪些AI能力付费",
+          "自己的岗位与AI结合后没有清晰升级路径",
+          "缺少真实项目、案例和可展示的作品集",
+          "担心被替代，却不知道如何转型",
+          "学习后没有业务反馈，难以判断自己是否掌握"
+        ]
+      },
+      "fde": {
+        "priority": 3,
+        "description": "希望进入企业AI落地、交付和Forward Deployed Engineering相关工作的专业人群",
+        "pains": [
+          "有技术能力，但缺少行业语境和业务诊断能力",
+          "不会做需求澄清、干系人沟通和交付边界管理",
+          "不熟悉遗留系统、权限、数据治理和安全要求",
+          "容易做出演示，却难以进入生产环境",
+          "不知道如何定义业务指标、验收标准和持续运营方式",
+          "缺少从PoC到生产落地的完整案例和可信背书"
+        ]
+      }
+    },
+    "content_pillars": {
+      "enterprise_ai": {
+        "ratio": 0.4,
+        "goal": "建立企业落地判断力，吸引企业主和FDE",
+        "topics": [
+          "真实场景选择与案例拆解",
+          "预算、ROI、风险与验收",
+          "从培训到流程改造",
+          "从PoC到生产交付"
+        ]
+      },
+      "ai_learning": {
+        "ratio": 0.3,
+        "goal": "让普通人完成一个可复用的工作结果",
+        "topics": [
+          "岗位工作流实操",
+          "AI工具选择与避坑",
+          "零基础跟做攻略",
+          "作品集与能力成长"
+        ]
+      },
+      "ai_marketing": {
+        "ratio": 0.2,
+        "goal": "连接AI能力与获客结果",
+        "topics": [
+          "AI内容生产工作流",
+          "企业短视频获客",
+          "私域承接与线索培育",
+          "内容数据复盘"
+        ]
+      },
+      "personal_thinking": {
+        "ratio": 0.1,
+        "goal": "建立真实、有判断的个人品牌",
+        "topics": [
+          "AI转型中的选择与取舍",
+          "创业、交付和职业成长反思",
+          "技术变化中的焦虑与长期主义"
+        ]
+      }
+    },
+    "editorial_rules": [
+      "每条视频只服务一个主要人群，只解决一个核心问题",
+      "优先使用具体场景、操作过程、案例或模板，不做纯观点空谈",
+      "普通短视频控制在3分钟以内，长攻略单独制作，不强行压缩",
+      "案例中的客户、数据、收入和效果必须可核实，不编造结果",
+      "个人思考必须连接AI、工作、创业或成长，不做泛情感内容",
+      "不把工具演示包装成企业落地，主动讲权限、数据、流程和人的约束"
+    ],
+    "content_funnel": {
+      "discovery": "抖音、小红书、视频号短视频",
+      "trust": "视频号完整案例与公众号长文",
+      "save_and_share": "清单、模板、流程图和跟做攻略",
+      "conversion": "公众号深度内容与自然咨询，不自动骚扰私信用户"
+    }
+  },
+  "platforms": {
+    "version": 1,
+    "platforms": {
+      "wechat_channels": {
+        "account_name": "刘量.",
+        "account_id": "",
+        "creator_url": "https://channels.weixin.qq.com/platform/post/list",
+        "url": "",
+        "enabled": true,
+        "role": "信任沉淀、企业案例和完整观点表达",
+        "short_video_duration": "90-180s",
+        "long_video_duration": "10-30min",
+        "content_focus": [
+          "企业AI落地案例",
+          "完整方法论",
+          "个人判断与创业思考"
+        ]
+      },
+      "douyin": {
+        "account_name": "刘量",
+        "account_id": "",
+        "canonical_url": "",
+        "url": "",
+        "enabled": true,
+        "role": "扩大曝光，测试选题、开头和用户反应",
+        "short_video_duration": "45-90s",
+        "content_focus": [
+          "反常识误区",
+          "具体问题与直接结论",
+          "强场景案例和实操片段"
+        ]
+      },
+      "xiaohongshu": {
+        "account_name": "刘量",
+        "account_id": "",
+        "creator_url": "https://creator.xiaohongshu.com/new/note-manager",
+        "url": "",
+        "enabled": true,
+        "role": "搜索流量、收藏和精准获客",
+        "short_video_duration": "60-180s",
+        "content_focus": [
+          "清单和避坑指南",
+          "跟做教程",
+          "关键词明确的经验总结"
+        ]
+      },
+      "wechat_official_account": {
+        "account_name": "老刘带你搞流量",
+        "url": "",
+        "enabled": true,
+        "role": "长文沉淀、搜索复用、信任建立和自然咨询承接",
+        "content_focus": [
+          "短视频扩展长文",
+          "完整攻略和模板",
+          "案例复盘与方法论"
+        ]
+      }
+    },
+    "publish_defaults": {
+      "videos_per_week_min": 3,
+      "videos_per_week_target": 4,
+      "videos_per_week_max": 5,
+      "long_guides_per_month": 2,
+      "master_short_video_duration": "90-180s",
+      "long_guide_duration": "10-30min",
+      "human_review_required": true,
+      "auto_publish": false
+    },
+    "weekly_rhythm": [
+      {
+        "slot": 1,
+        "pillar": "enterprise_ai",
+        "topic_type": "企业场景或案例"
+      },
+      {
+        "slot": 2,
+        "pillar": "ai_learning",
+        "topic_type": "岗位实操"
+      },
+      {
+        "slot": 3,
+        "pillar": "ai_marketing",
+        "topic_type": "AI获客工作流"
+      },
+      {
+        "slot": 4,
+        "pillar": "enterprise_ai_or_ai_learning",
+        "topic_type": "根据数据补一条企业案例或教程"
+      },
+      {
+        "slot": 5,
+        "pillar": "personal_thinking",
+        "topic_type": "可选，用真实思考替代低质量凑更"
+      }
+    ],
+    "repurposing": {
+      "long_guide_outputs": [
+        "1条10-30分钟完整攻略",
+        "2-4条独立短视频",
+        "1篇公众号长文",
+        "1份清单或模板"
+      ],
+      "rule": "每个短视频切片必须能独立理解，不直接使用缺乏上下文的长视频片段"
+    }
+  }
+}

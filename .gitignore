@@ -1,0 +1,33 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+*.log
+*.pid
+
+.venv*/
+vendor/
+node_modules/
+remotion-app/node_modules/
+remotion-app/dist/
+remotion-app/out/
+remotion-app/public/assets/
+
+# Local databases and snapshots. Only the sanitized starter file is tracked.
+data/*
+!data/seed.example.json
+
+# User media, generated outputs, research data and local backups.
+assets/
+voice/
+voice_profiles/
+subtitles/
+renders/
+covers/
+analytics/
+reports/
+narration/
+content_cards/
+caption-test-*/

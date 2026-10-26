@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>内容工作台 v2</title><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/v2.css"></head>
+<body>
+<aside class="sidebar"><div class="brand"><span class="brand-mark">C</span><div><strong>内容工作台</strong><small>v2 · 独立文章与视频</small></div></div><nav><button class="nav-item active" data-view="today">今天</button><button class="nav-item" data-view="article">文章</button><button class="nav-item" data-view="video">视频</button><button class="nav-item" data-view="jobs">任务队列</button><a class="nav-item" href="/legacy">旧版只读</a></nav><div class="side-bottom"><div class="local-status"><i></i><div>本机运行<small>版本化内容 · 持久任务</small></div></div></div></aside>
+<main><header class="topbar"><div><p>AI 内容营销工作台</p><h1 id="view-title">今天</h1></div><button class="button" data-action="refresh">刷新</button></header><div id="notice" class="notice" role="status" aria-live="polite"></div><section id="today" class="view active"></section><section id="article" class="view"></section><section id="video" class="view"></section><section id="jobs" class="view"></section></main>
+<div id="loading" class="loading">正在读取 v2 工作流…</div><script src="/v2.js"></script>
+</body></html>

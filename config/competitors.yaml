@@ -1,0 +1,207 @@
+version: 2
+verified_at: "2026-10-24"
+status: "活跃候选池；已核对近期公开内容，平台主页与短视频更新频率仍需分别核验"
+verification_scope: "日期证据来自官网、公开内容主页或播客，不代表其抖音、视频号、小红书均以相同频率更新"
+
+activity_policy:
+  preferred_recency_days: 30
+  maximum_recency_days: 90
+  review_every_days: 14
+  rule: "优先采用账号自己发布的内容日期；商业推荐榜单、网站版权年份和搜索页面更新时间不能单独证明活跃"
+
+active_benchmarks:
+  - name: "红烁AI"
+    group: "直接业务对标"
+    priority: 1
+    focus: "企业AI培训、岗位落地、FDE培养"
+    recent_content:
+      date: "2026-10-23"
+      title: "AI培训有没有用，拿作品说话：红烁AI企业AI培训把部门任务做成可演示工具"
+      url: "https://www.hongshuoai.com/articles/"
+      channel: "官网内容页"
+    monitor:
+      - "企业主和HR的购买顾虑"
+      - "培训成果、验收和课后陪跑"
+      - "FDE、数据安全和真实岗位任务"
+    platform_profiles: []
+
+  - name: "三节课"
+    group: "直接业务对标"
+    priority: 1
+    focus: "企业AI培训、职场技能与课程内容产品化"
+    recent_content:
+      date: "2026-10-23"
+      title: "冲业绩、写总结、做预算…年底忙不过来？快让全员用上AI！"
+      url: "https://mp.sohu.com/profile?xpt=c2Fuamlla2VAc29odS5jb20="
+      channel: "搜狐公开内容主页"
+    monitor:
+      - "企业团队学习的活动设计"
+      - "真实岗位任务如何转成课程"
+      - "资料领取与课程承接"
+    platform_profiles: []
+
+  - name: "CAIE研习社"
+    group: "直接业务对标"
+    priority: 1
+    focus: "AI岗位能力、企业培训、认证与实操内容"
+    recent_content:
+      date: "2026-10-23"
+      title: "如何成为AI技术应用工程师？智能营销与数据方向一次讲清"
+      url: "https://www.caieglobal.com/ainews.html"
+      channel: "CAIE官网；页面同时提供视频号入口"
+    monitor:
+      - "从招聘需求反推AI能力图谱"
+      - "AI营销、岗位实操和职业转型"
+      - "免费内容、训练营和认证的承接"
+    platform_profiles: []
+
+  - name: "混沌学园"
+    group: "直接业务与企业家内容对标"
+    priority: 1
+    focus: "企业AI认知、商业案例与企业家课程"
+    recent_content:
+      date: "2026-10-14"
+      title: "AI带给企业的，99%都是幻觉"
+      url: "https://news.qq.com/rain/a/20261014A0B8U700"
+      channel: "腾讯新闻认证创作者内容"
+    monitor:
+      - "企业家视角的冲突性标题"
+      - "视频访谈转深度文章的方式"
+      - "企业AI战略、组织能力与会尖锐观点"
+    platform_profiles: []
+
+  - name: "程序员晚枫"
+    group: "FDE与个人教学对标"
+    priority: 1
+    focus: "AI编程、自动化办公、FDE实战课"
+    recent_content:
+      date: "2026-10-14"
+      title: "FDE前沿部署工程师实战课·课程总览"
+      url: "https://www.python4office.cn/course/AI/fde/2026-10-14-fde-overview/"
+      channel: "个人官网；2026-10-18仍有其他新内容"
+    monitor:
+      - "FDE课程的知识结构"
+      - "普通人到AI交付能力的进阶路径"
+      - "教程、开源项目与社群的联动"
+    platform_profiles: []
+
+  - name: "Datawhale"
+    group: "学习者与FDE社群对标"
+    priority: 2
+    focus: "AI开源学习、Agent实践、开发者活动与FDE生态"
+    recent_content:
+      date: "2026-10-21"
+      title: "Personal Agent到底能帮我们做什么？"
+      url: "https://timeline.sohu.com/news/YOSsCjSA1N"
+      channel: "Datawhale公开内容"
+    monitor:
+      - "学习者如何参与真实项目"
+      - "共学、活动和内容生产的结合"
+      - "Agent与FDE人才的成长路径"
+    platform_profiles: []
+
+  - name: "千匠网络"
+    group: "企业AI与营销案例对标"
+    priority: 2
+    focus: "产业AI、企业智能体、AI营销与规模化落地"
+    recent_content:
+      date: "2026-10-09"
+      title: "千匠网络十周年：从产业数字化，到产业AI"
+      url: "https://blog.csdn.net/qianjiangcloud"
+      channel: "CSDN公开内容主页"
+    monitor:
+      - "企业案例与行业场景"
+      - "AI营销活动的选题和承接"
+      - "从产品功能转向业务结果的表达"
+    platform_profiles: []
+
+  - name: "AI炼金术"
+    group: "深度内容对标"
+    priority: 2
+    focus: "企业AI案例、创业访谈与AI工作方式"
+    recent_content:
+      date: "2026-10-14"
+      title: "AI帮我干完了20年的活儿，我却感觉像坐牢"
+      url: "https://podcasts.apple.com/mo/podcast/id1671502201?i=1000796322779"
+      channel: "播客；节目另有公众号和视频号"
+    monitor:
+      - "真实AI使用经验与反常识观点"
+      - "长访谈的观点提炼"
+      - "企业案例和个人思考的结合"
+    platform_profiles: []
+
+  - name: "十字路口Crossing"
+    group: "深度内容对标"
+    priority: 2
+    focus: "AI创业、商业判断、创作者与企业案例"
+    recent_content:
+      date: "2026-10-19"
+      title: "新的创业机会，正在Claude Code和Codex周围长出来"
+      url: "https://m.douban.com/podcast/subject/36935709/"
+      channel: "公开播客主页"
+    monitor:
+      - "AI热点的商业化解读"
+      - "人物故事与专业判断的平衡"
+      - "适合短视频切片的问题设置"
+    platform_profiles: []
+
+  - name: "数字生命卡兹克"
+    group: "内容表达对标；非直接业务竞品"
+    priority: 3
+    focus: "AI工具实测、技术热点与个人化表达"
+    recent_content:
+      date: "2026-10-12"
+      title: "AI开始逆向一切，你电脑里的每个软件都要被迫开源了"
+      url: "https://news.qq.com/rain/a/20261012A02X3700"
+      channel: "腾讯新闻创作者内容"
+    monitor:
+      - "标题和开头的信息增量"
+      - "工具实测的证据呈现"
+      - "复杂技术如何讲得通俗"
+    platform_profiles: []
+
+method_references:
+  - name: "余文皓 WenHao Yu"
+    url: "https://yu-wenhao.com/zh-TW/workshop/"
+    use: "学习实作课程、学员成果和陪跑交付；不因旧文章直接判断当前内容策略"
+  - name: "汇流顾问 Confluence Partners"
+    url: "https://confluence-partners.ai/cases/"
+    use: "学习企业案例与方法论呈现；不纳入近期活跃账号统计"
+
+excluded_from_active_pool:
+  - name: "熵恩咨询 / 小虎"
+    reason: "业务方向匹配，但本轮未核到近90天的可靠账号内容日期"
+  - name: "AI破局俱乐部"
+    reason: "本轮搜索结果不足以核验官方账号近期内容，不采用课程资源站日期代替"
+  - name: "秋叶大叔"
+    reason: "有2026年活动与出版消息，但本轮未核到适合作为依据的近期短视频内容"
+  - name: "馒头商学院·星河战队"
+    reason: "业务方向匹配，但官网版权年份不能证明近期内容活跃"
+
+next_platform_verification:
+  platforms:
+    - "视频号"
+    - "抖音"
+    - "小红书"
+  required_fields:
+    - "官方账号名称"
+    - "主页链接或平台内唯一标识"
+    - "最近10条内容日期"
+    - "近30天发布数量"
+    - "主要选题与内容形式"
+  rule: "只有公开网页活跃而短视频平台长期不更新的账号，保留为选题源，不用于短视频表现对标"
+
+review_rules:
+  compare_on:
+    - "目标用户"
+    - "近30天高频选题"
+    - "标题和开头"
+    - "内容结构"
+    - "案例与证据"
+    - "发布频率"
+    - "收藏、转发和咨询动机"
+    - "产品承接方式"
+  do_not_copy:
+    - "逐字脚本"
+    - "他人案例或未经授权素材"
+    - "无法核实的效果数字"

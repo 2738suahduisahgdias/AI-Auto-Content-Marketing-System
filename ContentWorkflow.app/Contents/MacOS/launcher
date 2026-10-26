@@ -1,0 +1,42 @@
+#!/bin/bash
+set -u
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+PID_FILE="$ROOT/data/server.pid"
+LOG_FILE="$ROOT/data/server.log"
+URL="http://127.0.0.1:8765"
+mkdir -p "$ROOT/data"
+
+if [ -f "$PID_FILE" ]; then
+  PID="$(/bin/cat "$PID_FILE")"
+  if /bin/kill -0 "$PID" 2>/dev/null; then
+    /usr/bin/open "$URL"
+    exit 0
+  fi
+  /bin/rm -f "$PID_FILE"
+fi
+
+if /usr/bin/python3 -c 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8765/api/bootstrap", timeout=1)' >/dev/null 2>&1; then
+  /usr/bin/open "$URL"
+  exit 0
+fi
+
+cd "$ROOT" || exit 1
+/usr/bin/nohup /usr/bin/python3 "$ROOT/app.py" --port 8765 >>"$LOG_FILE" 2>&1 &
+PID=$!
+echo "$PID" >"$PID_FILE"
+
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+  if /usr/bin/python3 -c 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8765/api/bootstrap", timeout=1)' >/dev/null 2>&1; then
+    /usr/bin/open "$URL"
+    exit 0
+  fi
+  if ! /bin/kill -0 "$PID" 2>/dev/null; then
+    /bin/rm -f "$PID_FILE"
+    /usr/bin/osascript -e 'display alert "内容工作流未能启动" message "请检查 data/server.log 中的错误信息。"'
+    exit 1
+  fi
+  /bin/sleep 1
+done
+
+/usr/bin/osascript -e 'display alert "内容工作流启动超时" message "请稍后再次双击，或检查 data/server.log。"'
+exit 1

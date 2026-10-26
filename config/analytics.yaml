@@ -1,0 +1,115 @@
+version: 1
+mode: "read_only"
+
+data_policy:
+  missing_value: null
+  missing_meaning: "未读取、平台未提供或读取失败；不得按0参与计算"
+  record_source_url: true
+  record_captured_at: true
+  separate_observed_and_derived: true
+  save_passwords: false
+  save_cookies: false
+  bypass_captcha_or_risk_control: false
+  auto_publish: false
+
+collection:
+  own_accounts:
+    douyin:
+      enabled: true
+      public_profile: true
+      backend_analytics: "manual_user_login_required"
+    wechat_channels:
+      enabled: true
+      public_profile: false
+      backend_analytics: "manual_user_login_required"
+    xiaohongshu:
+      enabled: true
+      public_profile: true
+      backend_analytics: "manual_user_login_required"
+    wechat_official_account:
+      enabled: true
+      public_profile: true
+      backend_analytics: "manual_user_login_required"
+  competitor_accounts:
+    recent_window_days: 30
+    max_items_per_account: 10
+    prioritize_verified_official_profiles: true
+    old_content_usage: "仅归档为方法参考，不进入近期表现对比"
+  rate_limits:
+    respect_platform_limits: true
+    stop_on_service_error: true
+    max_public_refreshes_per_run: 1
+
+metrics:
+  profile:
+    - "followers"
+    - "following"
+    - "total_likes"
+    - "works_count"
+  public_content:
+    - "published_at"
+    - "title"
+    - "url"
+    - "duration_seconds"
+    - "likes"
+    - "comments"
+    - "favorites"
+    - "shares"
+  own_backend_content:
+    - "views"
+    - "average_watch_seconds"
+    - "completion_rate"
+    - "average_play_percentage"
+    - "cover_click_through_rate"
+    - "two_second_bounce_rate"
+    - "three_second_retention_rate"
+    - "followers_gained"
+    - "profile_visits"
+    - "new_followers"
+    - "private_messages"
+    - "qualified_leads"
+  derived:
+    engagement_rate: "(likes + comments + favorites + shares) / views；仅当views和分子完整时计算"
+    save_rate: "favorites / views；仅当两个字段均存在时计算"
+    share_rate: "shares / views；仅当两个字段均存在时计算"
+    content_follower_conversion_rate: "followers_gained / views；仅当两个字段均存在时计算"
+    follower_conversion_rate: "new_followers / profile_visits；仅当两个字段均存在时计算"
+    lead_conversion_rate: "qualified_leads / profile_visits；仅当两个字段均存在时计算"
+
+analysis_rules:
+  - "跨平台不直接比较点赞、播放等绝对数值"
+  - "优先比较同账号、同平台、相近发布时长内的数据"
+  - "对标账号缺失播放量和完播率时，只分析选题、标题、结构和公开互动"
+  - "企业内容不能只看流量，同时评估目标用户匹配度、收藏、转发、主页访问和有效咨询"
+  - "单条爆款只能形成假设，至少结合3条同类内容再总结规律"
+  - "推荐选题必须能追溯到具体内容、用户评论或自有账号数据"
+  - "所有结论区分事实、推断和待验证假设"
+
+snapshots:
+  - id: "baseline"
+    after_publish: "发布前历史基线"
+  - id: "two_hours"
+    after_publish: "2小时"
+  - id: "one_day"
+    after_publish: "24小时"
+  - id: "three_days"
+    after_publish: "3天"
+  - id: "seven_days"
+    after_publish: "7天"
+
+topic_scoring:
+  audience_fit: 25
+  pain_intensity: 20
+  evidence_strength: 15
+  recent_performance: 15
+  business_relevance: 15
+  production_feasibility: 10
+  rule: "近期表现数据缺失时不虚构得分，降低证据强度并标注待验证"
+
+natural_language_commands:
+  - command: "复盘这周的数据"
+    action: "汇总自有账号快照、内容表现和有效咨询，生成事实、推断与下周建议"
+  - command: "分析最近的对标账号"
+    action: "只读取近30天活跃内容，更新选题和表达参考"
+  - command: "根据数据给我下周选题"
+    action: "结合账号策略、近期内容和历史复盘生成候选选题，等待用户确认"

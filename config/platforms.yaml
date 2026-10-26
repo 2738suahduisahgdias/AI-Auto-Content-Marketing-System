@@ -1,0 +1,84 @@
+version: 1
+
+platforms:
+  wechat_channels:
+    account_name: "刘量."
+    account_id: "sph2Yx4vWYs9x4U"
+    creator_url: "https://channels.weixin.qq.com/platform/post/list"
+    url: ""
+    enabled: true
+    role: "信任沉淀、企业案例和完整观点表达"
+    short_video_duration: "90-180s"
+    long_video_duration: "10-30min"
+    content_focus:
+      - "企业AI落地案例"
+      - "完整方法论"
+      - "个人判断与创业思考"
+  douyin:
+    account_name: "刘量"
+    account_id: "14076505"
+    canonical_url: "https://www.douyin.com/user/MS4wLjABAAAAguJne4jffmpYCHAubx7R3rVxxT9GmRoc26PS9fygm70"
+    url: "https://v.douyin.com/v3wGf8Y5Dwk/"
+    enabled: true
+    role: "扩大曝光，测试选题、开头和用户反应"
+    short_video_duration: "45-90s"
+    content_focus:
+      - "反常识误区"
+      - "具体问题与直接结论"
+      - "强场景案例和实操片段"
+  xiaohongshu:
+    account_name: "刘量"
+    account_id: "18426218140"
+    creator_url: "https://creator.xiaohongshu.com/new/note-manager"
+    url: ""
+    enabled: true
+    role: "搜索流量、收藏和精准获客"
+    short_video_duration: "60-180s"
+    content_focus:
+      - "清单和避坑指南"
+      - "跟做教程"
+      - "关键词明确的经验总结"
+  wechat_official_account:
+    account_name: "老刘带你搞流量"
+    url: ""
+    enabled: true
+    role: "长文沉淀、搜索复用、信任建立和自然咨询承接"
+    content_focus:
+      - "短视频扩展长文"
+      - "完整攻略和模板"
+      - "案例复盘与方法论"
+
+publish_defaults:
+  videos_per_week_min: 3
+  videos_per_week_target: 4
+  videos_per_week_max: 5
+  long_guides_per_month: 2
+  master_short_video_duration: "90-180s"
+  long_guide_duration: "10-30min"
+  human_review_required: true
+  auto_publish: false
+
+weekly_rhythm:
+  - slot: 1
+    pillar: "enterprise_ai"
+    topic_type: "企业场景或案例"
+  - slot: 2
+    pillar: "ai_learning"
+    topic_type: "岗位实操"
+  - slot: 3
+    pillar: "ai_marketing"
+    topic_type: "AI获客工作流"
+  - slot: 4
+    pillar: "enterprise_ai_or_ai_learning"
+    topic_type: "根据数据补一条企业案例或教程"
+  - slot: 5
+    pillar: "personal_thinking"
+    topic_type: "可选，用真实思考替代低质量凑更"
+
+repurposing:
+  long_guide_outputs:
+    - "1条10-30分钟完整攻略"
+    - "2-4条独立短视频"
+    - "1篇公众号长文"
+    - "1份清单或模板"
+  rule: "每个短视频切片必须能独立理解，不直接使用缺乏上下文的长视频片段"

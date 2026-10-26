@@ -1,0 +1,27 @@
+schema_version: 1
+observed_at: ""
+platform: ""
+account_name: ""
+account_url: ""
+content:
+  title: ""
+  url: ""
+  published_at: null
+  duration_seconds: null
+  content_type: null
+metrics:
+  views: null
+  likes: null
+  comments: null
+  favorites: null
+  shares: null
+evidence:
+  source_url: ""
+  source_type: "public_page"
+missing_fields:
+  - "views"
+  - "likes"
+  - "comments"
+  - "favorites"
+  - "shares"
+notes: ""
