@@ -1,6 +1,6 @@
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
-const state = { data: null, view: "today", taskId: null, account: "douyin", testing: false, generating: false, ttsTesting: false, ttsGenerating: false, transcribing: false, whisperxTesting: false, cloneTesting: false, assetGenerating: false, assetTesting: false, rendering: false, renderTesting: false };
+const state = { data: null, topicsData: null, topicView: "industry", topicBusy: false, topicDetail: null, view: "today", taskId: null, account: "douyin", testing: false, generating: false, ttsTesting: false, ttsGenerating: false, transcribing: false, whisperxTesting: false, cloneTesting: false, assetGenerating: false, assetTesting: false, rendering: false, renderTesting: false };
 const platformNames = { douyin: "抖音", wechat_channels: "视频号", xiaohongshu: "小红书", wechat_official_account: "公众号" };
 const pillarNames = { enterprise_ai: "企业 AI", ai_learning: "AI 学习", ai_marketing: "AI 获客", personal_thinking: "个人思考" };
 const audienceNames = { business_owners: "企业主", practitioners: "AI 从业者", fde: "FDE" };
@@ -17,14 +17,20 @@ const shortDate = value => value ? esc(String(value).slice(0, 10)) : "未读取"
 const selectedTask = () => state.data.tasks.find(task => task.content_id === state.taskId);
 
 async function api(path, options = {}) {
+  const method = options.method || "GET";
+  if (method !== "GET" && state.topicsData?.csrf_token) {
+    options.headers = { "X-CSRF-Token": state.topicsData.csrf_token, "Idempotency-Key": crypto.randomUUID(), ...(options.headers || {}) };
+  }
   const response = await fetch(path, options);
   let result;
   try { result = await response.json(); } catch { result = {}; }
   if (!response.ok) {
-    const error = new Error(result.error || `请求未完成（HTTP ${response.status}），请检查当前页面后重试`);
-    error.field = result.field || "workflow";
-    error.action = result.action || "核对当前步骤和输入后重试";
-    error.item = result.item;
+    const details = typeof result.error === "object" ? result.error : {};
+    const error = new Error(details.message || result.error || `请求未完成（HTTP ${response.status}），请检查当前页面后重试`);
+    error.code = details.code;
+    error.field = details.field || result.field || "workflow";
+    error.action = details.action || result.action || "核对当前步骤和输入后重试";
+    error.item = details.item || result.item;
     error.status = response.status;
     throw error;
   }
@@ -44,8 +50,14 @@ function notify(message, error = false) {
   clearTimeout(notify.timer);
   notify.timer = setTimeout(() => box.className = "notice", error ? 12000 : 3500);
 }
+async function refreshTopics(render = true) {
+  state.topicsData = await api("/api/topics/bootstrap");
+  if (render) renderTopics();
+  return state.topicsData;
+}
 async function refresh(message) {
   state.data = await api("/api/bootstrap");
+  try { await refreshTopics(false); } catch (error) { state.topicsData = { load_error: error.message, settings: {}, sources: {}, recommendations: {}, jobs: [] }; }
   if (!state.taskId || !selectedTask()) state.taskId = state.data.tasks[0]?.content_id || null;
   renderAll();
   if (message) notify(message);
@@ -91,17 +103,70 @@ function taskRow(task) {
   return `<article class="card task-row"><div><h3>${esc(task.title)}</h3><small>${esc(task.content_id)} · ${esc(pillarNames[task.pillar])} / ${esc(audienceNames[task.audience])}</small></div><span class="badge ${task.state === "analyzed" ? "green" : task.state === "review_required" ? "orange" : ""}">${esc(stateNames[task.state])}</span><span class="next-label">${esc(nextNames[task.state])}</span><button class="button small" data-open-task="${task.content_id}">打开任务</button></article>`;
 }
 
+const topicViewNames = { industry: "行业热点", hot: "热点选题", featured: "精选选题", competitor: "竞品选题", high_praise: "高赞选题" };
+function topicRecommendations(agent) {
+  const items = state.topicsData?.recommendations?.[agent] || [];
+  if (!items.length) return `<div class="empty"><strong>还没有${agent === "industry" ? "行业" : "抖音"}今日推荐</strong>先同步真实快照，再运行对应选题Agent。</div>`;
+  return `<div class="topic-grid">${items.map(item => `<article class="card topic"><div class="topic-meta"><span class="badge green">${esc(pillarNames[item.pillar] || "企业 AI")}</span><span class="badge">${esc(audienceNames[item.audience] || "企业主")}</span></div><h3>${esc(item.title)}</h3><p>${esc(item.reason)}</p><div class="evidence"><p><strong>差异化切入：</strong>${esc(item.angle)}</p>${(item.uncertainties || []).map(value => `<small>待核实：${esc(value)}</small>`).join("")}</div><small>${esc(item.created_at || "")}</small></article>`).join("")}</div>`;
+}
+function researchCard(item, allowAnalyze = true) {
+  const meta = item.metadata || {};
+  return `<article class="card hotspot"><div class="hotspot-top">${meta.rank ? `<span class="hotspot-rank">#${meta.rank}</span>` : ""}<strong>${esc(meta.heat || meta.source_name || "快照")}</strong><span class="badge ${item.analysis_status === "succeeded" ? "green" : ""}">${esc(item.analysis_status === "succeeded" ? "已拆解" : "仅快照")}</span></div><h3>${esc(item.title)}</h3><p>${esc(meta.author || meta.published_at || item.collections?.join(" / ") || "页面可见元数据")}</p><small>采集于 ${esc(item.last_seen_at || "未读取")} · 同步不下载视频</small><div class="topic-footer"><a class="button small" href="${esc(item.url)}" target="_blank" rel="noreferrer">原链接观看 ↗</a><button class="button small" data-create-research="${item.id}">创建任务</button>${allowAnalyze ? `<button class="button small" data-analyze-item="${item.id}">下载并拆解</button>` : ""}<button class="button small" data-detail-item="${item.id}">${item.analysis_status === "succeeded" ? "查看拆解" : "详情"}</button></div></article>`;
+}
+function syncSummary(last) {
+  let stats = {}; try { stats = JSON.parse(last.stats_json || "{}"); } catch (_) {}
+  const errors = (stats.errors || []).map(item => item.code === "LOGIN_REQUIRED" ? "收藏需要登录" : item.code).filter(Boolean);
+  return `热榜 ${stats.hot ?? 0}/20 · 精选 ${stats.featured ?? 0} · 竞品 ${stats.competitor ?? 0} · 高赞 ${stats.high_praise ?? 0} · 未下载媒体${errors.length ? ` · ${[...new Set(errors)].join("、")}` : ""}`;
+}
+function topicJobBanner() {
+  const data = state.topicsData || {};
+  const jobs = data.jobs || [];
+  const active = jobs.find(job => ["queued", "leased", "running"].includes(job.status));
+  const latest = jobs[0];
+  const failed = !active && latest && ["failed", "unknown_remote"].includes(latest.status) ? latest : null;
+  const last = data.last_sync;
+  return `${active ? `<div class="info-banner">后台执行中：${esc(active.kind)} · ${esc(active.stage || active.status)}。你可以离开本页，任务会持久保存。</div>` : ""}${failed ? `<div class="info-banner error-banner">最近任务失败：${esc(failed.error?.code || failed.status)} · ${esc(failed.error?.message || "请检查采集窗口和设置")}</div>` : ""}${last ? `<div class="info-banner">最近快照：${esc(last.status)} · ${esc(last.started_at)} · ${syncSummary(last)}</div>` : `<div class="info-banner">尚未运行新采集。旧热榜只有 5 条历史快照，不能当作今日 Top20。</div>`}`;
+}
+function researchDetailModal() {
+  const item = state.topicDetail;
+  if (!item) return "";
+  const analyses = item.analyses || [];
+  const report = analyses[0]?.report || {};
+  return `<div class="research-modal" role="dialog" aria-modal="true"><div class="research-dialog"><div class="section-head"><div><h2>${esc(item.title)}</h2><p><a href="${esc(item.url)}" target="_blank" rel="noreferrer">打开原链接 ↗</a> · 研究与生产授权分开</p></div><button class="button small" data-close-research>关闭</button></div>${!analyses.length ? `<div class="empty"><strong>尚未拆解</strong>点击“下载并拆解”后才读取视频和抽帧，不会在同步时批量下载。</div>` : `<div class="info-banner">${esc(report.ocr_engine || "OCR")} · ${report.frame_count || 0} 帧 · ${report.frames_with_text || 0} 帧有文字。OCR 不等同于口播全文。</div><div class="frame-timeline">${(report.timeline || []).map(frame => `<article class="frame-row"><a href="/api/v2/assets/${frame.asset_id}/content" target="_blank" rel="noreferrer"><img src="/api/v2/assets/${frame.asset_id}/content" alt="视频帧 ${frame.start_ms}"></a><div><strong>${(frame.start_ms / 1000).toFixed(1)}s <span class="badge">置信度 ${esc(frame.confidence)}</span></strong><p>${esc(frame.text || "未识别到清晰文字")}</p></div></article>`).join("")}</div><div class="issues"><strong>拆解边界</strong><ul>${(report.limitations || []).map(value => `<li>${esc(value)}</li>`).join("")}</ul></div>`}</div></div>`;
+}
 function renderTopics() {
-  const { topics, strategy, hotspots, favorites } = state.data;
-  $("#topics").innerHTML = `
-    <div class="info-banner">选题Agent：<strong>未配置</strong>。以下候选与热点均由你人工选择，不会自动生成或发布内容。</div>
-    <div class="section-head"><div><h2>抖音收藏夹 <span class="badge">${esc(favorites.captured_at)} 快照</span></h2><p>${esc(favorites.collection_mode)}</p></div><a class="button small" href="${esc(favorites.source)}" target="_blank" rel="noreferrer">打开收藏页 ↗</a></div>
-    <div class="hotspot-grid">${favorites.items.map(item => `<article class="card hotspot"><div class="hotspot-top"><span class="badge ${item.enabled ? "green" : "orange"}">${item.enabled ? item.count + " 个作品" : "不纳入"}</span></div><h3>${esc(item.name)}</h3><p><strong>${esc(item.role)}</strong></p><small>${esc(item.usage)}</small>${item.enabled ? `<button class="button small" data-use-collection="${esc(item.name)}" data-pillar="${esc(item.default_pillar)}" data-audience="${esc(item.default_audience)}">用此分类创建选题</button>` : ""}</article>`).join("")}</div>
-    <div class="section-head hotspot-heading"><div><h2>抖音热榜 <span class="badge">2026-10-25 快照</span></h2><p>${esc(hotspots.source_name)} · 导入于 ${esc(hotspots.captured_at)} · ${esc(hotspots.refresh_status)}</p></div><a class="button small" href="${esc(hotspots.source)}" target="_blank" rel="noreferrer">查看官方来源 ↗</a></div>
-    <div class="hotspot-grid">${(hotspots.items || []).map(item => `<article class="card hotspot"><div class="hotspot-top"><span class="hotspot-rank">#${item.rank}</span><strong>${esc(item.heat)}</strong><span class="badge ${item.relevance === "推荐" ? "green" : "orange"}">${esc(item.relevance)}</span></div><h3>${esc(item.title)}</h3><p>${esc(item.angle)}</p><small>建议任务：${esc(item.task_title)}</small><button class="button small ${item.relevance === "推荐" ? "primary" : ""}" data-create-hotspot="${item.rank}">用此热点创建任务</button></article>`).join("")}</div>
-    <div class="section-head"><h2>账号候选选题</h2><p>依据：${esc(strategy.brand.positioning)}。数据只代表初步信号。</p></div>
-    <div class="topic-grid">${topics.map(topic => `<article class="card topic"><span class="rank">0${topic.rank}</span><div class="topic-meta"><span class="badge green">${esc(pillarNames[topic.pillar])}</span><span class="badge">${esc(audienceNames[topic.audience])}</span><span class="badge">${esc(topic.duration)}</span></div><h3>${esc(topic.title)}</h3><div class="evidence">${topic.evidence.map(e => `<p>${esc(e.content)}</p><small>来源：${esc(e.source)}${e.limitation ? ` · ${esc(e.limitation)}` : ""}</small>`).join("")}</div><p><strong>切入：</strong>${esc(topic.script_angle)}</p><p class="muted"><strong>验证：</strong>${esc(topic.experiment)}</p><div class="topic-footer"><small>${topic.used_at ? `已于 ${shortDate(topic.used_at)} 选用，可再次复测` : "尚未选用"}</small><button class="button primary small" data-create-topic="${topic.id}">选此题并创建任务</button></div></article>`).join("")}</div>
-    <article class="card manual-panel" id="manual-create"><div class="section-head"><h2>手动创建选题</h2><p>无需编辑 YAML，编号和任务目录自动生成</p></div><form id="manual-form"><div class="form-grid"><div class="field"><label for="manual-title">选题标题</label><input id="manual-title" name="title" maxlength="200" required placeholder="这条内容要解决什么真实问题？"></div><div class="field"><label for="manual-pillar">内容支柱</label><select id="manual-pillar" name="pillar">${Object.entries(pillarNames).map(([k,v]) => `<option value="${k}">${v}</option>`).join("")}</select></div><div class="field"><label for="manual-audience">主要人群</label><select id="manual-audience" name="audience">${Object.entries(audienceNames).map(([k,v]) => `<option value="${k}">${v}</option>`).join("")}</select></div></div><div class="form-grid"><div class="field"><label for="manual-pain">核心痛点（可选）</label><input id="manual-pain" name="pain_point" placeholder="用户当前卡在哪里"></div><div class="field" style="grid-column:span 2"><label for="manual-angle">内容切入（可选）</label><input id="manual-angle" name="angle" placeholder="用什么真实场景、证据或步骤来讲"></div></div><div class="field"><label for="manual-collection">来源收藏夹（可选）</label><select id="manual-collection" name="favorite_collection"><option value="">不使用收藏夹分类</option>${favorites.items.filter(item => item.enabled).map(item => `<option value="${esc(item.name)}">${esc(item.name)} · ${esc(item.role)}</option>`).join("")}</select></div><button class="button primary" type="submit">创建任务并进入脚本</button></form></article>`;
+  const data = state.topicsData;
+  const { topics, strategy, favorites } = state.data;
+  if (!data) { $("#topics").innerHTML = `<div class="empty">正在读取选题研究快照…</div>`; return; }
+  if (data.load_error) { $("#topics").innerHTML = `<div class="empty"><strong>选题服务暂不可用</strong>${esc(data.load_error)}<br>其他工作流不受影响。</div>`; return; }
+  const settings = data.settings;
+  const view = state.topicView;
+  const sourceItems = data.sources?.[view] || [];
+  const sourceBody = view === "industry" ? `
+    <div class="topic-layout"><section><div class="section-head"><div><h2>行业今日推荐</h2><p>独立行业选题Agent · 只分析真实公开资讯</p></div><button class="button primary small" data-topic-recommend="industry">生成今日推荐</button></div>${topicRecommendations("industry")}<div class="section-head"><h2>行业资讯快照</h2><p>${sourceItems.length} 条 · 仅元数据</p></div><div class="hotspot-grid">${sourceItems.slice(0,20).map(item => researchCard(item,false)).join("") || `<div class="empty">尚未同步行业资讯，点击右上方“同步行业热点”。</div>`}</div></section><aside class="card topic-settings"><div class="section-head"><div><h2>行业范围与每日任务</h2><p>保存后按本地时间自动执行，无需终端</p></div></div><div class="field"><label>行业范围 / 搜索关键词</label><input id="industry-scope" value="${esc(settings.industry_scope || "")}"></div><div class="field"><label>行业选题Agent提示词</label><textarea id="industry-prompt" rows="6">${esc(settings.industry_prompt || "")}</textarea></div><div class="field"><label>抖音选题Agent提示词</label><textarea id="douyin-prompt" rows="6">${esc(settings.douyin_prompt || "")}</textarea></div><div class="form-grid"><div class="field"><label>每日时间</label><input id="daily-time" type="time" value="${esc(settings.daily_time || "09:00")}"></div><label class="check"><input id="daily-enabled" type="checkbox" ${settings.daily_enabled ? "checked" : ""}>启用每日任务</label></div><div class="field"><label>精选收藏夹</label><input id="featured-collection" value="${esc(settings.featured_collection || "选题")}"></div><div class="field"><label>竞品收藏夹</label><input id="competitor-collection" value="${esc(settings.competitor_collection || "企业AI落地竞对账号")}"></div><div class="field"><label>高赞收藏夹</label><input id="high-praise-collection" value="${esc(settings.high_praise_collection || "低粉高赞文案")}"></div><button class="button primary" data-save-topic-settings>保存设置与每日任务</button><hr><button class="button" data-sync-industry>同步行业热点</button><button class="button" data-sync-topics>同步抖音快照</button><button class="button" data-topic-login>连接采集窗口</button><p class="muted">专用浏览器首次需要登录。扫码、验证码和二次验证由你完成。</p></aside></div>` : `
+    <div class="section-head"><div><h2>${topicViewNames[view]} ${view === "hot" ? `<span class="badge ${data.hot_complete ? "green" : "orange"}">实际 ${data.hot_count} / 20</span>` : `<span class="badge">${sourceItems.length} 条快照</span>`}</h2><p>${view === "hot" ? "公开热榜，抓不全时明确标记，不补造榜单" : `收藏夹「${esc(data.collection_mapping?.[view] || "")}」 · 先看原链接，选择后才下载`}</p></div><div class="button-row">${view === "hot" ? `<button class="button primary small" data-topic-recommend="douyin">抖音今日推荐</button>` : ""}<button class="button small" data-sync-topics>同步快照</button></div></div>${view === "hot" ? `<div class="section-head"><h2>抖音今日推荐</h2><p>独立抖音选题Agent · 热榜 + 三类收藏</p></div>${topicRecommendations("douyin")}` : ""}<div class="hotspot-grid">${sourceItems.map(item => researchCard(item)).join("") || `<div class="empty"><strong>当前来源还没有作品快照</strong>请检查收藏夹名称并同步；不会用收藏数量冒充已抓取作品。</div>`}</div>`;
+  $("#topics").innerHTML = `<div class="topic-tabs">${Object.entries(topicViewNames).map(([key,name]) => `<button class="filter-chip ${view === key ? "active" : ""}" data-topic-view="${key}">${name}</button>`).join("")}<span class="filter-spacer"></span><span class="badge ${data.connection?.connection_status === "ready" ? "green" : "orange"}">${esc(data.connection?.connection_status || "未配置")}</span></div><div id="topic-job-banner">${topicJobBanner()}</div>${sourceBody}<details class="card manual-panel"><summary><strong>手动创建选题</strong><span class="muted"> 保留旧版创建方式</span></summary><form id="manual-form"><div class="form-grid"><div class="field"><label for="manual-title">选题标题</label><input id="manual-title" name="title" maxlength="200" required placeholder="这条内容要解决什么真实问题？"></div><div class="field"><label for="manual-pillar">内容支柱</label><select id="manual-pillar" name="pillar">${Object.entries(pillarNames).map(([k,v]) => `<option value="${k}">${v}</option>`).join("")}</select></div><div class="field"><label for="manual-audience">主要人群</label><select id="manual-audience" name="audience">${Object.entries(audienceNames).map(([k,v]) => `<option value="${k}">${v}</option>`).join("")}</select></div></div><div class="form-grid"><div class="field"><label for="manual-pain">核心痛点（可选）</label><input id="manual-pain" name="pain_point" placeholder="用户当前卡在哪里"></div><div class="field" style="grid-column:span 2"><label for="manual-angle">内容切入（可选）</label><input id="manual-angle" name="angle" placeholder="用什么真实场景、证据或步骤来讲"></div></div><div class="field"><label for="manual-collection">来源收藏夹（可选）</label><select id="manual-collection" name="favorite_collection"><option value="">不使用收藏夹分类</option>${favorites.items.filter(item => item.enabled).map(item => `<option value="${esc(item.name)}">${esc(item.name)} · ${esc(item.role)}</option>`).join("")}</select></div><button class="button primary" type="submit">创建任务并进入脚本</button></form></details><details class="card manual-panel"><summary><strong>保留：账号候选选题</strong><span class="muted"> ${topics.length} 个历史候选</span></summary><div class="topic-grid">${topics.map(topic => `<article class="card topic"><div class="topic-meta"><span class="badge green">${esc(pillarNames[topic.pillar])}</span><span class="badge">${esc(audienceNames[topic.audience])}</span></div><h3>${esc(topic.title)}</h3><div class="evidence">${topic.evidence.map(e => `<p>${esc(e.content)}</p><small>来源：${esc(e.source)}</small>`).join("")}</div><p><strong>切入：</strong>${esc(topic.script_angle)}</p><button class="button primary small" data-create-topic="${topic.id}">选此题并创建任务</button></article>`).join("")}</div></details>${researchDetailModal()}`;
+}
+async function topicAction(path, payload, message) {
+  if (state.topicBusy) return;
+  state.topicBusy = true;
+  try { await api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload || {}) }); notify(message || "任务已加入后台队列"); await refreshTopics(); }
+  catch (error) { notify(error, true); }
+  finally { state.topicBusy = false; }
+}
+async function saveTopicSettings() {
+  const payload = { industry_scope: $("#industry-scope").value, industry_prompt: $("#industry-prompt").value, douyin_prompt: $("#douyin-prompt").value,
+    daily_time: $("#daily-time").value, daily_enabled: $("#daily-enabled").checked,
+    featured_collection: $("#featured-collection").value, competitor_collection: $("#competitor-collection").value, high_praise_collection: $("#high-praise-collection").value };
+  await topicAction("/api/topics/settings", payload, "行业范围、提示词和每日任务已保存");
+}
+async function createResearchTask(itemId) {
+  try { const task = await api(`/api/topics/items/${itemId}/create-task`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); state.taskId = task.content_id; await refresh(`已创建 ${task.content_id}，来源快照已保留`); switchView("tasks"); }
+  catch (error) { notify(error, true); }
+}
+async function showResearchItem(itemId) {
+  try { state.topicDetail = await api(`/api/topics/items/${itemId}`); renderTopics(); }
+  catch (error) { notify(error, true); }
 }
 
 function renderTasks() {
@@ -421,10 +486,20 @@ document.addEventListener("click", async event => {
   const button = event.target.closest("button,[data-go-topics],[data-open-task]");
   if (!button || button.disabled) return;
   if (button.dataset.view) switchView(button.dataset.view);
-  else if (button.id === "new-task-top") { switchView("topics"); setTimeout(() => $("#manual-title")?.focus(), 0); }
+  else if (button.id === "new-task-top") { switchView("topics"); const form = $("#manual-form"); if (form) form.closest("details").open = true; setTimeout(() => $("#manual-title")?.focus(), 0); }
   else if (button.hasAttribute("data-go-topics")) switchView("topics");
   else if (button.dataset.openTask) openTask(button.dataset.openTask);
   else if (button.dataset.selectTask) { state.taskId = button.dataset.selectTask; renderTasks(); }
+  else if (button.dataset.topicView) { state.topicView = button.dataset.topicView; state.topicDetail = null; renderTopics(); }
+  else if (button.hasAttribute("data-save-topic-settings")) await saveTopicSettings();
+  else if (button.hasAttribute("data-sync-topics")) await topicAction("/api/topics/sync", {}, "抖音快照同步已开始；此阶段不下载视频");
+  else if (button.hasAttribute("data-sync-industry")) await topicAction("/api/topics/industry", { agent: "industry" }, "行业热点与推荐已开始");
+  else if (button.hasAttribute("data-topic-login")) await topicAction("/api/topics/browser/open", {}, "专用采集窗口即将打开，请在窗口内完成登录");
+  else if (button.dataset.topicRecommend) await topicAction("/api/topics/recommend", { agent: button.dataset.topicRecommend }, "选题Agent已开始分析真实快照");
+  else if (button.dataset.analyzeItem) await topicAction(`/api/topics/items/${button.dataset.analyzeItem}/analyze`, {}, "已选择该视频，开始按需下载、抽帧和OCR");
+  else if (button.dataset.detailItem) await showResearchItem(button.dataset.detailItem);
+  else if (button.dataset.createResearch) await createResearchTask(button.dataset.createResearch);
+  else if (button.hasAttribute("data-close-research")) { state.topicDetail = null; renderTopics(); }
   else if (button.dataset.createTopic) await createTask({ topic_id: Number(button.dataset.createTopic) });
   else if (button.dataset.createHotspot) await createTask({ hotspot_rank: Number(button.dataset.createHotspot) });
   else if (button.dataset.useCollection) {
@@ -489,6 +564,16 @@ document.addEventListener("submit", async event => {
   await createTask(Object.fromEntries(form.entries()));
 });
 $("#date-label").textContent = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "long" }).format(new Date());
+setInterval(async () => {
+  if (state.view !== "topics" || state.topicBusy || !state.topicsData || ["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) return;
+  const active = (state.topicsData.jobs || []).some(job => ["queued", "leased", "running"].includes(job.status));
+  if (active) {
+    try { await refreshTopics(false); $("#topic-job-banner").innerHTML = topicJobBanner(); } catch (_) {}
+  } else if (state.topicWasBusy) {
+    try { await refreshTopics(); } catch (_) {}
+  }
+  state.topicWasBusy = active;
+}, 3000);
 refresh().catch(error => { $("#loading").innerHTML = `无法连接本地服务：${esc(error.message)}`; });
 const loadingObserver = new MutationObserver(() => { if (state.data) { $("#loading").style.display = "none"; loadingObserver.disconnect(); } });
 loadingObserver.observe($("#today"), { childList: true });

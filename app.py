@@ -2027,7 +2027,7 @@ if __name__ == "__main__":
         raise SystemExit("端口无效")
     init_db()
     from content_workbench.api.v2 import V2Application
-    V2 = V2Application(DB_PATH, ROOT)
+    V2 = V2Application(DB_PATH, ROOT, create_task)
     V2.start()
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     print("Content Workflow v2: http://127.0.0.1:{}".format(args.port), flush=True)

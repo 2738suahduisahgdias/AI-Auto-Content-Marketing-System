@@ -19,25 +19,37 @@ from content_workbench.storage.db import expand_schema, loads
 
 
 class V2Application:
-    def __init__(self, db_path, root):
+    def __init__(self, db_path, root, legacy_task_creator=None):
+        from content_workbench.topics.api import TopicAPI
+        from content_workbench.topics.executors import TopicExecutors
+        from content_workbench.topics.scheduler import TopicScheduler, configure_schedule
+        from content_workbench.topics.service import TopicService
         self.root = Path(root).resolve()
         self.workbench = Workbench(db_path, self.root)
         self.jobs = JobStore(db_path)
-        self.worker = Worker(db_path, LocalExecutors(self.workbench).mapping(), self.root)
+        self.topics = TopicService(db_path, self.root)
+        executors = LocalExecutors(self.workbench).mapping()
+        executors.update(TopicExecutors(self.topics).mapping())
+        self.worker = Worker(db_path, executors, self.root)
+        self.topic_scheduler = TopicScheduler(db_path)
+        self.topic_api = TopicAPI(self, self.topics, legacy_task_creator)
         self.secret = secrets.token_bytes(32)
         self.sessions = set()
         with self.workbench.conn() as conn:
             expand_schema(conn)
+        configure_schedule(db_path, self.topics.settings())
 
     def start(self):
         self.worker.start()
+        self.topic_scheduler.start()
 
     def stop(self):
+        self.topic_scheduler.stop()
         self.worker.stop()
 
     @staticmethod
     def matches(path):
-        return path.startswith("/api/v2/")
+        return path.startswith("/api/v2/") or path.startswith("/api/topics/")
 
     def cookie(self, handler):
         parsed = SimpleCookie(handler.headers.get("Cookie", ""))
@@ -75,6 +87,8 @@ class V2Application:
         try:
             self.authenticate(handler, method in ("POST", "PUT", "PATCH", "DELETE"))
             body = handler.read_json() if method in ("POST", "PUT", "PATCH") and not path == "/api/v2/assets" else None
+            if path.startswith("/api/topics/"):
+                return self.topic_api.handle(handler, method, path, query, body)
             if method == "GET" and path == "/api/v2/bootstrap":
                 session = self.cookie(handler)
                 with self.workbench.conn(readonly=True) as conn:
