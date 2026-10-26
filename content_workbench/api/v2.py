@@ -20,6 +20,7 @@ from content_workbench.storage.db import expand_schema, loads
 
 class V2Application:
     def __init__(self, db_path, root, legacy_task_creator=None):
+        from content_workbench.agents.api import AgentAPI
         from content_workbench.topics.api import TopicAPI
         from content_workbench.topics.executors import TopicExecutors
         from content_workbench.topics.scheduler import TopicScheduler, configure_schedule
@@ -33,6 +34,7 @@ class V2Application:
         self.worker = Worker(db_path, executors, self.root)
         self.topic_scheduler = TopicScheduler(db_path)
         self.topic_api = TopicAPI(self, self.topics, legacy_task_creator)
+        self.agent_api = AgentAPI(self, db_path)
         self.secret = secrets.token_bytes(32)
         self.sessions = set()
         with self.workbench.conn() as conn:
@@ -49,7 +51,7 @@ class V2Application:
 
     @staticmethod
     def matches(path):
-        return path.startswith("/api/v2/") or path.startswith("/api/topics/")
+        return path.startswith("/api/v2/") or path.startswith("/api/topics/") or path.startswith("/api/agents/")
 
     def cookie(self, handler):
         parsed = SimpleCookie(handler.headers.get("Cookie", ""))
@@ -89,6 +91,8 @@ class V2Application:
             body = handler.read_json() if method in ("POST", "PUT", "PATCH") and not path == "/api/v2/assets" else None
             if path.startswith("/api/topics/"):
                 return self.topic_api.handle(handler, method, path, query, body)
+            if path.startswith("/api/agents/"):
+                return self.agent_api.handle(handler, method, path, body)
             if method == "GET" and path == "/api/v2/bootstrap":
                 session = self.cookie(handler)
                 with self.workbench.conn(readonly=True) as conn:

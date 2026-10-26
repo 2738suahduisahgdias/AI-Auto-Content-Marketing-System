@@ -3,6 +3,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from content_workbench.agents.registry import require_agent_enabled
 from content_workbench.domain.errors import DomainError
 from content_workbench.domain.services import Workbench
 from content_workbench.topics.industry_connector import fetch_industry
@@ -20,6 +21,7 @@ class TopicExecutors:
                 "topics.recommend": self.recommend, "research.analyze": self.analyze}
 
     def browser(self, context, action, stage, collection=None, url=None, output=None, wait_seconds=30):
+        config = require_agent_enabled(self.service.db_path, "hotspot_agent")
         arguments = [str(self.root / ".venv-topics/bin/python"), str(self.root / "content_workbench/topics/browser_worker.py"),
                      "--action", action, "--profile", str(self.root / "data/topic-browser-profile"),
                      "--wait-seconds", str(wait_seconds)]
@@ -29,7 +31,7 @@ class TopicExecutors:
             arguments += ["--url", url]
         if output:
             arguments += ["--output", str(output)]
-        stdout, _ = context.run_process(arguments, timeout=max(120, wait_seconds + 120), stage=stage, cwd=self.root)
+        stdout, _ = context.run_process(arguments, timeout=min(config["timeout_seconds"], max(120, wait_seconds + 120)), stage=stage, cwd=self.root)
         try:
             result = json.loads(stdout.strip().splitlines()[-1])
         except (json.JSONDecodeError, IndexError):
@@ -83,6 +85,7 @@ class TopicExecutors:
             raise
 
     def industry(self, job, context):
+        require_agent_enabled(self.service.db_path, "industry_topic_agent")
         settings = self.service.settings()
         context.progress("industry_public_metadata", 0.15)
         items = fetch_industry(settings["industry_scope"])
@@ -91,13 +94,13 @@ class TopicExecutors:
         recommendation = self.recommend({**job, "input": {**job["input"], "agent": "industry"}}, context)
         return {"items": len(items), "media_downloaded": 0, "recommendation": recommendation}
 
-    def kimi_json(self, context, agent_name, prompt):
+    def kimi_json(self, context, agent_name, prompt, timeout=600):
         binary = shutil.which("kimi") or str(Path.home() / ".kimi-code/bin/kimi")
         if not Path(binary).is_file():
             raise DomainError("KIMI_NOT_FOUND", "未找到 Kimi CLI", 503, "provider", "先安装并登录 Kimi CLI")
         agent = self.root / "agents" / (agent_name + ".md")
         stdout, _ = context.run_process([binary, "--agent-file", str(agent), "-p", prompt, "--output-format", "stream-json"],
-                                        timeout=600, stage=agent_name, cwd=self.root)
+                                        timeout=timeout, stage=agent_name, cwd=self.root)
         contents = []
         for line in stdout.splitlines():
             try:
@@ -134,6 +137,7 @@ class TopicExecutors:
         agent = job["input"].get("agent", "douyin")
         if agent not in ("douyin", "industry"):
             raise DomainError("INVALID_TOPIC_AGENT", "推荐Agent类型无效", 422, "agent", "选择 industry 或 douyin")
+        config = require_agent_enabled(self.service.db_path, agent + "_topic_agent")
         data = self.service.bootstrap()
         settings = data["settings"]
         sources = data["sources"] if agent == "douyin" else {"industry": data["sources"]["industry"]}
@@ -141,8 +145,8 @@ class TopicExecutors:
             raise DomainError("NO_TOPIC_SNAPSHOT", "当前没有可分析的真实快照", 409, "snapshot", "先同步热点、收藏或行业资讯")
         context.progress(agent + "_topic_analysis", 0.4)
         prompt = json.dumps({"agent": agent, "industry_scope": settings["industry_scope"],
-                             "custom_prompt": settings[agent + "_prompt"], "sources": sources}, ensure_ascii=False)
-        candidates = self.kimi_json(context, agent + "-topic-agent", prompt)
+                             "custom_prompt": settings[agent + "_prompt"] + "\n" + config["prompt"], "sources": sources}, ensure_ascii=False)
+        candidates = self.kimi_json(context, agent + "-topic-agent", prompt, config["timeout_seconds"])
         ids = self.service.save_candidates(agent, candidates)
         return {"agent": agent, "candidates": len(ids), "candidate_ids": ids}
 

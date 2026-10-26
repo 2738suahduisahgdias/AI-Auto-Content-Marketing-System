@@ -16,6 +16,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlsplit
 
+from content_workbench.agents.registry import agent_config
+
 os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 os.environ.setdefault("HF_HUB_ETAG_TIMEOUT", "30")
 
@@ -211,6 +213,13 @@ def run_process(arguments, timeout, output_limit=MAX_CLI_OUTPUT, label="Kimi CLI
         message = " ".join(stderr.strip().split())[:500]
         raise ApiError(502, "{} 调用失败".format(label) + ("：{}".format(message) if message else "，请检查本机配置"))
     return stdout, stderr
+
+
+def agent_runtime(agent_id):
+    config = agent_config(DB_PATH, agent_id)
+    if not config["enabled"]:
+        raise ApiError(409, "该 Agent 已停用，不能创建新任务", "enabled", "到设置页的 Agent 配置中心启用后再试。")
+    return config
 
 
 def find_kimi():
@@ -666,10 +675,11 @@ def generate_scripts(task):
         status = get_ai_status()
         if not status["ready"]:
             raise ApiError(409, "请先在设置页完成 Kimi 真实连接测试")
-        prompt = build_script_prompt(task)
+        config = agent_runtime("script_agent")
+        prompt = config["prompt"] + "\n" + build_script_prompt(task)
         detection = detect_kimi()
         try:
-            scripts = run_kimi_prompt(prompt, 600, detection)
+            scripts = run_kimi_prompt(prompt, config["timeout_seconds"], detection)
         except ApiError as error:
             record_ai_result(detection, error.message)
             raise
@@ -776,7 +786,8 @@ def generate_asset_plan(task, payload):
     context = {"title": task["title"], "master_script": master, "srt": srt_text,
                "audio_duration_seconds": duration, "allowed_asset_types": allowed,
                "requirements": "返回4～10个不重叠分镜；end_seconds不得超过音频+0.2秒；只给建议，不下载、不生成媒体、不代表授权"}
-    prompt = "根据当前任务的母稿、SRT和音频时长生成分镜建议，严格遵守agent JSON协议。\n" + json.dumps(context, ensure_ascii=False, separators=(",", ":"))
+    config = agent_runtime("asset_planning_agent")
+    prompt = config["prompt"] + "\n根据当前任务的母稿、SRT和音频时长生成分镜建议，严格遵守agent JSON协议。\n" + json.dumps(context, ensure_ascii=False, separators=(",", ":"))
     if len(prompt) > MAX_ASSET_PROMPT:
         raise ApiError(400, "分镜输入超过 60000 字符，请使用较短母稿或字幕")
     content_id = task["content_id"]
@@ -789,7 +800,7 @@ def generate_asset_plan(task, payload):
             raise ApiError(409, "请先完成 Kimi 真实连接测试")
         detection = detect_kimi()
         try:
-            raw = run_kimi_agent_json(ASSET_AGENT_PATH, prompt, 600, detection)
+            raw = run_kimi_agent_json(ASSET_AGENT_PATH, prompt, config["timeout_seconds"], detection)
             plan = validate_asset_plan(raw, duration, set(allowed))
         except ApiError as error:
             record_asset_ai_result(error.message)
@@ -1112,7 +1123,7 @@ def probe_media(path, kind):
     return {"duration_seconds": round(duration, 3), "streams": streams}
 
 
-def run_whisperx(audio_path, model, directory):
+def run_whisperx(audio_path, model, directory, timeout=3600):
     if not WHISPERX_PATH.is_file() or not os.access(WHISPERX_PATH, os.X_OK):
         raise ApiError(503, "WhisperX 尚未安装完成：缺少 .venv-whisperx/bin/whisperx")
     if not WHISPERX_WORKER.is_file():
@@ -1120,7 +1131,7 @@ def run_whisperx(audio_path, model, directory):
     output = directory / "whisperx.srt"
     run_process([str(WHISPERX_PYTHON), str(WHISPERX_WORKER), "--audio", str(audio_path),
                  "--model", model, "--language", "zh", "--output", str(output)],
-                3600, MAX_CLI_OUTPUT, "WhisperX")
+                timeout, MAX_CLI_OUTPUT, "WhisperX")
     info = probe_media(output, "srt")
     return output, info
 
@@ -1139,8 +1150,9 @@ def test_whisperx():
 
 
 def transcribe_audio(task, payload):
+    config = agent_runtime("caption_agent")
     require_state(task, "script_approved", "waiting_audio")
-    model = payload.get("model") or "small"
+    model = payload.get("model") or config["model"]
     if model not in ("small", "base"):
         raise ApiError(400, "WhisperX 仅支持 small 或 base", "model", "在转写模型下拉框中改选 small 或 base 后重试。")
     with connect() as conn:
@@ -1148,7 +1160,7 @@ def transcribe_audio(task, payload):
     audio_path = task_file_path(audio_row)
     try:
         with tempfile.TemporaryDirectory(prefix="whisperx-task-") as directory:
-            srt, info = run_whisperx(audio_path, model, Path(directory))
+            srt, info = run_whisperx(audio_path, model, Path(directory), config["timeout_seconds"])
             timestamp = now()
             final_directory = ROOT / "subtitles" / task["content_id"]
             final_directory.mkdir(parents=True, exist_ok=True)
@@ -1210,6 +1222,7 @@ def test_system_voice():
 
 
 def generate_audio(task, payload):
+    agent_runtime("voice_agent")
     require_state(task, "script_approved", "waiting_audio")
     script_key = payload.get("script_key", "master")
     if script_key not in SCRIPT_KEYS:
@@ -1269,14 +1282,14 @@ def generate_audio(task, payload):
         return result
 
 
-def run_openvoice(reference, text, directory):
+def run_openvoice(reference, text, directory, timeout=3600):
     missing = openvoice_missing_files()
     if missing:
         raise ApiError(503, "OpenVoice 尚未就绪，缺少：" + "、".join(path_label(path) for path in missing))
     output = directory / "clone.wav"
     run_process([str(OPENVOICE_PYTHON), str(OPENVOICE_WORKER), "--openvoice-root", str(OPENVOICE_ROOT),
                  "--ref", str(reference), "--text", text, "--output", str(output),
-                 "--work-dir", str(directory / "work"), "--speaker", "zh"], 3600, MAX_CLI_OUTPUT, "OpenVoice")
+                 "--work-dir", str(directory / "work"), "--speaker", "zh"], timeout, MAX_CLI_OUTPUT, "OpenVoice")
     return output, probe_media(output, "audio")
 
 
@@ -1292,6 +1305,7 @@ def test_clone_voice():
 
 
 def generate_clone_audio(task, payload):
+    config = agent_runtime("clone_agent")
     require_state(task, "script_approved", "waiting_audio")
     if not media_ai_status()["openvoice"]["ready"]:
         raise ApiError(409, "OpenVoice 尚未通过真实连接测试", "settings", "到设置页检查模型文件并点击“测试 OpenVoice”；成功后再生成克隆录音。")
@@ -1314,7 +1328,7 @@ def generate_clone_audio(task, payload):
         raise ApiError(404, "本人语音样本不存在或路径无效", "voice_id", "在本人音色记忆库重新上传有效样本，不要修改样本路径或引用任务目录。")
     try:
         with tempfile.TemporaryDirectory(prefix="openvoice-task-") as directory:
-            wav, info = run_openvoice(sample_path, text.strip(), Path(directory))
+            wav, info = run_openvoice(sample_path, text.strip(), Path(directory), config["timeout_seconds"])
             timestamp = now()
             final_directory = ROOT / "voice" / task["content_id"]
             final_directory.mkdir(parents=True, exist_ok=True)
@@ -1549,7 +1563,7 @@ def available_render_port():
         return sock.getsockname()[1]
 
 
-def run_remotion_render(props, output):
+def run_remotion_render(props, output, timeout=1800):
     npx = shutil.which("npx")
     if not npx or not (REMOTION_APP / "package.json").is_file():
         raise ApiError(503, "Remotion 项目或 npx 不可用", "settings", "确认 remotion-app 已安装依赖且 npx 可用，然后重试。")
@@ -1558,7 +1572,7 @@ def run_remotion_render(props, output):
         props_path.write_text(json.dumps(props, ensure_ascii=False), encoding="utf-8")
         run_process([npx, "remotion", "render", "src/index.ts", "TalkingHead", str(output),
                      "--props={}".format(props_path), "--codec=h264", "--port={}".format(available_render_port())],
-                1800, MAX_CLI_OUTPUT, "Remotion", REMOTION_APP)
+                timeout, MAX_CLI_OUTPUT, "Remotion", REMOTION_APP)
 
 
 def caption_overlays(captions, directory):
@@ -1580,7 +1594,7 @@ def caption_overlays(captions, directory):
     return "".join(filters), paths
 
 
-def run_upload_render(scenes, props, output, burn_subtitles):
+def run_upload_render(scenes, props, output, burn_subtitles, timeout=1800):
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         raise ApiError(503, "未找到 FFmpeg，无法合成上传素材", "settings", "安装 FFmpeg 后重试，或改用全部 Remotion。")
@@ -1603,7 +1617,7 @@ def run_upload_render(scenes, props, output, burn_subtitles):
         command.extend(["-filter_complex_threads", "2", "-filter_complex", ";".join(filters), "-map", "[final]", "-map", "{}:a".format(len(scenes)),
                         "-t", "{:.3f}".format(props["durationSeconds"]), "-r", "30", "-c:v", "libx264", "-preset", "veryfast",
                         "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(output)])
-        run_process(command, 1800, MAX_CLI_OUTPUT, "FFmpeg 上传合成")
+        run_process(command, timeout, MAX_CLI_OUTPUT, "FFmpeg 上传合成")
 
 
 def validate_rendered_mp4(path):
@@ -1614,6 +1628,7 @@ def validate_rendered_mp4(path):
 
 
 def render_task(task, payload):
+    config = agent_runtime("remotion_agent")
     require_state(task, "assets_approved", "rendered")
     mode = payload.get("mode")
     if mode not in ("upload", "remotion", "mixed"):
@@ -1626,9 +1641,9 @@ def render_task(task, payload):
         with tempfile.TemporaryDirectory(prefix="content-render-") as directory:
             output = Path(directory) / "render.mp4"
             if mode == "upload":
-                run_upload_render(scenes, props, output, payload.get("burn_subtitles", True))
+                run_upload_render(scenes, props, output, payload.get("burn_subtitles", True), config["timeout_seconds"])
             else:
-                run_remotion_render(props, output)
+                run_remotion_render(props, output, config["timeout_seconds"])
             info = validate_rendered_mp4(output)
             final_directory = ROOT / "renders" / task["content_id"]
             final_directory.mkdir(parents=True, exist_ok=True)

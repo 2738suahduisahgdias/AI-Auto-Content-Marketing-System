@@ -2,6 +2,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
+from content_workbench.agents.registry import agent_config
 from content_workbench.jobs.store import JobStore
 from content_workbench.storage.db import connect, dumps, immediate, utcnow
 
@@ -55,6 +56,8 @@ class TopicScheduler:
             self.stop_event.wait(30)
 
     def tick(self):
+        if not agent_config(self.db_path, "workflow_agent")["enabled"]:
+            return 0
         with connect(self.db_path) as conn:
             due = conn.execute("SELECT * FROM wb_schedules WHERE id=? AND enabled=1 AND next_due_at<=?", (SCHEDULE_ID, utcnow())).fetchone()
         if not due:
