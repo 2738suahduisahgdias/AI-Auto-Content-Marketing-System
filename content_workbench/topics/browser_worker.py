@@ -1,6 +1,7 @@
 import argparse
 import json
 import re
+import subprocess
 import time
 from pathlib import Path
 
@@ -97,6 +98,14 @@ def sync_collection(page, title):
     return list(collected.values())
 
 
+def has_video_stream(path):
+    result = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=codec_type", "-of", "json", str(path)], capture_output=True, text=True, timeout=30)
+    if result.returncode:
+        return False
+    streams = json.loads(result.stdout or "{}").get("streams", [])
+    return any(stream.get("codec_type") == "video" for stream in streams)
+
+
 def download_video(context, page, url, output):
     network_candidates = []
     def capture_response(response):
@@ -104,7 +113,7 @@ def download_video(context, page, url, output):
             network_candidates.append(response.url)
     page.on("response", capture_response)
     page.goto(url, wait_until="domcontentloaded", timeout=60000)
-    page.wait_for_selector("video", timeout=30000)
+    page.wait_for_selector("body", timeout=30000)
     page.wait_for_timeout(5000)
     candidates = page.evaluate("""() => {
       const urls=[];
@@ -142,6 +151,9 @@ def download_video(context, page, url, output):
             if len(body) < 1000 or len(body) > 500 * 1024 * 1024 or body.startswith(b"{"):
                 continue
             output.write_bytes(body)
+            if not has_video_stream(output):
+                output.unlink(missing_ok=True)
+                continue
             return {"downloaded": len(body)}
         except Exception:
             continue

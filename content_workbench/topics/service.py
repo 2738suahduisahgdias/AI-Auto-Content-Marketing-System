@@ -213,7 +213,7 @@ class TopicService:
                 value["report"] = loads(value.pop("report_json"), {})
                 value["evidence"] = [dict(evidence) for evidence in conn.execute("SELECT * FROM wb_evidence WHERE analysis_id=? ORDER BY start_ms", (analysis["id"],))]
                 item["analyses"].append(value)
-            item["assets"] = [dict(asset) for asset in conn.execute("""SELECT a.* FROM wb_assets a JOIN wb_asset_links l ON l.asset_id=a.id
+            item["assets"] = [dict(asset) for asset in conn.execute("""SELECT a.*,l.purpose FROM wb_assets a JOIN wb_asset_links l ON l.asset_id=a.id
                 WHERE l.owner_type='research_item' AND l.owner_id=?""", (item_id,))]
         if item["analyses"]:
             item["analysis_status"] = item["analyses"][0]["status"]

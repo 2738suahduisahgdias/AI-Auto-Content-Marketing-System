@@ -31,6 +31,8 @@ def ocr_tsv(text):
 def analyze_video(workbench, service, item_id, video_path, context):
     video_path = Path(video_path).resolve()
     info = probe(video_path, "video/mp4")
+    if not any(stream.get("codec_type") == "video" for stream in info.get("streams", [])):
+        raise DomainError("VIDEO_STREAM_MISSING", "下载文件只有音频，没有可抽帧画面", 422, "file", "重新下载含画面的 MP4 视频，不要上传纯音频")
     if info["duration_seconds"] > 900:
         raise DomainError("VIDEO_TOO_LONG", "单条拆解视频不能超过15分钟", 422, "file", "分段后重试或上传短视频")
     digest = file_hash(video_path)
@@ -47,7 +49,7 @@ def analyze_video(workbench, service, item_id, video_path, context):
     frames_dir.mkdir(parents=True, exist_ok=True)
     context.progress("extract_frames", 0.25)
     context.run_process([shutil.which("ffmpeg"), "-v", "error", "-y", "-i", str(video_path),
-                         "-vf", "fps=1/2,scale=1280:-2", "-frames:v", "60", str(frames_dir / "frame-%03d.png")],
+                         "-vf", "fps=30,select='not(mod(n,60))',scale=1280:-2", "-frames:v", "60", str(frames_dir / "frame-%03d.png")],
                         timeout=600, stage="extract_frames")
     frame_paths = sorted(frames_dir.glob("frame-*.png"))
     if not frame_paths:

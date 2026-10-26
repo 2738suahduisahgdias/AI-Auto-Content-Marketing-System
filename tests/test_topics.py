@@ -5,6 +5,7 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
+from content_workbench.domain.errors import DomainError
 from content_workbench.domain.services import Workbench
 from content_workbench.storage.db import PROJECT_ROOT, connect, expand_schema
 from content_workbench.topics.media_analysis import analyze_video
@@ -106,6 +107,22 @@ class TopicCase(unittest.TestCase):
         self.assertEqual(2000, report["timeline"][1]["start_ms"])
         recognized = " ".join(frame["text"] for frame in report["timeline"])
         self.assertTrue("企业" in recognized or "验收" in recognized, recognized)
+    def test_audio_only_rejected_and_short_video_keeps_first_frame(self):
+        from PIL import Image, ImageDraw, ImageFont
+        item_id = self.service.upsert_item({"title": "纯音频", "canonical_url": "https://example.com/audio-only"}, "featured")
+        subprocess.run([shutil.which("ffmpeg"), "-v", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=2", str(self.root / "audio-only.mp4")], check=True, timeout=30)
+        with self.assertRaises(DomainError) as caught:
+            analyze_video(self.workbench, self.service, item_id, self.root / "audio-only.mp4", DummyContext())
+        self.assertEqual("VIDEO_STREAM_MISSING", caught.exception.code)
+        image = Image.new("RGB", (1280, 720), "white")
+        draw = ImageDraw.Draw(image)
+        font = ImageFont.truetype("/System/Library/Fonts/STHeiti Medium.ttc", 60)
+        draw.text((150, 300), "首帧保留", font=font, fill="black")
+        image.save(self.root / "short.png")
+        subprocess.run([shutil.which("ffmpeg"), "-v", "error", "-y", "-loop", "1", "-t", "1", "-i", str(self.root / "short.png"),
+                        "-pix_fmt", "yuv420p", str(self.root / "short.mp4")], check=True, timeout=30)
+        result = analyze_video(self.workbench, self.service, item_id, self.root / "short.mp4", DummyContext())
+        self.assertGreaterEqual(result["frames"], 1)
 
 
 if __name__ == "__main__":
