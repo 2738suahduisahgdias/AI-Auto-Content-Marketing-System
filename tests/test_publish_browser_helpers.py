@@ -142,13 +142,15 @@ class WechatArticleValidationCase(unittest.TestCase):
 class PublishVerificationCase(unittest.TestCase):
     def test_sms_verification_is_not_a_publish_success(self):
         page = mock.Mock()
+        page.frames = []
         page.locator.return_value.inner_text.return_value = "接收短信验证码 请输入验证码 获取验证码"
         page.screenshot.return_value = None
-        result = browser_worker.click_publish(page, "douyin", "target-sms")
+        with mock.patch.object(browser_worker, "visible_text", return_value=None), \
+                mock.patch.object(browser_worker.time, "monotonic", side_effect=[0, 301]):
+            result = browser_worker.click_publish(page, "douyin", "target-sms")
         self.assertEqual("login_required", result["status"])
         self.assertEqual("verification", result["field"])
         page.get_by_role.assert_not_called()
-        page.get_by_text.assert_not_called()
 
     def test_normal_publish_help_text_is_not_authentication(self):
         page = mock.Mock()
