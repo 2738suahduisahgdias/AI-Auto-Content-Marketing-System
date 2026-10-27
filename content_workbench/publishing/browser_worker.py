@@ -511,7 +511,21 @@ def prepare_wechat_article(page, data, mode):
                     {"title": payload["title"], "body_length": len(payload["body"])})
 
 
+def authentication_required(page):
+    text = page.locator("body").inner_text()
+    return re.search(r"接收短信验证码|请输入验证码|获取验证码|扫码登录|安全验证|验证身份|微信验证", text)
+
+
+def authentication_interrupted(page, target_id):
+    return evidence(page, target_id, "login_required", set(), {
+        "status": "login_required", "field": "verification",
+        "error": "平台要求验证码、扫码或安全验证，尚未公开发布",
+        "action": "在后台登录流程完成验证后，重新生成预览并确认发布"})
+
+
 def click_publish(page, platform, target_id):
+    if authentication_required(page):
+        return authentication_interrupted(page, target_id)
     click_visible(page.get_by_role("button", name="我知道了", exact=True), 3000)
     labels = ("发表",) if platform == "wechat_official_account" else ("发布", "发表")
     clicked = False
@@ -533,6 +547,8 @@ def click_publish(page, platform, target_id):
     if not clicked:
         return field_error(platform, "publish_button", "没有找到可用的最终发表按钮，未执行发表")
     page.wait_for_timeout(2000)
+    if authentication_required(page):
+        return authentication_interrupted(page, target_id)
     confirmations = page.get_by_role("button", name=re.compile("确定|确认发表|确认发布|继续发布"))
     for index in range(confirmations.count()):
         button = confirmations.nth(index)
@@ -543,9 +559,12 @@ def click_publish(page, platform, target_id):
         except Exception:
             continue
     page.wait_for_timeout(5000)
-    success = page.get_by_text(re.compile("发布成功|发表成功|提交成功"))
-    if success.count():
-        return evidence(page, target_id, "published", {"published"}, {"status": "published", "published_evidence": success.first.inner_text()[:300], "url": None})
+    if authentication_required(page):
+        return authentication_interrupted(page, target_id)
+    for label in ("发布成功", "发表成功", "提交成功"):
+        success = visible_text(page, label)
+        if success:
+            return evidence(page, target_id, "published", {"published"}, {"status": "published", "published_evidence": success.inner_text()[:300], "url": None})
     return evidence(page, target_id, "unknown", set(), {"status": "unknown_remote", "error": "已执行点击，但未读到明确成功证据，请到平台后台核对"})
 
 

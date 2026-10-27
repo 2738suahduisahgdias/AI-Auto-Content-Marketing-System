@@ -139,5 +139,22 @@ class WechatArticleValidationCase(unittest.TestCase):
         page.goto.assert_not_called()
 
 
+class PublishVerificationCase(unittest.TestCase):
+    def test_sms_verification_is_not_a_publish_success(self):
+        page = mock.Mock()
+        page.locator.return_value.inner_text.return_value = "接收短信验证码 请输入验证码 获取验证码"
+        page.screenshot.return_value = None
+        result = browser_worker.click_publish(page, "douyin", "target-sms")
+        self.assertEqual("login_required", result["status"])
+        self.assertEqual("verification", result["field"])
+        page.get_by_role.assert_not_called()
+        page.get_by_text.assert_not_called()
+
+    def test_normal_publish_help_text_is_not_authentication(self):
+        page = mock.Mock()
+        page.locator.return_value.inner_text.return_value = "视频发布成功后，价格将无法更改"
+        self.assertIsNone(browser_worker.authentication_required(page))
+
+
 if __name__ == "__main__":
     unittest.main()
