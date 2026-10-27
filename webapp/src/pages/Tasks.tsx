@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, ChevronRight, RefreshCw } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useApp } from "@/AppContext";
@@ -19,8 +19,15 @@ export default function Tasks() {
   const { resources, refresh, run } = useApp();
   const [busy, setBusy] = useState("");
   const busyRef = useRef(false);
-  const tasks = (resources?.core.tasks || []) as VideoTask[];
+  const tasks = useMemo(() => (resources?.core.tasks || []) as VideoTask[], [resources?.core.tasks]);
   const selected = tasks.find(task => task.content_id === id) || (!id ? tasks[0] : undefined);
+  const [pagination, setPagination] = useState({ key: "", page: 1 });
+  const selectionKey = id || "";
+  const selectedIndex = Math.max(0, tasks.findIndex(task => task.content_id === selected?.content_id));
+  const pageCount = Math.max(1, Math.ceil(tasks.length / 10));
+  const currentPage = Math.min(pagination.key === selectionKey ? pagination.page : Math.floor(selectedIndex / 10) + 1, pageCount);
+  const goToPage = (page: number) => setPagination({ key: selectionKey, page });
+  const pageItems = tasks.slice((currentPage - 1) * 10, currentPage * 10);
   useEffect(() => {
     if (!id && selected) navigate(`/tasks/${selected.content_id}`, { replace: true });
   }, [id, selected, navigate]);
@@ -47,7 +54,7 @@ export default function Tasks() {
   return <>
     <PageHeader eyebrow="VIDEO WORKFLOW · 全流程留痕" title="视频任务" description="每一步使用真实文件和后端状态；生成不等于审批，质检不等于终审，记录不等于发布。" actions={<Button size="small" disabled={Boolean(busy)} onClick={() => void refresh()}><RefreshCw size={14} />刷新任务数据</Button>} />
     <div className="tasks-layout">
-      <aside className="tasks-sidebar"><div className="tasks-sidebar-head"><strong>全部任务</strong><Badge>{tasks.length}</Badge></div><nav aria-label="视频任务列表">{tasks.map(task => <Link className={`tasks-nav-item${task.content_id === selected.content_id ? " active" : ""}`} to={`/tasks/${task.content_id}`} key={task.content_id}><span><strong>{task.title}</strong><small>{task.content_id}</small></span><Badge tone={task.state === "analyzed" ? "green" : task.state === "review_required" ? "orange" : "neutral"}>{stateNames[task.state] || task.state}</Badge></Link>)}</nav><Link className="tasks-new-link" to="/topics/douyin">从选题库新建任务 <ChevronRight size={14} /></Link></aside>
+      <aside className="tasks-sidebar"><div className="tasks-sidebar-head"><strong>全部任务</strong><Badge>{tasks.length}</Badge></div><nav aria-label="视频任务列表">{pageItems.map(task => <Link className={`tasks-nav-item${task.content_id === selected.content_id ? " active" : ""}`} to={`/tasks/${task.content_id}`} key={task.content_id}><span><strong>{task.title}</strong><small>{task.content_id}</small></span><Badge tone={task.state === "analyzed" ? "green" : task.state === "review_required" ? "orange" : "neutral"}>{stateNames[task.state] || task.state}</Badge></Link>)}</nav>{tasks.length > 10 && <nav className="tasks-pagination" aria-label="视频分页"><Button size="small" disabled={currentPage === 1} onClick={() => goToPage(currentPage - 1)}>上一页</Button><span>{currentPage} / {pageCount} 页</span><Button size="small" disabled={currentPage === pageCount} onClick={() => goToPage(currentPage + 1)}>下一页</Button></nav>}<Link className="tasks-new-link" to="/topics/douyin">从选题库新建任务 <ChevronRight size={14} /></Link></aside>
       <main className="tasks-workbench">
         <header className="tasks-project-head"><div><p className="eyebrow">{pillarNames[selected.pillar] || selected.pillar} · {audienceNames[selected.audience] || selected.audience}</p><h1>{selected.title}</h1><p>{selected.content_id}{selected.angle ? ` · ${selected.angle}` : ""}</p>{selected.source?.type === "douyin_hotspot" && <p className="tasks-source">来源：抖音热点 #{selected.source.rank}「{selected.source.title}」 · 热度 {selected.source.heat} · {selected.source.captured_at} 快照</p>}{selected.source?.type === "douyin_favorite_collection" && <p className="tasks-source">来源：抖音收藏夹「{selected.source.name}」 · {selected.source.usage}</p>}</div><Badge tone={selected.state === "analyzed" ? "green" : selected.state === "review_required" ? "orange" : "blue"}>{stateNames[selected.state] || selected.state}</Badge></header>
         <ol className="tasks-steps" aria-label="视频工作流进度">{stages.map((name, index) => { const done = index < stage || selected.state === "analyzed"; const current = index === stage && selected.state !== "analyzed"; return <li className={`${done ? "done" : ""}${current ? " current" : ""}`} key={name} aria-current={current ? "step" : undefined}><span>{done ? <Check size={13} /> : index + 1}</span><strong>{name}</strong><small>{index === 8 && selected.state === "analyzed" ? "发布复盘Agent" : stageAgents[index]}</small></li>; })}</ol>

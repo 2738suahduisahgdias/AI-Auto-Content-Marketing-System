@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Check, Download, FilePlus2, FileText, Link2, Plus, Send, Sparkles } from "lucide-react";
+import { Check, Download, FilePlus2, FileText, Plus, Send, Sparkles } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useApp } from "@/AppContext";
-import { PublishingPanel } from "@/components/PublishingPanel";
 import { Badge, Button, Card, Empty, ErrorBox, Field, Modal, PageHeader, Progress, Textarea } from "@/components/ui";
 import { api, jsonOptions } from "@/lib/api";
 import { articleStateNames, jobStatusNames } from "@/lib/names";
@@ -30,8 +29,15 @@ export default function Articles() {
   const { resources, refresh, run, notify } = useApp();
   const { id } = useParams();
   const navigate = useNavigate();
-  const items = resources?.articles.items || [];
+  const items = useMemo(() => resources?.articles.items || [], [resources?.articles.items]);
   const selected = items.find(item => item.id === id) || (!id ? items[0] : undefined);
+  const [pagination, setPagination] = useState({ key: "", page: 1 });
+  const selectionKey = id || "";
+  const selectedIndex = Math.max(0, items.findIndex(item => item.id === selected?.id));
+  const pageCount = Math.max(1, Math.ceil(items.length / 10));
+  const currentPage = Math.min(pagination.key === selectionKey ? pagination.page : Math.floor(selectedIndex / 10) + 1, pageCount);
+  const goToPage = (page: number) => setPagination({ key: selectionKey, page });
+  const pageItems = items.slice((currentPage - 1) * 10, currentPage * 10);
   const outline = activeRevision(selected, "outline");
   const draft = activeRevision(selected, "draft");
   const exported = activeRevision(selected, "export");
@@ -44,14 +50,12 @@ export default function Articles() {
   const [createOpen, setCreateOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newBrief, setNewBrief] = useState("");
-  const [publishUrl, setPublishUrl] = useState("");
 
   if (loadedRevision !== revisionKey) {
     setLoadedRevision(revisionKey);
     setBrief(String(selected?.campaign.brief?.text || ""));
     setOutlineText(String(outline?.payload.text || ""));
     setDraftText(String(draft?.payload.text || ""));
-    setPublishUrl("");
   }
 
   const jobs = useMemo(() => (resources?.articles.jobs || []).filter(job => (job as Job & { aggregate_id?: string }).aggregate_id === selected?.id).slice(0, 5), [resources?.articles.jobs, selected?.id]);
@@ -61,10 +65,6 @@ export default function Articles() {
     const timer = window.setInterval(() => void refresh(), 3000);
     return () => window.clearInterval(timer);
   }, [hasActiveJob, refresh]);
-
-  const publishingSource = useMemo(() => selected && draft && ["approved", "exported"].includes(selected.state)
-    ? { id: selected.id, title: String(selected.campaign.title), body: String(draft.payload.text || "") }
-    : null, [selected, draft]);
 
   const execute = async (key: string, action: () => Promise<unknown>, success: string) => {
     if (busy || !selected) return null;
@@ -116,13 +116,6 @@ export default function Articles() {
     })), decision === "approve" ? "当前正文已人工批准，可导出或创建文章发布批次" : "正文已退回修改");
   };
 
-  const recordPublication = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!publishUrl.trim()) return;
-    const result = await execute("publish-link", () => api(`/api/articles/${selected?.id}/publish`, jsonOptions("POST", { revision_id: draft?.id, url: publishUrl.trim() })), "真实发布链接已记录");
-    if (result) setPublishUrl("");
-  };
-
   const currentStep = exported ? 5 : selected?.state === "approved" ? 5 : draft ? 4 : outline ? 3 : 2;
   const exportPayload = exported?.payload || {};
   const canEdit = Boolean(selected) && !hasActiveJob;
@@ -132,13 +125,14 @@ export default function Articles() {
     <div className="article-workspace">
       <Card className="article-sidebar">
         <div className="article-sidebar-head"><strong>全部文章</strong><span>{items.length} 篇</span></div>
-        {items.map(item => <Link to={`/articles/${item.id}`} key={item.id} className={`article-list-item${item.id === selected?.id ? " active" : ""}`}><strong>{String(item.campaign.title)}</strong><small>{articleStateNames[item.state] || item.state} · v{item.version}<br />{item.id}</small></Link>)}
+        {pageItems.map(item => <Link to={`/articles/${item.id}`} key={item.id} className={`article-list-item${item.id === selected?.id ? " active" : ""}`}><strong>{String(item.campaign.title)}</strong><small>{articleStateNames[item.state] || item.state} · v{item.version}<br />{item.id}</small></Link>)}
         {!items.length && <Empty title="还没有文章" description="新建真实主题，或创建本地写作规范样例。" />}
+        {items.length > 10 && <nav className="article-pagination" aria-label="文章分页"><Button size="small" disabled={currentPage === 1} onClick={() => goToPage(currentPage - 1)}>上一页</Button><span>{currentPage} / {pageCount} 页</span><Button size="small" disabled={currentPage === pageCount} onClick={() => goToPage(currentPage + 1)}>下一页</Button></nav>}
       </Card>
       <main className="article-main">
         {!selected ? <Empty title={id ? "没有找到这篇文章" : "开始第一条独立文章任务"} description={id ? "它可能已被移除，或链接不完整。请从左侧选择真实文章。" : "创建后，大纲和正文都会保存为可追溯版本。"} action={<Button variant="primary" onClick={() => setCreateOpen(true)}><FilePlus2 size={15} />新建文章</Button>} /> : <>
           <div className="article-title-block"><div><p className="eyebrow">公众号文章 · {selected.id}</p><h2>{String(selected.campaign.title)}</h2><p>当前版本 v{selected.version} · 每次保存生成新版本</p></div><Badge tone={["approved", "exported", "published"].includes(selected.state) ? "green" : selected.state === "in_review" ? "orange" : "neutral"}>{articleStateNames[selected.state] || selected.state}</Badge></div>
-          <div className="article-steps">{["真实需求", "论证大纲", "完整正文", "人工终审", "导出发布"].map((name, index) => <span key={name} className={`article-step${index + 1 <= currentStep ? " active" : ""}`}>{index + 1} {name}</span>)}</div>
+          <div className="article-steps">{["真实需求", "论证大纲", "完整正文", "人工终审", "交付文档"].map((name, index) => <span key={name} className={`article-step${index + 1 <= currentStep ? " active" : ""}`}>{index + 1} {name}</span>)}</div>
           {hasActiveJob && <div className="article-review-note">后台任务正在运行。当前编辑内容会保留；生成完成后仅在新版本出现时更新编辑器。</div>}
           <Card className="article-card">
             <div className="article-card-head"><div><h3>文章要求</h3><p>生成时作为本次输入，不覆盖其他 Agent，也不会自动保存为正文。</p></div></div>
@@ -161,15 +155,12 @@ export default function Articles() {
               {draft && selected.state === "in_review" && <Button size="small" variant="danger" disabled={Boolean(busy)} onClick={() => decide("reject")}>退回修改</Button>}
               {draft && ["approved", "exported"].includes(selected.state) && <Button size="small" variant="primary" disabled={Boolean(busy) || hasActiveJob} onClick={() => void execute("export", () => api(`/api/articles/${selected.id}/export`, jsonOptions("POST", { revision_id: draft.id, expected_version: selected.version })), "文章导出已加入后台；完成后可下载真实文件")}><Download size={14} />导出当前正文</Button>}
             </div>
-            {exported && <div className="article-export"><div><strong>已导出 Markdown + 安全 HTML</strong><p>{exported.id} · 文件由后端真实生成</p></div><div className="button-row">{exportPayload.markdown_asset_id ? <a className="button button-small" href={`/api/v2/assets/${exportPayload.markdown_asset_id}/content?download=1`}><Download size={13} />下载 Markdown</a> : <Button size="small" disabled title="导出修订缺少 Markdown 资产，请重新导出">Markdown 不可用</Button>}{exportPayload.html_asset_id ? <a className="button button-small" href={`/api/v2/assets/${exportPayload.html_asset_id}/content?download=1`}><Download size={13} />下载 HTML</a> : <Button size="small" disabled title="导出修订缺少 HTML 资产，请重新导出">HTML 不可用</Button>}</div></div>}
           </Card>
           {!!jobs.length && <div className="article-jobs">{jobs.map(job => <ArticleJob job={job} key={job.id} />)}</div>}
-          <Card className="article-card">
-            <div className="article-card-head"><div><h3>手动补录真实发布链接</h3><p>这里只记录你已在平台核实的链接，不会把预览或导出当成公开成功。</p></div></div>
-            <form onSubmit={recordPublication}><Field label="已发布文章 URL"><input className="input" type="url" required value={publishUrl} onChange={event => setPublishUrl(event.target.value)} placeholder="https://mp.weixin.qq.com/..." /></Field><Button size="small" type="submit" disabled={Boolean(busy) || !selected.active_revisions.export} title={!selected.active_revisions.export ? "先批准并导出当前正文" : undefined}><Link2 size={14} />记录真实发布</Button></form>
-            {!!selected.publications.length && <div className="article-publications">{selected.publications.map((publication, index) => <div className="article-publication" key={`${publication.url}-${index}`}><a href={String(publication.url)} target="_blank" rel="noreferrer">{String(publication.url)}</a><time>{String(publication.published_at || "时间未读取")}</time></div>)}</div>}
-          </Card>
-          {publishingSource && <><PublishingPanel kind="article" source={publishingSource} /><p className="muted small">也可以在<Link to={`/publish?kind=article&id=${encodeURIComponent(selected.id)}`}>发布中心</Link>单独处理这篇文章。</p></>}
+          {["approved", "exported", "published"].includes(selected.state) && <Card className="article-card article-delivery">
+            <div className="article-card-head"><div><h3>交付文档</h3><p>这里只提供实际生成的文档；平台预览与公开发布统一在发布中心完成。</p></div><Link className="button button-small" to={`/publish?kind=article&id=${encodeURIComponent(selected.id)}`}>前往发布中心</Link></div>
+            {exported ? <div className="article-export"><div><strong>Markdown + 安全 HTML</strong><p>{exported.id} · 文件由后端真实生成</p></div><div className="button-row">{exportPayload.markdown_asset_id ? <a className="button button-small" href={`/api/v2/assets/${exportPayload.markdown_asset_id}/content?download=1`}><Download size={13} />下载 Markdown</a> : <Button size="small" disabled title="导出修订缺少 Markdown 资产，请重新导出">Markdown 不可用</Button>}{exportPayload.html_asset_id ? <a className="button button-small" href={`/api/v2/assets/${exportPayload.html_asset_id}/content?download=1`}><Download size={13} />下载 HTML</a> : <Button size="small" disabled title="导出修订缺少 HTML 资产，请重新导出">HTML 不可用</Button>}</div></div> : <Empty title="尚未导出交付文档" description="导出当前已批准正文后，这里会显示真实 Markdown 和 HTML 下载文件。" />}
+          </Card>}
         </>}
       </main>
     </div>

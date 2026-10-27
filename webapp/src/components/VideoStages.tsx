@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Download, Plus, Trash2 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Badge, Button, Field, Input, Textarea } from "@/components/ui";
 import type { Json, Task } from "@/lib/types";
 import { platformNames, scriptNames } from "@/lib/names";
@@ -184,17 +185,11 @@ function ReviewStage({ task, busy, action }: StageProps) {
   return <><StageHead title="人工最终审核" description="请完整观看最终成片。此确认与之后的发布确认是两个独立检查点。" badge="用户 · 最终人工确认" tone="orange" /><VideoPreview task={task} /><div className="task-info">当前五项质检已通过，但仍需你本人确认最终内容、表达与发布风险。</div><ActionBar hint="审核要求修改时，可返回脚本或素材，后续审批会清除。"><Button variant="danger" disabled={Boolean(busy)} onClick={() => void action("revise_script")}>返回脚本返修</Button><Button variant="danger" disabled={Boolean(busy)} onClick={() => void action("revise_assets")}>返回素材返修</Button><Button variant="primary" disabled={Boolean(busy)} onClick={() => void action("approve_final")}>我已看成片，批准最终版本</Button></ActionBar></>;
 }
 
-function PublicationsStage({ task, busy, request, action }: StageProps) {
-  const initial = () => Object.fromEntries(Object.keys(platformNames).map(platform => [platform, { status: "unpublished", url: "", title: "", description: "", tags: "", note: "", ...(task.publications[platform] || {}) }]));
-  const [records, setRecords] = useState<Record<string, Json>>(initial);
-  const update = (platform: string, key: string, value: string) => setRecords(current => ({ ...current, [platform]: { ...current[platform], [key]: value } }));
-  const save = () => request("save-publications", `/api/tasks/${task.content_id}/publications`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ publications: records }) }, "平台标题、简介、标签和真实发布记录已保存");
-  const confirm = async () => { if (await save()) await action("confirm_publish"); };
+function PublicationsStage({ task }: StageProps) {
   return <>
-    <StageHead title="人工发布记录" description="编辑各平台标题、简介、标签与链接；保存不等于发布，发布确认仍需单独操作。" badge="本页不自动公开发布" tone="orange" />
-    <div className="task-publish-list">{Object.entries(platformNames).map(([platform, name]) => <section className="task-publish-row" key={platform}><div className="task-section-head"><h3>{name}</h3><select value={records[platform].status} disabled={Boolean(busy)} onChange={event => update(platform, "status", event.target.value)}><option value="unpublished">未发布</option><option value="published">已发布</option><option value="skipped">本次不发</option></select></div><div className="task-form-grid"><Field label="发布标题"><Input maxLength={300} value={records[platform].title || ""} disabled={Boolean(busy)} onChange={event => update(platform, "title", event.target.value)} placeholder="该平台实际使用的标题" /></Field><Field label="发布链接"><Input value={records[platform].url || ""} disabled={Boolean(busy)} onChange={event => update(platform, "url", event.target.value)} placeholder="已发布必填 https:// 真实链接" /></Field></div><Field label="简介 / 正文摘要"><Textarea value={records[platform].description || ""} disabled={Boolean(busy)} onChange={event => update(platform, "description", event.target.value)} placeholder="记录该平台实际使用的简介或正文摘要" /></Field><Field label="标签"><Input maxLength={1000} value={records[platform].tags || ""} disabled={Boolean(busy)} onChange={event => update(platform, "tags", event.target.value)} placeholder="例如：#企业AI #AI营销" /></Field>{records[platform].url && /^https?:\/\//.test(records[platform].url) && <a className="task-source-link" href={records[platform].url} target="_blank" rel="noreferrer">打开已记录链接 ↗</a>}</section>)}</div>
-    <div className="task-info">发布自动化请使用“发布与复盘”的预览流程；本页仅记录你已在平台完成并核实的结果。不要填入测试链接，不会在此处点击公开发布。</div>
-    <ActionBar hint="确认前会保存当前内容；至少一个平台须为已发布并附真实链接。"><Button disabled={Boolean(busy)} onClick={() => void save()}>{busy === "save-publications" ? "正在保存…" : "保存发布信息"}</Button>{task.state === "approved" && <Button variant="primary" disabled={Boolean(busy)} onClick={() => void confirm()}>保存并确认已完成上述发布</Button>}</ActionBar>
+    <StageHead title="交付视频" description="这里只展示真实生成的成片；平台预览与公开发布统一在发布中心完成。" badge="真实 MP4 交付" tone="green" />
+    <VideoPreview task={task} />
+    <ActionBar hint="下载检查交付文件后，如需公开发布，请前往发布中心选择对应平台。"><Link className="button button-primary" to={`/publish?kind=video&id=${encodeURIComponent(task.content_id)}`}>前往发布中心</Link></ActionBar>
   </>;
 }
 
