@@ -210,6 +210,14 @@ class PublishingService:
         self.update_batch_status(batch["id"])
         return job
 
+    def verify(self, target_id, idempotency_key=None):
+        batch, target = self.target(target_id)
+        if target["status"] != "unknown_remote":
+            raise DomainError("PUBLISH_RECONCILE_NOT_REQUIRED", "只有待人工核对的目标需要后台结果核验", 409, "status", "先完成预览或核对当前状态")
+        self.assert_current(batch)
+        return self.jobs.enqueue("publish.verify", {"target_id": target_id}, target_id, idempotency_key,
+                                 scope="verify:" + target_id, max_attempts=1, resource_key="browser")
+
     def reconcile(self, target_id, evidence, external_url=None):
         batch, target = self.target(target_id)
         if target["status"] != "unknown_remote":

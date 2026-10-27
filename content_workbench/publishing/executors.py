@@ -15,7 +15,7 @@ class PublishingExecutors:
         self.root = service.root
 
     def mapping(self):
-        return {"publish.prepare": self.prepare, "publish.execute": self.execute, "publish.login": self.login}
+        return {"publish.prepare": self.prepare, "publish.execute": self.execute, "publish.login": self.login, "publish.verify": self.verify}
 
     def profile(self, platform):
         if platform in ("douyin", "xiaohongshu"):
@@ -75,6 +75,19 @@ class PublishingExecutors:
         error = self.error(platform, "execute", result)
         self.service.set_target_result(target["id"], "failed", result, error.as_dict(), job_id=job["id"])
         raise error
+
+    def verify(self, job, context):
+        batch, target = self.service.target(job["input"]["target_id"])
+        source = self.service.assert_current(batch)
+        platform = target["platform"]
+        payload = self.service.resolve_assets(target["payload"])
+        result = self.run(context, "verify", platform, {"source": source, "payload": payload, "target_id": target["id"]})
+        if result.get("status") == "published" and result.get("published_evidence"):
+            self.service.set_target_result(target["id"], "published", result, job_id=job["id"], external_url=result.get("url"))
+            return {"target_id": target["id"], "platform": platform, "status": "published", "url": result.get("url")}
+        self.service.set_target_result(target["id"], "unknown_remote", result,
+                                       {"code": "PUBLISH_NOT_VERIFIED", "message": result.get("error", "后台未核验到发布结果")}, job_id=job["id"])
+        return {"target_id": target["id"], "platform": platform, "status": result.get("status", "not_found")}
 
     def login(self, job, context):
         platform = job["input"].get("platform")

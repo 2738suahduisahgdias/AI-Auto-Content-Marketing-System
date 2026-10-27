@@ -160,6 +160,16 @@ class PublishingCase(unittest.TestCase):
         self.assertEqual("published", result["status"])
         self.assertEqual("https://example.com/published", result["external_url"])
 
+    def test_backend_verification_marks_only_real_evidence_published(self):
+        batch = self.service.create_batch("video", self.video, self.video_targets())
+        target = batch["targets"][0]
+        self.service.set_target_result(target["id"], "unknown_remote", {})
+        executor = PublishingExecutors(self.service)
+        with mock.patch.object(executor, "run", return_value={"status": "published", "published_evidence": "笔记管理存在标题", "url": "https://example.com/note"}):
+            result = executor.verify({"id": "job-verify", "input": {"target_id": target["id"]}}, mock.Mock())
+        self.assertEqual("published", result["status"])
+        self.assertEqual("published", self.service.target(target["id"])[1]["status"])
+
 
 if __name__ == "__main__":
     unittest.main()

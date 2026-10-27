@@ -33,6 +33,10 @@ class PublishingAPI:
         if method == "POST" and match:
             job = self.service.retry(match.group(1), handler.headers.get("Idempotency-Key"))
             return self.app.response(handler, job, 202)
+        match = re.fullmatch(r"/api/publishing/targets/([^/]+)/verify", path)
+        if method == "POST" and match:
+            job = self.service.verify(match.group(1), handler.headers.get("Idempotency-Key"))
+            return self.app.response(handler, job, 202)
         match = re.fullmatch(r"/api/publishing/targets/([^/]+)/reconcile", path)
         if method == "POST" and match:
             result = self.service.reconcile(match.group(1), body.get("evidence"), body.get("external_url"))

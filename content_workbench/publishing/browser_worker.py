@@ -249,6 +249,19 @@ def xhs_editor(page):
     return page
 
 
+def verify_xhs_video(page, data):
+    if not xhs_editor(page):
+        return {"status": "login_required", "error": "小红书创作者后台需要登录"}
+    if not click_text(page, "笔记管理", 15000):
+        return field_error("xiaohongshu", "verification", "未找到笔记管理入口，无法核验发布结果")
+    title = data["payload"]["title"]
+    if visible_text(page, title, 20000):
+        return evidence(page, data["target_id"], "published", {"published"}, {
+            "status": "published", "published_evidence": "笔记管理列表存在标题：" + title, "url": page.url})
+    return evidence(page, data["target_id"], "not_found", set(), {
+        "status": "not_found", "error": "笔记管理中未找到该标题，保持待核对，禁止自动重发"})
+
+
 def prepare_xhs_video(page, data, mode):
     source, payload = data["source"], data["payload"]
     if not xhs_editor(page):
@@ -287,7 +300,11 @@ def prepare_xhs_article(page, data, mode):
         return field_error("xiaohongshu", "body", "未找到长文标题或正文编辑器")
     fill(title, payload["title"])
     fill(body, payload["body"])
-    if payload["title"] not in value_of(title) or payload["body"][:30] not in value_of(body):
+    normalized_title = re.sub(r"\s+", "", payload["title"])
+    actual_body = re.sub(r"\s+", "", value_of(body))
+    if (normalized_title not in re.sub(r"\s+", "", value_of(title))
+            or re.sub(r"\s+", "", payload["body"][:30]) not in actual_body
+            or re.sub(r"\s+", "", payload["body"][-30:]) not in actual_body):
         return field_error("xiaohongshu", "body", "长文标题或正文读回不一致")
     fields = {"title", "body", "long_article"}
     if not click_xhs_action(page, "一键排版", 15000):
@@ -302,12 +319,12 @@ def prepare_xhs_article(page, data, mode):
     for _ in range(4):
         if xhs_publish_control(page):
             break
-        if not click_xhs_action(page, "下一步", 5000) and not click_xhs_action(page, "下一步设置"):
+        if not click_xhs_action(page, "下一步", 5000) and not click_text(page, "下一步", 3000) and not click_xhs_action(page, "下一步设置"):
             break
         page.wait_for_timeout(2000)
     click_text(page, "我知道了", 3000)
     try:
-        page.get_by_text(re.compile("笔记图片生成中")).wait_for(state="hidden", timeout=60000)
+        page.get_by_text(re.compile("笔记图片生成中")).wait_for(state="hidden", timeout=180000)
     except Exception:
         return field_error("xiaohongshu", "cover", "长文笔记图片仍在生成，请稍后重试，不要跳过图片检查")
     if not visible_text(page, "内容设置") or not xhs_publish_control(page, 30000):
@@ -534,7 +551,7 @@ def click_publish(page, platform, target_id):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--action", choices=("login", "prepare", "execute"), required=True)
+    parser.add_argument("--action", choices=("login", "prepare", "execute", "verify"), required=True)
     parser.add_argument("--platform", choices=tuple(URLS), required=True)
     parser.add_argument("--profile", required=True)
     parser.add_argument("--payload-file")
@@ -551,7 +568,9 @@ def main():
                 result = {"status": "browser_closed", "login_verified": False, "next_action": "返回发布中心重新生成预览"}
             else:
                 data = json.loads(Path(args.payload_file).read_text(encoding="utf-8"))
-                if args.platform == "douyin":
+                if args.action == "verify" and args.platform == "xiaohongshu":
+                    result = verify_xhs_video(page, data)
+                elif args.platform == "douyin":
                     result = prepare_douyin(page, data, args.action)
                 elif args.platform == "xiaohongshu" and data["source"]["kind"] == "video":
                     result = prepare_xhs_video(page, data, args.action)
