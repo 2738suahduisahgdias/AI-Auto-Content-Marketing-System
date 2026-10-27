@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Bot, BookOpen, CalendarDays, FileText, Home, Library, Menu, Newspaper, PenTool, Play, Settings, Share2, TrendingUp, Video, X } from "lucide-react";
+import { Bot, BookOpen, CalendarDays, FileText, Home, Library, Menu, Newspaper, PenTool, Play, Settings, Share2, ShieldCheck, TrendingUp, Video, X } from "lucide-react";
 import { useApp } from "@/AppContext";
 import { Busy, ErrorBox } from "@/components/ui";
 import { cn } from "@/components/ui";
@@ -19,6 +19,7 @@ const groups: { label: string; items: { to: string; label: string; icon: LucideI
     { to: "/accounts", label: "账号日报", icon: CalendarDays },
     { to: "/articles", label: "文章任务", icon: FileText },
     { to: "/tasks", label: "视频任务", icon: Video },
+    { to: "/review", label: "审核中心", icon: ShieldCheck },
     { to: "/publish", label: "发布与复盘", icon: Share2 },
   ] },
   { label: "系统", items: [
@@ -26,7 +27,7 @@ const groups: { label: string; items: { to: string; label: string; icon: LucideI
     { to: "/settings", label: "设置", icon: Settings },
   ] },
 ];
-const titles: Record<string, string> = { "/": "今天", "/topics/industry": "行业热点", "/topics/douyin": "抖音选题", "/topics/wechat": "视频号选题", "/topics/xiaohongshu": "小红书选题", "/accounts": "账号日报", "/articles": "文章任务", "/tasks": "视频任务", "/publish": "发布与复盘", "/knowledge": "Ontology 知识库", "/settings": "设置" };
+const titles: Record<string, string> = { "/": "今天", "/topics/industry": "行业热点", "/topics/douyin": "抖音选题", "/topics/wechat": "视频号选题", "/topics/xiaohongshu": "小红书选题", "/accounts": "账号日报", "/articles": "文章任务", "/tasks": "视频任务", "/review": "短视频审核", "/publish": "发布与复盘", "/knowledge": "Ontology 知识库", "/settings": "设置" };
 
 function Navigation({ onNavigate }: { onNavigate?: () => void }) {
   return <nav className="main-nav" aria-label="主导航">{groups.map(group => <div className="nav-group" key={group.label}><p>{group.label}</p>{group.items.map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} onClick={onNavigate} className={({ isActive }) => cn("nav-link", isActive && "active")}><Icon size={16} /><span>{label}</span></NavLink>)}</div>)}</nav>;

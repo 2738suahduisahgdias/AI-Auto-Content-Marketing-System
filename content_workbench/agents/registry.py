@@ -18,6 +18,8 @@ AGENTS = {
     "account_analysis_agent": {"name": "账号分析Agent", "description": "账号日报、表现分析与今日推荐", "engines": ["kimi_cli"], "engine": "kimi_cli", "model": "default_unpinned", "timeout": 600, "attempts": 3, "concurrency": 2, "prompt": True, "connected": True},
     "article_agent": {"name": "文章创作Agent", "description": "文章大纲、正文、引用与导出", "engines": ["kimi_cli"], "engine": "kimi_cli", "model": "default_unpinned", "timeout": 600, "attempts": 3, "concurrency": 2, "prompt": True, "connected": True},
     "workflow_agent": {"name": "流程监督Agent", "description": "每日调度、提醒与恢复", "engines": ["scheduler"], "engine": "scheduler", "model": "daily", "timeout": 60, "attempts": 3, "concurrency": 1, "prompt": False, "connected": True},
+    "video_review_agent": {"name": "短视频审核Agent", "description": "批量技术预审与风险证据整理", "engines": ["kimi_cli"], "engine": "kimi_cli", "model": "default_unpinned", "timeout": 600, "attempts": 2, "concurrency": 1, "prompt": True, "connected": True},
+    "schedule_agent": {"name": "发布调度Agent", "description": "批量定时、间隔与发布队列管理", "engines": ["scheduler"], "engine": "scheduler", "model": "interval_queue", "timeout": 60, "attempts": 3, "concurrency": 1, "prompt": False, "connected": True},
 }
 DEFAULT_PROMPTS = {
     "industry_topic_agent": "优先真实业务、流程改造、验收和可复用方法。",
@@ -26,6 +28,7 @@ DEFAULT_PROMPTS = {
     "asset_planning_agent": "优先真实业务画面、录屏、流程图和简洁文字卡。",
     "account_analysis_agent": "区分事实、推断和待验证实验，不编造指标或稳定规律。",
     "article_agent": "先明确读者、真实任务和核心结论，用证据组织步骤、边界与行动清单。",
+    "video_review_agent": "只基于实际证据指出风险位置与核查建议，不判断事实、版权或平台合规结论。",
 }
 
 

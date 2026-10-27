@@ -35,6 +35,9 @@ class PublishingService:
                     "title": item["campaign"]["title"], "body": revision["payload"].get("text", ""), "revision_id": revision_id}
         if kind != "video":
             raise DomainError("PUBLISH_KIND_INVALID", "发布类型仅支持文章或视频", 422, "content_kind", "选择文章或视频")
+        if source_id.startswith("reviewitem_"):
+            from content_workbench.review.service import ReviewService
+            return ReviewService(self.db_path, self.root).source_for_publish(source_id)
         with self.conn(readonly=True) as conn:
             task = conn.execute("SELECT * FROM tasks WHERE content_id=?", (source_id,)).fetchone()
             file = conn.execute("SELECT * FROM files WHERE content_id=? AND kind='video' ORDER BY id DESC LIMIT 1", (source_id,)).fetchone()

@@ -8,6 +8,7 @@ const Topics = lazy(() => import("@/pages/Topics"));
 const Accounts = lazy(() => import("@/pages/Accounts"));
 const Articles = lazy(() => import("@/pages/Articles"));
 const Tasks = lazy(() => import("@/pages/Tasks"));
+const Review = lazy(() => import("@/pages/Review"));
 const Publish = lazy(() => import("@/pages/Publish"));
 const Knowledge = lazy(() => import("@/pages/Knowledge"));
 const Settings = lazy(() => import("@/pages/Settings"));
@@ -19,6 +20,7 @@ export default function App() {
     <Route path="/accounts" element={<Accounts />} />
     <Route path="/articles/:id?" element={<Articles />} />
     <Route path="/tasks/:id?" element={<Tasks />} />
+    <Route path="/review" element={<Review />} />
     <Route path="/publish" element={<Publish />} />
     <Route path="/knowledge" element={<Knowledge />} />
     <Route path="/settings" element={<Settings />} />

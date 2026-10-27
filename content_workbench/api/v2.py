@@ -31,6 +31,11 @@ class V2Application:
         from content_workbench.publishing.api import PublishingAPI
         from content_workbench.publishing.executors import PublishingExecutors
         from content_workbench.publishing.service import PublishingService
+        from content_workbench.review.api import ReviewAPI
+        from content_workbench.review.executors import ReviewExecutors
+        from content_workbench.review.service import ReviewService
+        from content_workbench.schedule.api import ScheduleAPI, ScheduleDispatcher
+        from content_workbench.schedule.service import ScheduleService
         from content_workbench.topics.api import TopicAPI
         from content_workbench.topics.executors import TopicExecutors
         from content_workbench.topics.scheduler import TopicScheduler, configure_schedule
@@ -41,19 +46,25 @@ class V2Application:
         self.topics = TopicService(db_path, self.root)
         self.accounts = AccountService(db_path, self.topics)
         self.publishing = PublishingService(db_path, self.root)
+        self.review = ReviewService(db_path, self.root)
+        self.schedule = ScheduleService(db_path, self.root, self.publishing)
         executors = LocalExecutors(self.workbench).mapping()
         executors.update(TopicExecutors(self.topics).mapping())
         executors.update(AccountExecutors(self.accounts).mapping())
         executors.update(PublishingExecutors(self.publishing).mapping())
+        executors.update(ReviewExecutors(self.review).mapping())
         self.worker = Worker(db_path, executors, self.root)
         self.topic_scheduler = TopicScheduler(db_path)
         self.account_scheduler = AccountScheduler(db_path)
+        self.schedule_dispatcher = ScheduleDispatcher(self.schedule)
         self.topic_api = TopicAPI(self, self.topics, legacy_task_creator)
         self.account_api = AccountAPI(self, self.accounts)
         self.article_api = ArticleAPI(self)
         self.knowledge = KnowledgeService(db_path, self.root)
         self.knowledge_api = KnowledgeAPI(self, self.knowledge)
         self.publishing_api = PublishingAPI(self, self.publishing)
+        self.review_api = ReviewAPI(self, self.review)
+        self.schedule_api = ScheduleAPI(self, self.schedule)
         self.agent_api = AgentAPI(self, db_path)
         self.secret = secrets.token_bytes(32)
         self.sessions = set()
@@ -66,15 +77,17 @@ class V2Application:
         self.worker.start()
         self.topic_scheduler.start()
         self.account_scheduler.start()
+        self.schedule_dispatcher.start()
 
     def stop(self):
+        self.schedule_dispatcher.stop()
         self.topic_scheduler.stop()
         self.account_scheduler.stop()
         self.worker.stop()
 
     @staticmethod
     def matches(path):
-        return path == "/api/articles" or path.startswith(("/api/v2/", "/api/topics/", "/api/agents/", "/api/accounts/", "/api/publish/", "/api/publishing/", "/api/articles/", "/api/knowledge/"))
+        return path in ("/api/articles", "/api/schedule") or path.startswith(("/api/v2/", "/api/topics/", "/api/agents/", "/api/accounts/", "/api/publish/", "/api/publishing/", "/api/review/", "/api/schedule/", "/api/articles/", "/api/knowledge/"))
 
     def cookie(self, handler):
         parsed = SimpleCookie(handler.headers.get("Cookie", ""))
@@ -111,7 +124,7 @@ class V2Application:
     def handle(self, handler, method, path, query):
         try:
             self.authenticate(handler, method in ("POST", "PUT", "PATCH", "DELETE"))
-            body = handler.read_json() if method in ("POST", "PUT", "PATCH") and not path == "/api/v2/assets" else None
+            body = handler.read_json() if method in ("POST", "PUT", "PATCH") and path not in ("/api/v2/assets", "/api/review/uploads") else None
             if path.startswith("/api/topics/"):
                 return self.topic_api.handle(handler, method, path, query, body)
             if path.startswith("/api/agents/"):
@@ -122,6 +135,10 @@ class V2Application:
                 return self.article_api.handle(handler, method, path, body)
             if path.startswith("/api/publishing/"):
                 return self.publishing_api.handle(handler, method, path, query, body)
+            if path.startswith("/api/review/"):
+                return self.review_api.handle(handler, method, path, query, body)
+            if path == "/api/schedule" or path.startswith("/api/schedule/"):
+                return self.schedule_api.handle(handler, method, path, body)
             if path.startswith("/api/knowledge/"):
                 return self.knowledge_api.handle(handler, method, path, query, body)
             if method == "GET" and path == "/api/v2/bootstrap":

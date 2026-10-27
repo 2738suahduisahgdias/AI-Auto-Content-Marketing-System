@@ -5,7 +5,10 @@ import subprocess
 import time
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
+try:
+    from playwright.sync_api import sync_playwright
+except ModuleNotFoundError:
+    sync_playwright = None
 
 HOT_URL = "https://www.douyin.com/hot"
 PROFILE_URL = "https://www.douyin.com/user/self?showSubTab=favorite_folder&showTab=favorite_collection"
@@ -55,6 +58,8 @@ def logged_in(context):
 
 
 def open_context(playwright, profile):
+    if playwright is None:
+        raise RuntimeError("浏览器采集需要在 .venv-topics 隔离环境运行 Playwright")
     return playwright.chromium.launch_persistent_context(
         user_data_dir=str(profile), channel="chrome", headless=False,
         viewport={"width": 1440, "height": 960}, accept_downloads=True,

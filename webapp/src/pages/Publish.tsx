@@ -1,8 +1,10 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FileText, Film, Info } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useApp } from "@/AppContext";
 import { PublishingPanel, type PublishingSource } from "@/components/PublishingPanel";
+import { ScheduleSettings } from "@/components/ScheduleSettings";
+import { api } from "@/lib/api";
 import { Card, Field, PageHeader } from "@/components/ui";
 import type { Article, ContentKind, Task } from "@/lib/types";
 import "./Publish.css";
@@ -15,9 +17,14 @@ function draftOf(article: Article) {
 export default function Publish() {
   const { resources } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [reviewed, setReviewed] = useState<any[]>([]);
   const kind: ContentKind = searchParams.get("kind") === "article" ? "article" : "video";
+  useEffect(() => {
+    api("/api/review/bootstrap").then(data => setReviewed((data.batch?.items || []).filter((item: any) => item.decision === "approved").map((item: any) => ({ ...item, content_id: item.id, title: item.source_path.split("/").pop() })))).catch(() => setReviewed([]));
+  }, []);
   const articles = (resources?.articles.items || []).filter(item => ["approved", "exported"].includes(item.state) && item.active_revisions.draft);
-  const videos = ((resources?.core.tasks || []) as Task[]).filter(task => task.state === "approved" && task.files.some(file => file.kind === "video" && String(file.relative_path || "").toLowerCase().endsWith(".mp4")));
+  const tasks = ((resources?.core.tasks || []) as Task[]).filter(task => task.state === "approved" && task.files.some(file => file.kind === "video" && String(file.relative_path || "").toLowerCase().endsWith(".mp4")));
+  const videos = [...tasks, ...reviewed];
   const sources: (Article | Task)[] = kind === "article" ? articles : videos;
   const requestedId = searchParams.get("id") || "";
   const selected = sources.find(item => (kind === "article" ? (item as Article).id : (item as Task).content_id) === requestedId) || sources[0];
@@ -28,6 +35,11 @@ export default function Publish() {
     if (kind === "article") {
       const article = selected as Article;
       return { id: article.id, title: String(article.campaign.title), body: String(draftOf(article)?.payload.text || "") };
+    }
+    const reviewed = selected as any;
+    if (reviewed.source_path) {
+      const title = reviewed.source_path.split("/").pop().replace(/\.[^.]+$/, "");
+      return { id: reviewed.id, title, body: title };
     }
     const task = selected as Task;
     return {
@@ -50,6 +62,7 @@ export default function Publish() {
     <Card className="publish-source-card"><div><h2>{kind === "article" ? "选择已批准的文章正文" : "选择已人工批准的视频任务"}</h2><p>{kind === "article" ? "公众号与小红书长文只读取当前文章的已审批正文。" : "抖音、小红书与视频号只读取已批准 MP4；不会用文章、音频或 SRT 代替成片。"}</p></div><Field label={kind === "article" ? "文章来源" : "视频来源"}><select value={selectedId} disabled={!sources.length} onChange={event => setSearchParams({ kind, id: event.target.value })}>{!sources.length && <option value="">没有符合发布条件的来源</option>}{sources.map(item => { const itemId = kind === "article" ? (item as Article).id : (item as Task).content_id; const title = kind === "article" ? String((item as Article).campaign.title) : (item as Task).title; return <option value={itemId} key={itemId}>{title} · {itemId}</option>; })}</select></Field></Card>
     <div className="publish-boundary"><Info size={16} /><p>登录窗口任务、预览就绪和公开成功是三种不同状态。页面只展示后端真实结果；公开发布前请检查专用浏览器中的账号、上传进度和平台提示。</p></div>
     <PublishingPanel kind={kind} source={source} />
+    <ScheduleSettings kind={kind} source={source} />
     <div className="publish-related"><h2>发布记录与复盘</h2><p>文章的其他真实链接可在<Link to={selectedId && kind === "article" ? `/articles/${selectedId}` : "/articles"}>文章任务</Link>补录；视频的手动发布记录与 2h / 1d / 3d / 7d 数据在<Link to={selectedId && kind === "video" ? `/tasks/${selectedId}` : "/tasks"}>视频任务</Link>继续处理。</p></div>
   </div>;
 }
