@@ -131,6 +131,20 @@ class MediaReviewCase(unittest.TestCase):
         self.assertNotIn("silenceremove", command)
         self.assertNotIn("blackdetect", command)
 
+    def test_full_range_input_is_normalized_to_limited_yuv420p(self):
+        source = self.sources["normal"]
+        full_range = self.root / "full-range.mp4"
+        subprocess.run([FFMPEG, "-v", "error", "-y", "-i", str(source),
+                        "-vf", "scale=out_range=pc", "-color_range", "pc", "-c:v", "libx264",
+                        "-pix_fmt", "yuv420p", "-c:a", "copy", str(full_range)], check=True, timeout=60)
+        output = self.root / "limited-range.mp4"
+        command = build_safe_transcode_command(full_range, output, 360, 640)
+        subprocess.run(command, check=True, timeout=60)
+        converted = self.reviewer().review(output, check_ocr=False)
+        self.assertEqual("passed", converted["status"], converted["issues"])
+        self.assertEqual("yuv420p", converted["media"]["video"]["pix_fmt"])
+        self.assertTrue(converted["machine_checks_passed"])
+
     def test_safe_candidate_refuses_overwrite_and_non_mp4(self):
         source = self.sources["normal"]
         with self.assertRaises(ValueError):

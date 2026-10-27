@@ -1,6 +1,5 @@
 import type {Caption} from '@remotion/captions';
-import {createTikTokStyleCaptions} from '@remotion/captions';
-import React, {useMemo} from 'react';
+import React from 'react';
 import {
 	Interactive,
 	useCurrentFrame,
@@ -13,10 +12,8 @@ import {
 type BasicCaptionsProps = InteractiveTransformProps &
 	Pick<SequenceProps, 'width'> & {
 		readonly captions: Caption[];
-		readonly combineTokensWithinMilliseconds?: number;
 	};
 
-const defaultCombineTokensWithinMilliseconds = 3000;
 const defaultWidth = 900;
 
 const basicCaptionsSchema = {
@@ -29,37 +26,20 @@ const basicCaptionsSchema = {
 		description: 'Caption area width',
 		hiddenFromList: false,
 	},
-	combineTokensWithinMilliseconds: {
-		type: 'number',
-		min: 0,
-		step: 50,
-		default: defaultCombineTokensWithinMilliseconds,
-		description: 'Time between caption pages',
-		hiddenFromList: false,
-	},
 } as const satisfies InteractivitySchema;
 
 const BasicCaptionsContent: React.FC<BasicCaptionsProps> = ({
 	captions,
-	combineTokensWithinMilliseconds = defaultCombineTokensWithinMilliseconds,
 	style,
 	width = defaultWidth,
 }) => {
 	const frame = useCurrentFrame();
 	const {fps} = useVideoConfig();
-	const pages = useMemo(
-		() =>
-			createTikTokStyleCaptions({
-				captions,
-				combineTokensWithinMilliseconds,
-			}).pages,
-		[captions, combineTokensWithinMilliseconds],
-	);
 	const currentTimeMs = (frame / fps) * 1000;
-	const page = pages.find(
+	const page = captions.find(
 		(candidate) =>
 			currentTimeMs >= candidate.startMs &&
-			currentTimeMs < candidate.startMs + candidate.durationMs,
+			currentTimeMs < candidate.endMs,
 	);
 
 	return (
@@ -78,9 +58,10 @@ const BasicCaptionsContent: React.FC<BasicCaptionsProps> = ({
 						backgroundColor: 'rgba(64, 64, 64, 0.75)',
 						color: '#ffffff',
 						fontFamily: 'Arial, Helvetica, sans-serif',
-						fontSize: 64,
+						fontSize: 42,
 						fontWeight: 400,
-						lineHeight: 1.2,
+						lineHeight: 1.35,
+							maxWidth: 860,
 						padding: '14px 22px',
 						textAlign: 'center',
 						textWrap: 'balance',

@@ -76,7 +76,7 @@ def render_remotion(workbench, item_id, context):
         props_path.write_text(json.dumps(props, ensure_ascii=False), encoding="utf-8")
         output = staging / "render.mp4"
         context.run_process(["npx", "remotion", "render", "src/index.ts", "TalkingHead", str(output),
-                             "--props=" + str(props_path), "--codec=h264", "--port=" + str(free_port())],
+                             "--props=" + str(props_path), "--codec=h264", "--pixel-format=yuv420p", "--port=" + str(free_port())],
                             timeout=1800, stage="remotion_render", cwd=remotion_root)
         info = probe(output, "video/mp4")
         streams = info["streams"]

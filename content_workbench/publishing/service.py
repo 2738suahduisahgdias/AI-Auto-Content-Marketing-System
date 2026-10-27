@@ -210,6 +210,18 @@ class PublishingService:
         self.update_batch_status(batch["id"])
         return job
 
+    def reconcile(self, target_id, evidence, external_url=None):
+        batch, target = self.target(target_id)
+        if target["status"] != "unknown_remote":
+            raise DomainError("PUBLISH_RECONCILE_NOT_REQUIRED", "只有待人工核对的目标可以确认发布结果", 409, "status", "先完成预览或核对当前状态")
+        evidence = str(evidence or "").strip()
+        if len(evidence) < 10:
+            raise DomainError("PUBLISH_RECONCILE_EVIDENCE_REQUIRED", "请提供平台后台的实际发布证据", 422, "evidence", "填写后台时间、内容或真实链接，不要只写已发布")
+        preview = dict(target.get("preview") or {})
+        preview.update({"published_evidence": evidence, "reconciled_by": "local_user", "reconciled_at": utcnow()})
+        self.set_target_result(target_id, "published", preview, external_url=external_url)
+        return self.target(target_id)[1]
+
     def set_target_result(self, target_id, status, preview=None, error=None, job_id=None, external_url=None):
         with self.conn() as conn, immediate(conn):
             conn.execute("""UPDATE publish_targets SET status=?,preview_json=?,error_json=?,job_id=COALESCE(?,job_id),

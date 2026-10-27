@@ -2,7 +2,7 @@ from content_workbench.domain.errors import DomainError
 
 ARTICLE_PLATFORMS = ("wechat_official_account", "xiaohongshu")
 VIDEO_PLATFORMS = ("douyin", "xiaohongshu", "wechat_channels")
-SUPPORTED_PREPARE = {"wechat_official_account", "xiaohongshu", "douyin"}
+SUPPORTED_PREPARE = {"wechat_official_account", "xiaohongshu", "douyin", "wechat_channels"}
 PLATFORM_NAMES = {
     "wechat_official_account": "公众号",
     "xiaohongshu": "小红书",

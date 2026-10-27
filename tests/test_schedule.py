@@ -77,12 +77,12 @@ class ScheduleCase(unittest.TestCase):
         with self.assertRaises(DomainError) as caught:
             self.service.create_schedule([request], "2026-01-01T10:00:00Z")
         self.assertEqual("PUBLISH_CONFIRMATION_STALE", caught.exception.code)
-        unsupported = self.make_batch(platforms=("wechat_channels",))
-        with self.assertRaises(DomainError) as caught:
-            self.create([unsupported])
-        self.assertEqual("PUBLISH_CONNECTOR_PENDING", caught.exception.code)
+        channels = self.make_batch(platforms=("wechat_channels",))
+        schedule = self.create([channels])
+        self.assertEqual("wechat_channels", schedule["queue"][0]["platform"])
+        self.service.cancel_schedule(schedule["id"])
         with connect(self.db, readonly=True) as conn:
-            self.assertEqual(0, conn.execute("SELECT COUNT(*) FROM publish_schedules").fetchone()[0])
+            self.assertEqual(1, conn.execute("SELECT COUNT(*) FROM publish_schedules").fetchone()[0])
             self.assertEqual([], conn.execute("PRAGMA foreign_key_check").fetchall())
 
     def test_video_platform_rows_are_independent_and_confirmation_is_recorded(self):

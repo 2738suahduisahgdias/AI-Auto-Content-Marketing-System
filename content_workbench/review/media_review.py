@@ -59,11 +59,13 @@ def build_safe_transcode_command(source, output, width=1080, height=1920):
         raise ValueError("转码宽高必须是正偶数")
     return [
         shutil.which("ffmpeg") or "ffmpeg", "-n", "-i", str(source),
-        "-map", "0:v:0", "-map", "0:a:0",
-        "-vf", "scale={}:{}:force_original_aspect_ratio=decrease,"
-               "pad={}:{}:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p".format(width, height, width, height),
+        "-map", "0:v:0", "-map", "0:a:0", "-map_metadata", "-1",
+        "-vf", "scale={}:{}:out_range=tv:force_original_aspect_ratio=decrease,"
+               "pad={}:{}:(ow-iw)/2:(oh-ih)/2,setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709,"
+               "setsar=1,format=yuv420p".format(width, height, width, height),
         "-c:v", "libx264", "-preset", "medium", "-crf", "18",
-        "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
+        "-pix_fmt", "yuv420p", "-color_range", "tv", "-color_primaries", "bt709",
+        "-color_trc", "bt709", "-colorspace", "bt709", "-c:a", "aac", "-b:a", "192k",
         "-movflags", "+faststart", str(output),
     ]
 

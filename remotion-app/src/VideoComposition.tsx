@@ -85,11 +85,15 @@ const SceneLayer: React.FC<{scene: TalkingHeadScene}> = ({scene}) => {
             style={{
               color: "#f3f8ed",
               fontFamily: "Arial, PingFang SC, Microsoft YaHei, sans-serif",
-              fontSize: 62,
+              fontSize: 58,
               fontWeight: 650,
               lineHeight: 1.45,
               textAlign: "center",
               textWrap: "balance",
+              display: "-webkit-box",
+              WebkitLineClamp: 4,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
             }}
           >
             {scene.description || scene.name}
@@ -154,7 +158,7 @@ export const VideoComposition: React.FC<TalkingHeadProps> = ({
         <div style={{color: "#d7f277", fontSize: 26, letterSpacing: 3, marginBottom: 12}}>
           AI 落地实战
         </div>
-        <div style={{fontSize: 46, fontWeight: 700, lineHeight: 1.35, textWrap: "balance"}}>
+        <div style={{fontSize: 44, fontWeight: 700, lineHeight: 1.35, textWrap: "balance", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden"}}>
           {title}
         </div>
       </div>

@@ -1,4 +1,5 @@
 import json
+import sys
 import tempfile
 from pathlib import Path
 
@@ -24,8 +25,13 @@ class PublishingExecutors:
     def run(self, context, action, platform, payload=None):
         config = require_agent_enabled(self.service.db_path, "publish_agent")
         with tempfile.TemporaryDirectory(prefix="publishing-job-") as directory:
-            arguments = [str(self.root / ".venv-topics/bin/python"), str(self.root / "content_workbench/publishing/browser_worker.py"),
-                         "--action", action, "--platform", platform, "--profile", str(self.profile(platform))]
+            use_bridge = platform in ("wechat_channels", "wechat_official_account") and action in ("prepare", "execute")
+            worker = "webbridge_worker.py" if use_bridge else "browser_worker.py"
+            python = sys.executable if use_bridge else str(self.root / ".venv-topics/bin/python")
+            arguments = [python, str(self.root / "content_workbench/publishing" / worker),
+                         "--action", action, "--platform", platform]
+            if not use_bridge:
+                arguments += ["--profile", str(self.profile(platform))]
             if payload is not None:
                 path = Path(directory) / "payload.json"
                 path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
@@ -74,6 +80,12 @@ class PublishingExecutors:
         platform = job["input"].get("platform")
         if platform not in PLATFORM_NAMES:
             raise DomainError("PUBLISH_PLATFORM_INVALID", "发布平台无效", 422, "platform", "使用页面提供的平台登录入口")
+        if platform in ("wechat_channels", "wechat_official_account"):
+            from .webbridge_worker import Bridge
+            url = "https://channels.weixin.qq.com/platform/post/create" if platform == "wechat_channels" else "https://mp.weixin.qq.com/"
+            Bridge().call("navigate", {"url": url, "newTab": True, "group_title": "发布预览验证"})
+            return {"status": "browser_opened", "transport": "webbridge", "login_verified": False,
+                    "next_action": "在 Chrome 的发布预览验证标签组中登录，再重新生成预览"}
         return self.run(context, "login", platform)
 
     @staticmethod
@@ -81,6 +93,6 @@ class PublishingExecutors:
         status = result.get("status")
         message = result.get("error") or result.get("message") or "浏览器没有完成发布步骤"
         code = "LOGIN_REQUIRED" if status == "login_required" else "PUBLISH_STEP_FAILED"
-        action = "在发布中心打开对应平台专用登录窗口，登录后重试" if code == "LOGIN_REQUIRED" else "检查{}、{}和平台页面变化后重试".format(PLATFORM_NAMES[platform], stage)
+        action = result.get("action") or ("在发布中心打开对应平台登录页面，登录后重试" if code == "LOGIN_REQUIRED" else "检查{}、{}和平台页面变化后重试".format(PLATFORM_NAMES[platform], stage))
         return DomainError(code, PLATFORM_NAMES[platform] + "：" + message, 409 if code == "LOGIN_REQUIRED" else 502,
                            result.get("field") or platform, action)

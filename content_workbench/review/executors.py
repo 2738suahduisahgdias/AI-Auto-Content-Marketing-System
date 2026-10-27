@@ -27,7 +27,7 @@ class ReviewExecutors:
                 options = dict(batch["rules"])
                 check_ocr = options.pop("check_ocr", True)
                 options.pop("ai_risk", None)
-                report = review_media(item["source_path"], check_ocr=check_ocr, **options)
+                report = review_media(item["candidate_path"] or item["source_path"], check_ocr=check_ocr, **options)
                 status = "needs_review"
                 error = None
             except Exception as exc:
@@ -54,9 +54,11 @@ class ReviewExecutors:
         command = report["safe_transcode_candidate"]["command"]
         work = Path(item["source_path"]).parent / ".审核工作"
         work.mkdir(exist_ok=True)
-        candidate = work / (Path(item["source_path"]).stem + ".mp4")
+        candidate = work / (Path(item["source_path"]).stem + "-" + job.get("id", "manual-repair") + ".mp4")
         command = [str(candidate) if value == "media-review-output.mp4" else value for value in command]
         context.run_process(command, timeout=1800, stage="safe_transcode")
+        if not candidate.is_file() or candidate.stat().st_size == 0:
+            raise DomainError("REVIEW_CANDIDATE_MISSING", "转码结束但没有生成新的候选文件", 502, "item_id", "查看转码日志后重试，旧候选不能作为新结果")
         report = review_media(candidate)
         with self.service.conn() as conn:
             conn.execute("UPDATE review_items SET status='needs_review',candidate_path=?,report_json=?,updated_at=? WHERE id=?",

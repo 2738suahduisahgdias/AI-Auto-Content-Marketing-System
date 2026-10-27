@@ -137,7 +137,7 @@ class ReviewService:
                 raise DomainError("REVIEW_CANDIDATE_MISSING", "审核候选文件不存在", 409, "item_id", "重新上传或转码后终审")
             directory = Path(item["source_path"]).parent / "审核通过"
             directory.mkdir(exist_ok=True)
-            output_path = (directory / source.name).resolve()
+            output_path = (directory / Path(item["source_path"]).name).resolve()
             if output_path != source:
                 shutil.copy2(source, output_path)
             output = str(output_path)

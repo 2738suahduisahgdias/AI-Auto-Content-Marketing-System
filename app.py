@@ -1476,8 +1476,15 @@ def latest_task_file(task, kind):
     return next((file for file in task["files"] if file["kind"] == kind), None)
 
 
+def render_card_text(value, fallback, limit=48):
+    text = re.sub(r"\s+", " ", str(value or "")).strip() or fallback
+    return text if len(text) <= limit else text[:limit - 1].rstrip("，。；：、 ") + "…"
+
+
 def fallback_render_scenes(task, duration):
-    descriptions = [task["title"], task.get("angle") or "真实任务与完整流程", "人工检查每一步", "结果可核验，再进入发布"]
+    descriptions = [render_card_text(task["title"], "企业 AI 落地实战", 36),
+                    render_card_text(task.get("angle"), "真实任务与完整流程"),
+                    "人工检查每一步", "结果可核验，再进入发布"]
     return [{"id": "text-{}".format(index), "name": "文字卡 {:02d}".format(index + 1),
              "start_seconds": round(duration * index / 4, 3), "end_seconds": round(duration * (index + 1) / 4, 3),
              "asset_type": "own", "description": descriptions[index], "media": None}
@@ -1528,7 +1535,8 @@ def prepare_render_assets(task, mode, platform):
             continue
         scene = {"id": item.get("id") or "scene-{}".format(index), "name": item.get("name") or "分镜 {}".format(index + 1),
                  "start_seconds": round(start, 3), "end_seconds": round(end, 3),
-                 "asset_type": item.get("asset_type") or "own", "description": item.get("description") or item.get("name") or task["title"],
+                 "asset_type": item.get("asset_type") or "own",
+                 "description": render_card_text(item.get("description") or item.get("name"), task["title"]),
                  "media": None}
         if complete:
             row = asset_rows[item["file_id"]]
@@ -1551,7 +1559,7 @@ def prepare_render_assets(task, mode, platform):
     if mode in ("upload", "mixed") and not any(scene.get("_local_path") for scene in scenes):
         raise ApiError(409, "已授权场景中没有可渲染的视频或图片", "asset_plan",
                        "至少关联一个 MP4/MOV/WebM 视频或 PNG/JPEG/WebP 图片；其他文件请改作授权凭证，或选择全部 Remotion。")
-    props = {"title": task["title"], "audio": "assets/{}/narration.wav".format(task["content_id"]),
+    props = {"title": render_card_text(task["title"], "企业 AI 落地实战", 42), "audio": "assets/{}/narration.wav".format(task["content_id"]),
              "captions": captions, "durationSeconds": duration,
              "scenes": [{key: value for key, value in scene.items() if not key.startswith("_")} for scene in scenes]}
     return props, scenes, duration
@@ -1564,6 +1572,7 @@ def available_render_port():
 
 
 def run_remotion_render(props, output, timeout=1800):
+    output = Path(output).resolve()
     npx = shutil.which("npx")
     if not npx or not (REMOTION_APP / "package.json").is_file():
         raise ApiError(503, "Remotion 项目或 npx 不可用", "settings", "确认 remotion-app 已安装依赖且 npx 可用，然后重试。")
@@ -1571,8 +1580,10 @@ def run_remotion_render(props, output, timeout=1800):
         props_path = Path(directory) / "props.json"
         props_path.write_text(json.dumps(props, ensure_ascii=False), encoding="utf-8")
         run_process([npx, "remotion", "render", "src/index.ts", "TalkingHead", str(output),
-                     "--props={}".format(props_path), "--codec=h264", "--port={}".format(available_render_port())],
+                     "--props={}".format(props_path), "--codec=h264", "--pixel-format=yuv420p", "--port={}".format(available_render_port())],
                 timeout, MAX_CLI_OUTPUT, "Remotion", REMOTION_APP)
+    if not output.is_file() or output.stat().st_size == 0:
+        raise ApiError(502, "Remotion 命令结束但没有生成有效 MP4", "render", "查看渲染日志和输出路径后重试。")
 
 
 def caption_overlays(captions, directory):

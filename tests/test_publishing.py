@@ -154,6 +154,11 @@ class PublishingCase(unittest.TestCase):
             with self.assertRaises(UnknownRemote):
                 executor.execute({"id": "job-execute", "input": {"target_id": target["id"]}}, mock.Mock())
         self.assertEqual("unknown_remote", self.service.target(target["id"])[1]["status"])
+        with self.assertRaises(DomainError):
+            self.service.reconcile(target["id"], "已发布")
+        result = self.service.reconcile(target["id"], "平台视频管理列表显示本条内容于今天发布", "https://example.com/published")
+        self.assertEqual("published", result["status"])
+        self.assertEqual("https://example.com/published", result["external_url"])
 
 
 if __name__ == "__main__":

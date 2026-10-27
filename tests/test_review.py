@@ -57,7 +57,15 @@ class ReviewCase(unittest.TestCase):
         ReviewExecutors(self.service).scan({"input": {"batch_id": batch["id"]}}, Context())
         item = self.service.get_batch(batch["id"])["items"][0]
         self.assertTrue(item["report"]["safe_transcode_candidate"]["eligible"])
-        ReviewExecutors(self.service).repair({"input": {"item_id": item["id"]}}, Context())
+        executor = ReviewExecutors(self.service)
+        executor.repair({"id": "repair-1", "input": {"item_id": item["id"]}}, Context())
+        first_candidate = self.service.get_batch(batch["id"])["items"][0]["candidate_path"]
+        executor.repair({"id": "repair-2", "input": {"item_id": item["id"]}}, Context())
+        item = self.service.get_batch(batch["id"])["items"][0]
+        self.assertNotEqual(first_candidate, item["candidate_path"])
+        executor.scan({"input": {"batch_id": batch["id"]}}, Context())
+        item = self.service.get_batch(batch["id"])["items"][0]
+        self.assertEqual(item["candidate_path"], item["report"]["source"]["path"])
         output = self.service.decide(item["id"], "approved")
         self.assertTrue(Path(output).is_file())
         self.assertEqual(self.folder / "审核通过" / "sample.mp4", Path(output))

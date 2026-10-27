@@ -34,7 +34,7 @@ const lockedStatuses = new Set(["published", "unknown_remote", "preparing", "pub
 function targetDefaults(source: PublishingSource, platform: string, kind: ContentKind, target?: PublishTarget): TargetForm {
   const payload = target?.payload || {};
   const status = target?.status || "draft";
-  const supported = kind === "article" || platform !== "wechat_channels";
+  const supported = platform in platformNames;
   return {
     enabled: supported && !lockedStatuses.has(status),
     title: String(payload.title || source.title),
@@ -125,7 +125,7 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
     if (!source) return;
     const targets = platforms.filter(platform => {
       const target = batch?.targets.find(item => item.platform === platform);
-      const supported = kind === "article" || platform !== "wechat_channels";
+      const supported = platform in platformNames;
       return forms[platform]?.enabled && supported && !lockedStatuses.has(target?.status || "draft");
     }).map(platform => {
       const form = forms[platform];
@@ -184,7 +184,7 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
         const target = batch?.targets.find(item => item.platform === platform);
         const status = target?.status || "draft";
         const form = forms[platform] || targetDefaults(source, platform, kind, target);
-        const supported = kind === "article" || platform !== "wechat_channels";
+        const supported = platform in platformNames;
         const locked = lockedStatuses.has(status) || !supported;
         const coverRequired = kind === "article" && platform === "wechat_official_account";
         const targetError = target?.error && Object.keys(target.error).length ? target.error : null;
@@ -193,8 +193,8 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
             <label className="publishing-check"><input type="checkbox" checked={form.enabled} disabled={locked || Boolean(busy)} onChange={event => update(platform, { enabled: event.target.checked })} /><strong>{platformNames[platform]}{kind === "article" && platform === "xiaohongshu" ? "长文" : ""}</strong></label>
             <Badge tone={statusTone(status)}>{publishStatusNames[status] || status}</Badge>
           </div>
-          {!supported ? <p className="publishing-unsupported">视频号发布字段尚未完成真实登录验证，当前不能加入批次。</p> : <>
-            <Button size="small" variant="ghost" disabled={Boolean(busy)} onClick={() => void execute(`login:${platform}`, () => api(`/api/publishing/connections/${platform}/login`, jsonOptions("POST")), "专用登录窗口任务已提交；请在 5 分钟内完成登录，再重新生成预览")}><LogIn size={14} />打开专用登录窗口</Button>
+          <>
+            <Button size="small" variant="ghost" disabled={Boolean(busy)} onClick={() => void execute(`login:${platform}`, () => api(`/api/publishing/connections/${platform}/login`, jsonOptions("POST")), "登录页面已打开；登录后重新生成预览")}><LogIn size={14} />{["wechat_channels", "wechat_official_account"].includes(platform) ? "在已登录 Chrome 中打开" : "打开专用登录窗口"}</Button>
             <Field label="发布标题"><Input value={form.title} disabled={locked || Boolean(busy)} maxLength={platform === "wechat_official_account" ? 64 : kind === "article" ? 200 : 300} onChange={event => update(platform, { title: event.target.value })} /></Field>
             {kind === "article" && platform === "wechat_official_account" && <div className="publishing-two-columns"><Field label="作者（最多 8 字）"><Input value={form.author} disabled={locked || Boolean(busy)} maxLength={8} onChange={event => update(platform, { author: event.target.value })} /></Field><Field label="摘要（最多 120 字）"><Textarea value={form.summary} disabled={locked || Boolean(busy)} maxLength={120} onChange={event => update(platform, { summary: event.target.value })} /></Field></div>}
             <Field label={kind === "article" ? "正文" : "发布简介"}><Textarea className="publishing-body" value={form.body} disabled={locked || Boolean(busy)} onChange={event => update(platform, { body: event.target.value })} /></Field>
@@ -203,9 +203,9 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
               <Input type="file" accept=".png,.jpg,.jpeg,.webp" disabled={locked || Boolean(busy)} onChange={event => void uploadCover(platform, event.target.files?.[0])} />
               <span className={`publishing-cover-name${coverRequired && !form.coverAssetId ? " is-missing" : ""}`}>{busy === `cover:${platform}` ? "正在上传并校验封面…" : form.coverName || (form.coverAssetId ? "已关联封面资产" : coverRequired ? "尚未上传封面" : "未设置封面")}</span>
             </Field>
-          </>}
+          </>
           {targetError && <ErrorBox><strong>{String(targetError.code || "发布失败")}</strong><br />{String(targetError.message || "平台步骤未完成")}{targetError.action && <><br />怎么改：{String(targetError.action)}</>}</ErrorBox>}
-          {status === "unknown_remote" && <div className="publishing-unknown"><ShieldAlert size={17} /><p><strong>禁止直接重试</strong>平台点击后的结果无法确认。请先在平台后台核实是否已公开，避免重复发布。</p></div>}
+          {status === "unknown_remote" && <><div className="publishing-unknown"><ShieldAlert size={17} /><p><strong>禁止直接重试</strong>平台点击后的结果无法确认。请先在平台后台核实是否已公开，避免重复发布。</p></div><Button size="small" disabled={Boolean(busy)} onClick={() => { const evidence = window.prompt("请填写平台后台的实际发布证据（时间、内容或真实链接）；不要只写已发布"); if (evidence) void execute(`reconcile:${target?.id}`, () => api(`/api/publishing/targets/${target?.id}/reconcile`, jsonOptions("POST", { evidence })), "平台实际发布结果已记录"); }}>已在后台核实为已发布</Button></>}
           {target?.preview?.screenshot && <p className="publishing-evidence">预览证据：{String(target.preview.screenshot)}</p>}
           {status === "ready" && <p className="publishing-ready">平台报告预览字段已核验；公开前请检查专用窗口中的实际上传与文案。</p>}
           {target?.external_url && <a className="button button-small publishing-external" href={target.external_url} target="_blank" rel="noreferrer">查看真实发布链接<ExternalLink size={13} /></a>}
