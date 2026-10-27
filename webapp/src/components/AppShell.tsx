@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Bot, BookOpen, CalendarDays, FileText, Home, Library, Menu, Newspaper, PenTool, Play, Settings, Share2, ShieldCheck, TrendingUp, Video, X } from "lucide-react";
+import { Bot, CalendarDays, FileText, Home, Library, Menu, PenTool, Settings, Share2, ShieldCheck, TrendingUp, Video, X } from "lucide-react";
 import { useApp } from "@/AppContext";
 import { Busy, ErrorBox } from "@/components/ui";
 import { cn } from "@/components/ui";
@@ -10,10 +10,7 @@ import { cn } from "@/components/ui";
 const groups: { label: string; items: { to: string; label: string; icon: LucideIcon; end?: boolean }[] }[] = [
   { label: "工作", items: [{ to: "/", label: "今天", icon: Home, end: true }] },
   { label: "选题", items: [
-    { to: "/topics/industry", label: "行业热点", icon: Newspaper },
-    { to: "/topics/douyin", label: "抖音选题", icon: TrendingUp },
-    { to: "/topics/wechat", label: "视频号选题", icon: Play },
-    { to: "/topics/xiaohongshu", label: "小红书选题", icon: BookOpen },
+    { to: "/topics/douyin", label: "选题中心", icon: TrendingUp },
   ] },
   { label: "生产", items: [
     { to: "/articles", label: "文章任务", icon: FileText },
