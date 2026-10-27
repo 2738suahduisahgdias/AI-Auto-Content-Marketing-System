@@ -72,7 +72,7 @@ def publish_preview(page, video, title, description):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--action", choices=("xhs_notes", "douyin_account", "publish_preview"), required=True)
+    parser.add_argument("--action", choices=("xhs_notes", "douyin_account", "publish_preview", "xiaohongshu_login", "douyin_publish_login"), required=True)
     parser.add_argument("--profile", required=True)
     parser.add_argument("--video")
     parser.add_argument("--title", default="")
@@ -89,6 +89,11 @@ def main():
                     print(json.dumps(xhs_notes(page), ensure_ascii=False))
             elif args.action == "douyin_account":
                 print(json.dumps(douyin_account(page), ensure_ascii=False))
+            elif args.action in ("xiaohongshu_login", "douyin_publish_login"):
+                url = "https://creator.xiaohongshu.com/" if args.action == "xiaohongshu_login" else "https://creator.douyin.com/creator-micro/content/upload"
+                page.goto(url, wait_until="domcontentloaded", timeout=60000)
+                page.wait_for_timeout(300000)
+                print(json.dumps({"status": "browser_closed", "login_verified": False, "next_action": "返回工作台重新同步或创建发布预览"}, ensure_ascii=False))
             else:
                 if not args.video:
                     raise ValueError("video required")

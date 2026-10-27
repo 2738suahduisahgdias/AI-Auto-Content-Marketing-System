@@ -14,7 +14,13 @@ class AccountExecutors:
 
     def mapping(self):
         return {"accounts.sync": self.sync, "accounts.recommend": self.recommend, "accounts.daily": self.daily,
-                "publish.douyin": self.publish_preview}
+                "accounts.login": self.login, "publish.douyin": self.publish_preview}
+
+    def login(self, job, context):
+        platform = job["input"].get("platform")
+        if platform not in ("xiaohongshu", "douyin_publish"):
+            raise DomainError("ACCOUNT_BROWSER_PLATFORM_INVALID", "登录平台无效", 422, "platform", "重新选择登录入口")
+        return self.platform(context, platform + "_login", platform + "_login")
 
     def platform(self, context, action, stage, **kwargs):
         config = require_agent_enabled(self.topics.db_path, "hotspot_agent")
