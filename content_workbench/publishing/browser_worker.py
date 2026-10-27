@@ -203,6 +203,18 @@ def evidence(page, target_id, mode, fields, extra=None):
     return result
 
 
+def verify_douyin(page, data):
+    page.goto(URLS["douyin"], wait_until="domcontentloaded", timeout=60000)
+    if not click_text(page, "内容管理", 15000):
+        return field_error("douyin", "verification", "未找到内容管理入口，无法核验发布结果")
+    title = data["payload"]["title"]
+    if visible_text(page, title, 20000):
+        return evidence(page, data["target_id"], "published", {"published"}, {
+            "status": "published", "published_evidence": "抖音内容管理列表存在标题：" + title, "url": page.url})
+    return evidence(page, data["target_id"], "not_found", set(), {
+        "status": "not_found", "error": "抖音内容管理中未找到该标题，保持待核对，禁止自动重发"})
+
+
 def prepare_douyin(page, data, mode):
     source, payload = data["source"], data["payload"]
     page.goto(URLS["douyin"], wait_until="domcontentloaded", timeout=60000)
@@ -237,7 +249,7 @@ def prepare_douyin(page, data, mode):
     if payload["description"][:30] not in readback:
         return field_error("douyin", "description", "简介写入后读回不一致")
     if mode == "execute":
-        return click_publish(page, "douyin", data["target_id"])
+        return click_publish(page, "douyin", data["target_id"], payload["title"])
     return evidence(page, data["target_id"], mode, fields, {"title": payload["title"]})
 
 
@@ -538,7 +550,7 @@ def authentication_interrupted(page, platform, target_id):
     return evidence_result
 
 
-def click_publish(page, platform, target_id):
+def click_publish(page, platform, target_id, title=None):
     if authentication_required(page):
         return authentication_interrupted(page, platform, target_id)
     click_visible(page.get_by_role("button", name="我知道了", exact=True), 3000)
@@ -580,6 +592,9 @@ def click_publish(page, platform, target_id):
         success = visible_text(page, label)
         if success:
             return evidence(page, target_id, "published", {"published"}, {"status": "published", "published_evidence": success.inner_text()[:300], "url": None})
+    if platform == "douyin" and title and visible_text(page, title, 5000):
+        return evidence(page, target_id, "published", {"published"}, {
+            "status": "published", "published_evidence": "抖音内容管理列表存在标题：" + title, "url": page.url})
     return evidence(page, target_id, "unknown", set(), {"status": "unknown_remote", "error": "已执行点击，但未读到明确成功证据，请到平台后台核对"})
 
 
@@ -604,6 +619,8 @@ def main():
                 data = json.loads(Path(args.payload_file).read_text(encoding="utf-8"))
                 if args.action == "verify" and args.platform == "xiaohongshu":
                     result = verify_xhs_video(page, data)
+                elif args.action == "verify" and args.platform == "douyin":
+                    result = verify_douyin(page, data)
                 elif args.platform == "douyin":
                     result = prepare_douyin(page, data, args.action)
                 elif args.platform == "xiaohongshu" and data["source"]["kind"] == "video":
