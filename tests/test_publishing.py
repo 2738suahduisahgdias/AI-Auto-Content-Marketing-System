@@ -170,6 +170,23 @@ class PublishingCase(unittest.TestCase):
         self.assertEqual("published", result["status"])
         self.assertEqual("published", self.service.target(target["id"])[1]["status"])
 
+    def test_retrospective_contains_only_verified_records_and_boundaries(self):
+        article = self.service.create_batch("article", self.article["id"], self.article_targets())
+        video = self.service.create_batch("video", self.video, self.video_targets())
+        published = article["targets"][0]
+        self.service.set_target_result(published["id"], "published", {"published_evidence": "公众号首页已发表", "reconciled_at": "2026-10-28T01:00:00Z"})
+        self.service.set_target_result(video["targets"][0]["id"], "unknown_remote", {})
+        data = self.service.retrospective()
+        self.assertEqual(1, data["total_published"])
+        self.assertEqual({"douyin", "xiaohongshu", "wechat_channels", "wechat_official_account"}, set(data["platforms"]))
+        item = data["platforms"]["wechat_official_account"]["items"][0]
+        self.assertEqual("标题", item["title"])
+        self.assertEqual("article", item["content_kind"])
+        self.assertEqual("2026-10-28T01:00:00Z", item["verified_at"])
+        self.assertEqual([], data["platforms"]["douyin"]["items"])
+        self.assertIn("暂不能判断传播效果", data["platforms"]["douyin"]["data_boundary"])
+        self.assertIn("不是平台效果结论", data["platforms"]["xiaohongshu"]["suggestion_kind"])
+
 
 if __name__ == "__main__":
     unittest.main()

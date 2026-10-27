@@ -16,18 +16,23 @@ const groups: { label: string; items: { to: string; label: string; icon: LucideI
     { to: "/topics/xiaohongshu", label: "小红书选题", icon: BookOpen },
   ] },
   { label: "生产", items: [
-    { to: "/accounts", label: "账号日报", icon: CalendarDays },
     { to: "/articles", label: "文章任务", icon: FileText },
     { to: "/tasks", label: "视频任务", icon: Video },
+  ] },
+  { label: "发布", items: [
     { to: "/review", label: "审核中心", icon: ShieldCheck },
-    { to: "/publish", label: "发布与复盘", icon: Share2 },
+    { to: "/publish", label: "发布中心", icon: Share2 },
+  ] },
+  { label: "数据", items: [
+    { to: "/accounts", label: "账号日报", icon: CalendarDays },
+    { to: "/retrospective", label: "内容复盘", icon: TrendingUp },
   ] },
   { label: "系统", items: [
     { to: "/knowledge", label: "知识库", icon: Library },
     { to: "/settings", label: "设置", icon: Settings },
   ] },
 ];
-const titles: Record<string, string> = { "/": "今天", "/topics/industry": "行业热点", "/topics/douyin": "抖音选题", "/topics/wechat": "视频号选题", "/topics/xiaohongshu": "小红书选题", "/accounts": "账号日报", "/articles": "文章任务", "/tasks": "视频任务", "/review": "短视频审核", "/publish": "发布与复盘", "/knowledge": "Ontology 知识库", "/settings": "设置" };
+const titles: Record<string, string> = { "/": "今天", "/topics/industry": "行业热点", "/topics/douyin": "抖音选题", "/topics/wechat": "视频号选题", "/topics/xiaohongshu": "小红书选题", "/accounts": "账号日报", "/retrospective": "内容复盘", "/articles": "文章任务", "/tasks": "视频任务", "/review": "短视频审核", "/publish": "发布中心", "/knowledge": "Ontology 知识库", "/settings": "设置" };
 
 function Navigation({ onNavigate }: { onNavigate?: () => void }) {
   return <nav className="main-nav" aria-label="主导航">{groups.map(group => <div className="nav-group" key={group.label}><p>{group.label}</p>{group.items.map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} onClick={onNavigate} className={({ isActive }) => cn("nav-link", isActive && "active")}><Icon size={16} /><span>{label}</span></NavLink>)}</div>)}</nav>;

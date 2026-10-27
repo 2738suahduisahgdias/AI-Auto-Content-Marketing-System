@@ -129,6 +129,34 @@ class PublishingService:
         batch["targets"] = targets
         return batch
 
+    def retrospective(self):
+        suggestions = {
+            "douyin": "用内容管理中的标题和发布时间核验发布；短信验证完成后仍需核对作品列表。",
+            "xiaohongshu": "长文控制篇幅与图片数量，公众号长文不要直接复用到小红书。",
+            "wechat_channels": "保留人工选文件断点；上传后核对时长、短标题与描述再公开。",
+            "wechat_official_account": "公众号保留完整深度文章，并为管理员微信验证预留确认步骤。",
+        }
+        result = {platform: {"platform_name": PLATFORM_NAMES[platform], "items": [],
+                             "suggestion": suggestions[platform], "suggestion_kind": "流程建议，不是平台效果结论",
+                             "data_boundary": "发布记录已核验；曝光、互动及分时间窗口指标未关联到本条内容，暂不能判断传播效果。"}
+                for platform in PLATFORM_NAMES}
+        with self.conn(readonly=True) as conn:
+            rows = conn.execute("""SELECT t.id AS target_id,t.platform,t.payload_json,t.preview_json,t.external_url,t.updated_at,
+                                       b.id AS batch_id,b.content_kind,b.source_id
+                                FROM publish_targets t JOIN publish_batches b ON b.id=t.batch_id
+                                WHERE t.status='published' ORDER BY t.updated_at DESC""").fetchall()
+        for row in rows:
+            payload = loads(row["payload_json"], {})
+            preview = loads(row["preview_json"], {})
+            result[row["platform"]]["items"].append({
+                "target_id": row["target_id"], "batch_id": row["batch_id"], "source_id": row["source_id"],
+                "content_kind": row["content_kind"], "title": payload.get("title") or row["source_id"],
+                "verified_at": preview.get("reconciled_at") or row["updated_at"],
+                "external_url": row["external_url"], "evidence": preview.get("published_evidence"),
+            })
+        return {"platforms": result, "total_published": len(rows),
+                "note": "仅包含已核验发布记录；提升建议来自工作流证据，不代表内容效果已得到验证。"}
+
     def bootstrap(self, kind=None, source_id=None):
         batch = None
         if kind and source_id:

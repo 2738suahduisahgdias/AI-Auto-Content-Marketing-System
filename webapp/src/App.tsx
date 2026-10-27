@@ -6,6 +6,7 @@ import { Busy } from "@/components/ui";
 const Today = lazy(() => import("@/pages/Today"));
 const Topics = lazy(() => import("@/pages/Topics"));
 const Accounts = lazy(() => import("@/pages/Accounts"));
+const Retrospective = lazy(() => import("@/pages/Retrospective"));
 const Articles = lazy(() => import("@/pages/Articles"));
 const Tasks = lazy(() => import("@/pages/Tasks"));
 const Review = lazy(() => import("@/pages/Review"));
@@ -18,6 +19,7 @@ export default function App() {
     <Route path="/" element={<Today />} />
     <Route path="/topics/:source" element={<Topics />} />
     <Route path="/accounts" element={<Accounts />} />
+    <Route path="/retrospective" element={<Retrospective />} />
     <Route path="/articles/:id?" element={<Articles />} />
     <Route path="/tasks/:id?" element={<Tasks />} />
     <Route path="/review" element={<Review />} />

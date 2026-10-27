@@ -14,6 +14,8 @@ class PublishingAPI:
             data = self.service.bootstrap(query.get("kind", [None])[0], query.get("source_id", [None])[0])
             data["csrf_token"] = self.app.csrf(self.app.cookie(handler))
             return self.app.response(handler, data)
+        if method == "GET" and path == "/api/publishing/retrospective":
+            return self.app.response(handler, self.service.retrospective())
         if method == "POST" and path == "/api/publishing/batches":
             batch = self.service.create_batch(body.get("content_kind"), body.get("source_id"), body.get("targets"))
             return self.app.response(handler, batch, 201)
