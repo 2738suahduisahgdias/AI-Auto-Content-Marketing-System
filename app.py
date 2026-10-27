@@ -1777,15 +1777,28 @@ class Handler(BaseHTTPRequestHandler):
         return value
 
     def serve_static(self, path):
-        names = {"/": "index.html", "/v2": "v2.html", "/v2.js": "v2.js", "/v2.css": "v2.css",
+        names = {"/v2": "v2.html", "/v2.js": "v2.js", "/v2.css": "v2.css",
                  "/legacy": "index.html", "/index.html": "index.html", "/styles.css": "styles.css", "/app.js": "app.js",
                  "/workspaces.js": "workspaces.js", "/publishing.js": "publishing.js"}
-        if path not in names:
+        react_index = WEB_ROOT / "react-dist" / "index.html"
+        react_route = False
+        if path == "/" and react_index.is_file():
+            target = react_index
+            react_route = True
+        elif path.startswith("/assets/"):
+            target = (WEB_ROOT / "react-dist" / path.lstrip("/")).resolve()
+            if (WEB_ROOT / "react-dist") not in target.parents or not target.is_file():
+                raise ApiError(404, "静态资源不存在")
+        elif path in names:
+            target = WEB_ROOT / names[path]
+        elif react_index.is_file():
+            target = react_index
+            react_route = True
+        else:
             raise ApiError(404, "页面不存在")
-        target = WEB_ROOT / names[path]
         body = target.read_bytes()
         content_type = "text/html" if target.suffix == ".html" else "text/css" if target.suffix == ".css" else "application/javascript"
-        session_header = V2.session_header(self) if V2 and path in ("/", "/v2", "/legacy") else None
+        session_header = V2.session_header(self) if V2 and (react_route or path in ("/v2", "/legacy")) else None
         self.send_response(200)
         if session_header:
             self.send_header("Set-Cookie", session_header)
