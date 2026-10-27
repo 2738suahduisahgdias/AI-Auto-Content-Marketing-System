@@ -1779,7 +1779,7 @@ class Handler(BaseHTTPRequestHandler):
     def serve_static(self, path):
         names = {"/": "index.html", "/v2": "v2.html", "/v2.js": "v2.js", "/v2.css": "v2.css",
                  "/legacy": "index.html", "/index.html": "index.html", "/styles.css": "styles.css", "/app.js": "app.js",
-                 "/workspaces.js": "workspaces.js"}
+                 "/workspaces.js": "workspaces.js", "/publishing.js": "publishing.js"}
         if path not in names:
             raise ApiError(404, "页面不存在")
         target = WEB_ROOT / names[path]

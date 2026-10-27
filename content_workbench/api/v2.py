@@ -28,6 +28,9 @@ class V2Application:
         from content_workbench.articles.api import ArticleAPI
         from content_workbench.knowledge.api import KnowledgeAPI
         from content_workbench.knowledge.service import KnowledgeService
+        from content_workbench.publishing.api import PublishingAPI
+        from content_workbench.publishing.executors import PublishingExecutors
+        from content_workbench.publishing.service import PublishingService
         from content_workbench.topics.api import TopicAPI
         from content_workbench.topics.executors import TopicExecutors
         from content_workbench.topics.scheduler import TopicScheduler, configure_schedule
@@ -37,9 +40,11 @@ class V2Application:
         self.jobs = JobStore(db_path)
         self.topics = TopicService(db_path, self.root)
         self.accounts = AccountService(db_path, self.topics)
+        self.publishing = PublishingService(db_path, self.root)
         executors = LocalExecutors(self.workbench).mapping()
         executors.update(TopicExecutors(self.topics).mapping())
         executors.update(AccountExecutors(self.accounts).mapping())
+        executors.update(PublishingExecutors(self.publishing).mapping())
         self.worker = Worker(db_path, executors, self.root)
         self.topic_scheduler = TopicScheduler(db_path)
         self.account_scheduler = AccountScheduler(db_path)
@@ -48,6 +53,7 @@ class V2Application:
         self.article_api = ArticleAPI(self)
         self.knowledge = KnowledgeService(db_path, self.root)
         self.knowledge_api = KnowledgeAPI(self, self.knowledge)
+        self.publishing_api = PublishingAPI(self, self.publishing)
         self.agent_api = AgentAPI(self, db_path)
         self.secret = secrets.token_bytes(32)
         self.sessions = set()
@@ -68,7 +74,7 @@ class V2Application:
 
     @staticmethod
     def matches(path):
-        return path == "/api/articles" or path.startswith(("/api/v2/", "/api/topics/", "/api/agents/", "/api/accounts/", "/api/publish/", "/api/articles/", "/api/knowledge/"))
+        return path == "/api/articles" or path.startswith(("/api/v2/", "/api/topics/", "/api/agents/", "/api/accounts/", "/api/publish/", "/api/publishing/", "/api/articles/", "/api/knowledge/"))
 
     def cookie(self, handler):
         parsed = SimpleCookie(handler.headers.get("Cookie", ""))
@@ -114,6 +120,8 @@ class V2Application:
                 return self.account_api.handle(handler, method, path, body)
             if path == "/api/articles" or path.startswith("/api/articles/"):
                 return self.article_api.handle(handler, method, path, body)
+            if path.startswith("/api/publishing/"):
+                return self.publishing_api.handle(handler, method, path, query, body)
             if path.startswith("/api/knowledge/"):
                 return self.knowledge_api.handle(handler, method, path, query, body)
             if method == "GET" and path == "/api/v2/bootstrap":
