@@ -3,6 +3,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from content_workbench.agents.registry import require_agent_enabled
 from content_workbench.domain.errors import DomainError
 from content_workbench.domain.services import Workbench
 from content_workbench.media.probe import probe
@@ -47,13 +48,16 @@ class LocalExecutors:
         return {"revision_id": revision_id, "active": active, "model": "unpinned", "provider": "kimi_cli"}
 
     def generate_text(self, job, context):
+        agent_id = {"article.outline": "article_agent", "article.draft": "article_agent", "video.script": "script_agent"}[job["kind"]]
+        config = require_agent_enabled(self.workbench.db_path, agent_id)
         item = self.workbench.get_item(job["aggregate_id"])
         context.progress("model_generate", 0.15)
         prompt = json.dumps({"operation": job["kind"], "campaign": item["campaign"],
-                             "brief": item["campaign"]["brief"], "input": job["input"].get("prompt", "")}, ensure_ascii=False)
+                             "brief": item["campaign"]["brief"], "input": job["input"].get("prompt", ""),
+                             "agent_supplement": config["prompt"]}, ensure_ascii=False)
         agent = self.root / "agents" / "content-item-agent.md"
         stdout, _ = context.run_process([self.kimi(), "--agent-file", str(agent), "-p", prompt,
-                                         "--output-format", "stream-json"], timeout=600, stage="kimi_cli", cwd=self.root)
+                                         "--output-format", "stream-json"], timeout=config["timeout_seconds"], stage="kimi_cli", cwd=self.root)
         contents = []
         for line in stdout.splitlines():
             try:

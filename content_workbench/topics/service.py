@@ -1,5 +1,6 @@
 import hashlib
 import json
+import urllib.request
 from pathlib import Path
 
 from content_workbench.jobs.store import JobStore
@@ -12,7 +13,7 @@ DEFAULT_SETTINGS = {
     "daily_time": "09:00", "daily_enabled": False,
     "featured_collection": "选题", "competitor_collection": "企业AI落地竞对账号", "high_praise_collection": "低粉高赞文案",
 }
-SOURCE_KEYS = ("industry", "hot", "featured", "competitor", "high_praise")
+SOURCE_KEYS = ("industry", "hot", "featured", "competitor", "high_praise", "xhs_notes", "wechat_inbox")
 
 
 def stable_id(prefix, value):
@@ -73,13 +74,13 @@ class TopicService:
             conn.execute("INSERT OR IGNORE INTO wb_collections VALUES (?,?,?,?,1)", (collection_id, account_id, title, title))
         return collection_id
 
-    def upsert_item(self, item, source_key, collection_title=None, run_id=None):
+    def upsert_item(self, item, source_key, collection_title=None, run_id=None, platform="douyin"):
         url = item.get("canonical_url") or item.get("url")
         if not url or not url.startswith(("https://", "http://")):
             raise ValueError("作品缺少有效原链接")
         platform_item_id = str(item.get("platform_item_id") or "") or None
         url_hash = canonical_hash(url)
-        item_id = stable_id("research", "douyin:" + (platform_item_id or url_hash))
+        item_id = stable_id("research", platform + ":" + (platform_item_id or url_hash))
         timestamp = utcnow()
         metadata = dict(item.get("metadata") or {})
         for key in ("title", "rank", "heat", "author", "published_at", "duration", "visible_metrics", "source_url"):
@@ -89,7 +90,7 @@ class TopicService:
         metadata["title"] = item.get("title") or metadata.get("title") or "未读取标题"
         collection_id = self.collection(collection_title) if collection_title else None
         with self.conn() as conn, immediate(conn):
-            existing = conn.execute("SELECT id FROM wb_research_items WHERE platform='douyin' AND canonical_url_hash=?", (url_hash,)).fetchone()
+            existing = conn.execute("SELECT id FROM wb_research_items WHERE platform=? AND canonical_url_hash=?", (platform, url_hash)).fetchone()
             if existing:
                 item_id = existing[0]
                 previous = conn.execute("SELECT metadata_json FROM wb_research_items WHERE id=?", (item_id,)).fetchone()[0]
@@ -100,12 +101,31 @@ class TopicService:
                              (platform_item_id, url, dumps(metadata), timestamp, timestamp, item_id))
             else:
                 conn.execute("INSERT INTO wb_research_items VALUES (?,?,?,?,?,?,?,?,?)",
-                             (item_id, "douyin", platform_item_id, url, url_hash, dumps(metadata), timestamp, timestamp, timestamp))
+                             (item_id, platform, platform_item_id, url, url_hash, dumps(metadata), timestamp, timestamp, timestamp))
             if collection_id:
                 conn.execute("""INSERT INTO wb_memberships VALUES (?,?, 'present',?,0)
                     ON CONFLICT(collection_id,item_id) DO UPDATE SET status='present',last_seen_run_id=excluded.last_seen_run_id,consecutive_full_scan_misses=0""",
                     (collection_id, item_id, run_id))
         return item_id
+
+    def cache_cover(self, item_id):
+        item = self.get_item(item_id)
+        url = item["metadata"].get("cover_url")
+        if not url:
+            return False
+        path = self.root / "covers" / "topic-research" / (item_id + ".jpg")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0", "Referer": item["url"]})
+        with urllib.request.urlopen(request, timeout=20) as response:
+            content_type = response.headers.get("Content-Type", "")
+            if response.status != 200 or not content_type.startswith("image/"):
+                return False
+            body = response.read(10 * 1024 * 1024)
+        if len(body) < 100:
+            return False
+        path.write_bytes(body)
+        self.update_metadata(item_id, {"cover_cached": True})
+        return True
 
     def update_metadata(self, item_id, values):
         with self.conn() as conn, immediate(conn):
@@ -181,7 +201,7 @@ class TopicService:
             item = self.item_dict(row, by_item.get(row["id"]))
             item["collections"] = [m["title"] for m in memberships if m["item_id"] == row["id"]]
             source = item["source_key"]
-            if source in ("hot", "industry"):
+            if source in ("hot", "industry", "xhs_notes", "wechat_inbox"):
                 grouped[source].append(item)
             for key, title in mapping.items():
                 if title in item["collections"] and item not in grouped[key]:

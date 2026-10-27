@@ -12,9 +12,21 @@
     <div class="brand"><span class="brand-mark">C</span><div><strong>内容工作流</strong><small>本地创作台</small></div></div>
     <nav aria-label="主导航">
       <button class="nav-item active" data-view="today"><span>今</span>今天</button>
-      <button class="nav-item" data-view="topics"><span>选</span>选题</button>
-      <button class="nav-item" data-view="tasks"><span>作</span>任务</button>
-      <button class="nav-item" data-view="accounts"><span>号</span>账号</button>
+      <div class="nav-group"><div class="nav-group-title">选题</div>
+        <button class="nav-item nav-subitem" data-view="industry"><span>行</span>行业热点</button>
+        <button class="nav-item nav-subitem" data-view="douyin"><span>抖</span>抖音选题</button>
+        <button class="nav-item nav-subitem" data-view="wechat"><span>视</span>视频号选题</button>
+        <button class="nav-item nav-subitem" data-view="xiaohongshu"><span>红</span>小红书选题</button>
+      </div>
+      <div class="nav-group"><div class="nav-group-title">账号</div>
+        <button class="nav-item nav-subitem" data-view="accounts"><span>报</span>账号日报</button>
+        <button class="nav-item nav-subitem" data-view="publish"><span>发</span>发布与复盘</button>
+      </div>
+      <div class="nav-group"><div class="nav-group-title">任务</div>
+        <button class="nav-item nav-subitem" data-view="articles"><span>文</span>文章任务</button>
+        <button class="nav-item nav-subitem" data-view="tasks"><span>视</span>视频任务</button>
+      </div>
+      <button class="nav-item" data-view="knowledge"><span>知</span>知识库</button>
       <button class="nav-item" data-view="settings"><span>设</span>设置</button>
     </nav>
     <div class="side-bottom">
@@ -27,11 +39,17 @@
     <div id="notice" class="notice" role="status" aria-live="polite"></div>
     <section id="today" class="view active"></section>
     <section id="topics" class="view"></section>
+    <section id="wechat" class="view"></section>
+    <section id="xiaohongshu" class="view"></section>
     <section id="tasks" class="view"></section>
+    <section id="articles" class="view"></section>
     <section id="accounts" class="view"></section>
+    <section id="publish" class="view"></section>
+    <section id="knowledge" class="view"></section>
     <section id="settings" class="view"></section>
   </main>
   <div id="loading" class="loading"><span></span>正在打开本地工作流…</div>
   <script src="/app.js"></script>
+  <script src="/workspaces.js"></script>
 </body>
 </html>

@@ -20,7 +20,14 @@ from content_workbench.storage.db import expand_schema, loads
 
 class V2Application:
     def __init__(self, db_path, root, legacy_task_creator=None):
+        from content_workbench.accounts.api import AccountAPI
+        from content_workbench.accounts.executors import AccountExecutors
+        from content_workbench.accounts.scheduler import AccountScheduler, configure_account_schedule
+        from content_workbench.accounts.service import AccountService
         from content_workbench.agents.api import AgentAPI
+        from content_workbench.articles.api import ArticleAPI
+        from content_workbench.knowledge.api import KnowledgeAPI
+        from content_workbench.knowledge.service import KnowledgeService
         from content_workbench.topics.api import TopicAPI
         from content_workbench.topics.executors import TopicExecutors
         from content_workbench.topics.scheduler import TopicScheduler, configure_schedule
@@ -29,29 +36,39 @@ class V2Application:
         self.workbench = Workbench(db_path, self.root)
         self.jobs = JobStore(db_path)
         self.topics = TopicService(db_path, self.root)
+        self.accounts = AccountService(db_path, self.topics)
         executors = LocalExecutors(self.workbench).mapping()
         executors.update(TopicExecutors(self.topics).mapping())
+        executors.update(AccountExecutors(self.accounts).mapping())
         self.worker = Worker(db_path, executors, self.root)
         self.topic_scheduler = TopicScheduler(db_path)
+        self.account_scheduler = AccountScheduler(db_path)
         self.topic_api = TopicAPI(self, self.topics, legacy_task_creator)
+        self.account_api = AccountAPI(self, self.accounts)
+        self.article_api = ArticleAPI(self)
+        self.knowledge = KnowledgeService(db_path, self.root)
+        self.knowledge_api = KnowledgeAPI(self, self.knowledge)
         self.agent_api = AgentAPI(self, db_path)
         self.secret = secrets.token_bytes(32)
         self.sessions = set()
         with self.workbench.conn() as conn:
             expand_schema(conn)
         configure_schedule(db_path, self.topics.settings())
+        configure_account_schedule(db_path)
 
     def start(self):
         self.worker.start()
         self.topic_scheduler.start()
+        self.account_scheduler.start()
 
     def stop(self):
         self.topic_scheduler.stop()
+        self.account_scheduler.stop()
         self.worker.stop()
 
     @staticmethod
     def matches(path):
-        return path.startswith("/api/v2/") or path.startswith("/api/topics/") or path.startswith("/api/agents/")
+        return path == "/api/articles" or path.startswith(("/api/v2/", "/api/topics/", "/api/agents/", "/api/accounts/", "/api/publish/", "/api/articles/", "/api/knowledge/"))
 
     def cookie(self, handler):
         parsed = SimpleCookie(handler.headers.get("Cookie", ""))
@@ -93,6 +110,12 @@ class V2Application:
                 return self.topic_api.handle(handler, method, path, query, body)
             if path.startswith("/api/agents/"):
                 return self.agent_api.handle(handler, method, path, body)
+            if path.startswith("/api/accounts/") or path.startswith("/api/publish/"):
+                return self.account_api.handle(handler, method, path, body)
+            if path == "/api/articles" or path.startswith("/api/articles/"):
+                return self.article_api.handle(handler, method, path, body)
+            if path.startswith("/api/knowledge/"):
+                return self.knowledge_api.handle(handler, method, path, query, body)
             if method == "GET" and path == "/api/v2/bootstrap":
                 session = self.cookie(handler)
                 with self.workbench.conn(readonly=True) as conn:

@@ -1778,7 +1778,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def serve_static(self, path):
         names = {"/": "index.html", "/v2": "v2.html", "/v2.js": "v2.js", "/v2.css": "v2.css",
-                 "/legacy": "index.html", "/index.html": "index.html", "/styles.css": "styles.css", "/app.js": "app.js"}
+                 "/legacy": "index.html", "/index.html": "index.html", "/styles.css": "styles.css", "/app.js": "app.js",
+                 "/workspaces.js": "workspaces.js"}
         if path not in names:
             raise ApiError(404, "页面不存在")
         target = WEB_ROOT / names[path]
@@ -1873,13 +1874,13 @@ class Handler(BaseHTTPRequestHandler):
                     media_ai = media_ai_status()
                     asset_ai = get_asset_ai_status()
                     render_ai = get_render_ai_status()
-                    capabilities = [{"name": "数据分析Agent", "status": "未接入"},
-                                    {"name": "选题Agent", "status": "未配置"},
+                    capabilities = [{"name": "账号分析Agent", "status": "已接入"},
+                                    {"name": "选题Agent", "status": "已配置"},
                                     {"name": "脚本Agent", "status": "已连接" if ai["ready"] else "未测试" if ai["installed"] else "未配置"},
                                     {"name": "素材规划Agent", "status": asset_ai["status"]},
                                     {"name": "视频构建Agent", "status": render_ai["status"]},
                                     {"name": "质检Agent", "status": "未接入"},
-                                    {"name": "发布复盘Agent", "status": "未接入"},
+                                    {"name": "发布Agent", "status": "仅预览填充，人工发布"},
                                     {"name": "系统语音生成", "status": voices["capabilities"]["system_status"]},
                                     {"name": "WhisperX自动字幕", "status": media_ai["whisperx"]["status"]},
                                     {"name": "OpenVoice本人克隆", "status": media_ai["openvoice"]["status"]}]

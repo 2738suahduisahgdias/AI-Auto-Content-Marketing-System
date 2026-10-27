@@ -1,7 +1,7 @@
 import re
 
 from content_workbench.domain.errors import DomainError
-from content_workbench.storage.db import connect, dumps
+from content_workbench.storage.db import connect, dumps, new_id
 
 
 class TopicAPI:
@@ -16,6 +16,20 @@ class TopicAPI:
             data = self.service.bootstrap()
             data["csrf_token"] = self.app.csrf(self.app.cookie(handler))
             return self.app.response(handler, data)
+        if method == "POST" and path == "/api/topics/wechat/messages":
+            data = body or {}
+            text = str(data.get("text", "")).strip()
+            if not text:
+                raise DomainError("WECHAT_MESSAGE_EMPTY", "微信消息不能为空", 422, "text", "粘贴链接、标题或灵感文本")
+            tag = str(data.get("tag", "精选"))
+            if tag not in ("精选", "竞品", "高赞", "行业"):
+                raise DomainError("WECHAT_TAG_INVALID", "标签必须是精选、竞品、高赞或行业", 422, "tag", "选择正确标签")
+            url = str(data.get("url", "")).strip()
+            canonical = url or "https://wechat.local/messages/" + new_id("message")
+            item_id = self.service.upsert_item({"title": text[:200], "canonical_url": canonical,
+                "metadata": {"title": text[:200], "tag": tag, "raw_message": text, "original_url": url,
+                             "ingest": "wechat_manual", "source_name": "微信私聊"}}, "wechat_inbox", platform="wechat_channels")
+            return self.app.response(handler, self.service.get_item(item_id), 201)
         if method == "POST" and path == "/api/topics/settings":
             return self.app.response(handler, self.service.save_settings(body or {}))
         if method == "POST" and path == "/api/topics/browser/open":
