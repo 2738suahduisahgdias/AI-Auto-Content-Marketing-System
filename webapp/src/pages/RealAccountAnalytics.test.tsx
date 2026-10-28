@@ -32,5 +32,6 @@ describe("RealAccountAnalytics", () => {
     expect(screen.queryByText("55,080")).not.toBeInTheDocument();
     expect(screen.queryByText("产品演示 · 全部指标为模拟数据")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "查看演示" })).toHaveAttribute("href", "/accounts?demo=1");
+    expect(document.querySelector(".analytics-platform-dimension")).not.toBeInTheDocument();
   });
 });

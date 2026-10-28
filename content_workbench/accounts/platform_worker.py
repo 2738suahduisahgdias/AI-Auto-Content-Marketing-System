@@ -6,7 +6,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from playwright.sync_api import sync_playwright
+try:
+    from playwright.sync_api import sync_playwright
+except ModuleNotFoundError:
+    sync_playwright = None
 
 from content_workbench.topics.browser_worker import open_context, visible_videos
 
@@ -21,27 +24,39 @@ def xhs_notes(page):
     page.wait_for_timeout(5000)
     if "login" in page.url:
         return {"status": "login_required"}
-    items = page.evaluate("""() => {
-      const result=[];const seen=new Set();
-      for(const a of document.querySelectorAll('a[href]')){
-        const href=a.href;
-        if(!/explore|note-manager|notes|note_detail/.test(href))continue;
-        const text=(a.innerText||'').trim();if(!text||seen.has(href))continue;
-        const title=text.split('\\n').map(x=>x.trim()).filter(x=>x.length>1).sort((a,b)=>b.length-a.length)[0];
-        if(!title)continue;
-        const image=a.querySelector('img')?.src||a.parentElement?.querySelector('img')?.src||'';
-        const metrics=text.match(/\\d+(?:\\.\\d+)?[万wW]?/g)||[];
-        seen.add(href);result.push({title,canonical_url:href,metadata:{title,cover_url:image,visible_metrics:metrics,visible_text:text.slice(0,1000)}});
-        if(result.length>=50)break;
-      }
-      return result;
-    }""")
+    cards = page.evaluate("""() => Array.from(document.querySelectorAll('.note-card')).map(card => ({
+      title: card.querySelector('.note-card__title')?.innerText.trim() || '',
+      text: card.innerText,
+      impression: card.getAttribute('data-impression') || '',
+      cover: card.querySelector('.note-card__media')?.style.backgroundImage || ''
+    }))""")
+    items = []
+    for card in cards:
+        if not card["title"]:
+            continue
+        note_id = ""
+        try:
+            impression = json.loads(card["impression"])
+            note_id = impression.get("noteTarget", {}).get("value", {}).get("noteId", "")
+        except (TypeError, json.JSONDecodeError):
+            pass
+        text = card["text"]
+        published_at = re.search(r"20\d{2}-\d{2}-\d{2}(?:\s+\d{2}:\d{2})?", text)
+        items.append({"title": card["title"], "canonical_url": "https://www.xiaohongshu.com/explore/" + note_id if note_id else "https://creator.xiaohongshu.com/new/note-manager",
+                      "platform_item_id": note_id or None,
+                      "metadata": {"title": card["title"], "cover_url": card["cover"], "visible_text": text[:2000],
+                                   "visible_metrics": re.findall(r"\d+(?:\.\d+)?[万wW]?", text),
+                                   "published_at": published_at.group(0) if published_at else None}})
     return {"status": "ok", "items": items}
 
 
 def douyin_account(page):
     page.goto("https://www.douyin.com/user/self", wait_until="domcontentloaded", timeout=60000)
     page.wait_for_timeout(3500)
+    if "login" in page.url or "登录后查看" in page.locator("body").inner_text():
+        return {"status": "login_required"}
+    page.mouse.wheel(0, 2200)
+    page.wait_for_timeout(3000)
     body = page.locator("body").inner_text()
     def match(pattern):
         found = re.search(pattern, body)
@@ -50,6 +65,69 @@ def douyin_account(page):
                "likes": match(r"获赞\s*(\d+(?:\.\d+)?[万wW]?)"), "works_count": match(r"作品\s*(\d+)") }
     items = visible_videos(page, 20)
     return {"status": "ok", "profile": profile, "items": items}
+
+
+def labeled_metrics(text, platform):
+    labels = {"views": ("播放量", "播放", "阅读", "观看"),
+              "likes": ("点赞", "推荐", "获赞", "喜欢", "在看"),
+              "comments": ("评论", "评论数"), "shares": ("分享", "转发"),
+              "favorites": ("收藏", "收藏数"), "fans": ("粉丝", "关注者", "关注人数")}
+    result = {}
+    for key, names in labels.items():
+        for name in names:
+            found = re.search(re.escape(name) + r"(?:量|数|人数)?\s*[：:]?\s*(\d+(?:\.\d+)?[万wW]?)", text)
+            if found:
+                result[key] = found.group(1)
+                break
+    return result
+
+
+def linked_items(page, platform):
+    raw_items = page.evaluate("""(platform) => {
+      const result=[];const seen=new Set();
+      for(const a of document.querySelectorAll('a[href]')){
+        const href=a.href;const text=(a.innerText||a.closest('tr')?.innerText||a.closest('li')?.innerText||'').trim();
+        if(!text||seen.has(href))continue;
+        const relevant=platform==='wechat_official_account'?/appmsg|__biz/.test(href):/post|video/.test(href);
+        if(!relevant)continue;
+        if(platform!=='wechat_official_account'&&!a.querySelector('img'))continue;
+        const lines=text.split('\\n').map(x=>x.trim()).filter(Boolean);
+        const title=lines.filter(x=>x.length>1&&!/^[\\d.,]+[万wW]?$/.test(x)).sort((a,b)=>b.length-a.length)[0];
+        if(!title)continue;
+        seen.add(href);result.push({title,canonical_url:href,metadata:{title,visible_text:text.slice(0,2000),cover_url:a.querySelector('img')?.src||''}});
+        if(result.length>=50)break;
+      }
+      return result;
+    }""", platform)
+    for item in raw_items:
+        text = item["metadata"].get("visible_text", "")
+        published_at = re.search(r"20\d{2}[-/年]\d{1,2}[-/月]\d{1,2}", text)
+        item["metadata"]["published_at"] = published_at.group(0) if published_at else None
+        item["metrics"] = labeled_metrics(text, platform)
+    return raw_items
+
+
+def channels_account(page):
+    page.goto("https://channels.weixin.qq.com/platform/post/list", wait_until="domcontentloaded", timeout=60000)
+    page.wait_for_timeout(5000)
+    body = page.locator("body").inner_text()
+    if "login" in page.url or "登录视频号助手" in body:
+        return {"status": "login_required"}
+    return {"status": "ok", "profile": labeled_metrics(body, "wechat_channels"), "items": linked_items(page, "wechat_channels")}
+
+
+def official_account(page):
+    page.goto("https://mp.weixin.qq.com/", wait_until="domcontentloaded", timeout=60000)
+    page.wait_for_timeout(5000)
+    body = page.locator("body").inner_text()
+    if "使用账号登录" in body or "扫码登录" in body:
+        return {"status": "login_required"}
+    query = re.search(r"[?&]token=(\d+)", page.url)
+    if query:
+        page.goto("https://mp.weixin.qq.com/cgi-bin/appmsg?t=media/appmsg_list&action=list&token=" + query.group(1), wait_until="domcontentloaded", timeout=60000)
+        page.wait_for_timeout(4000)
+        body = page.locator("body").inner_text()
+    return {"status": "ok", "profile": labeled_metrics(body, "wechat_official_account"), "items": linked_items(page, "wechat_official_account")}
 
 
 def publish_preview(page, video, title, description):
@@ -72,12 +150,14 @@ def publish_preview(page, video, title, description):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--action", choices=("xhs_notes", "douyin_account", "publish_preview", "xiaohongshu_login", "douyin_publish_login"), required=True)
+    parser.add_argument("--action", choices=("xhs_notes", "douyin_account", "channels_account", "official_account", "publish_preview", "xiaohongshu_login", "douyin_publish_login"), required=True)
     parser.add_argument("--profile", required=True)
     parser.add_argument("--video")
     parser.add_argument("--title", default="")
     parser.add_argument("--description", default="")
     args = parser.parse_args()
+    if sync_playwright is None:
+        raise RuntimeError("真实账号采集需要 .venv-topics 隔离环境中的 Playwright，请先运行安装脚本")
     with sync_playwright() as p:
         context = open_context(p, Path(args.profile).resolve())
         try:
@@ -89,6 +169,10 @@ def main():
                     print(json.dumps(xhs_notes(page), ensure_ascii=False))
             elif args.action == "douyin_account":
                 print(json.dumps(douyin_account(page), ensure_ascii=False))
+            elif args.action == "channels_account":
+                print(json.dumps(channels_account(page), ensure_ascii=False))
+            elif args.action == "official_account":
+                print(json.dumps(official_account(page), ensure_ascii=False))
             elif args.action in ("xiaohongshu_login", "douyin_publish_login"):
                 url = "https://creator.xiaohongshu.com/" if args.action == "xiaohongshu_login" else "https://creator.douyin.com/creator-micro/content/upload"
                 page.goto(url, wait_until="domcontentloaded", timeout=60000)

@@ -39,29 +39,30 @@ class AccountExecutors:
 
     def sync(self, job, context):
         result = {"accounts": {}, "media_downloaded": 0}
-        try:
-            xhs = self.platform(context, "xhs_notes", "xiaohongshu_notes")
-            items = xhs.get("items", [])
-            for item in items:
-                item_id = self.topics.upsert_item(item, "xhs_notes", platform="xiaohongshu")
-                try:
-                    self.topics.cache_cover(item_id)
-                except Exception:
-                    pass
-            self.service.save_snapshot("xiaohongshu", {"connection": "ready"}, items)
-            result["accounts"]["xiaohongshu"] = len(items)
-        except DomainError as error:
-            result["accounts"]["xiaohongshu_error"] = error.message
-        try:
-            douyin = self.platform(context, "douyin_account", "douyin_account")
-            items = douyin.get("items", [])
-            self.service.save_snapshot("douyin", douyin.get("profile", {}), items)
-            result["accounts"]["douyin"] = len(items)
-        except DomainError as error:
-            result["accounts"]["douyin_error"] = error.message
-        if "xiaohongshu_error" in result["accounts"] and "douyin_error" in result["accounts"]:
-            details = "；".join("{}：{}".format(name, result["accounts"][key]) for key, name in (("xiaohongshu_error", "小红书"), ("douyin_error", "抖音")))
-            raise DomainError("ACCOUNTS_UNAVAILABLE", details, 409, "browser", "在专用采集窗口分别登录小红书和抖音；若已登录，按上方页面错误检查创作者后台结构")
+        sources = [("xiaohongshu", "xhs_notes"), ("douyin", "douyin_account"),
+                   ("wechat_channels", "channels_account"), ("wechat_official_account", "official_account")]
+        for platform, action in sources:
+            try:
+                snapshot = self.platform(context, action, platform)
+                items = snapshot.get("items", [])
+                if platform == "xiaohongshu":
+                    for item in items:
+                        item_id = self.topics.upsert_item(item, "xhs_notes", platform="xiaohongshu")
+                        try:
+                            self.topics.cache_cover(item_id)
+                        except Exception:
+                            pass
+                profile = {**(snapshot.get("profile") or {}), "connection": "ready" if items else "empty"}
+                self.service.save_snapshot(platform, profile, items)
+                result["accounts"][platform] = len(items)
+                if not items:
+                    result["accounts"][platform + "_warning"] = "已打开后台但未读取到内容；账号可能无内容，也可能页面结构已变化，请检查后台列表"
+            except DomainError as error:
+                result["accounts"][platform + "_error"] = error.message
+        errors = [key for key in result["accounts"] if key.endswith("_error")]
+        if len(errors) == len(sources):
+            details = "；".join("{}：{}".format(key, result["accounts"][key]) for key in errors)
+            raise DomainError("ACCOUNTS_UNAVAILABLE", details, 409, "browser", "在接入向导分别登录对应平台后重试；已登录平台检查页面结构")
         return result
 
     def recommend(self, job, context):

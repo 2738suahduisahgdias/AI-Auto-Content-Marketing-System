@@ -17,15 +17,17 @@ export function TopicCard({ item, busy = false, allowAnalyze = true, onCreate, o
   const author = metadata.author_name || metadata.author || "作者未读取";
   const likes = metadata.like_count ?? metadata.visible_metrics?.like_count;
   const hasOriginalUrl = /^https?:\/\//.test(item.url) && !item.url.startsWith("https://wechat.local/");
+  const source = item.source_key || metadata.source_key;
+  const showCover = !["hot", "industry"].includes(String(source || ""));
   return <Card className="topic-research-card">
-    <div className="topic-research-cover">
-      {metadata.cover_cached ? <img src={`/api/topics/items/${encodeURIComponent(item.id)}/cover`} alt="" loading="lazy" /> : <span>封面待同步</span>}
+    {showCover && <div className="topic-research-cover-native">
+      {metadata.cover_cached ? <img src={`/api/topics/items/${encodeURIComponent(item.id)}/cover`} alt={`${item.title} 封面`} loading="lazy" /> : <span className="topic-cover-pending">封面待同步</span>}
       <div className="topic-cover-meta">
         <Badge tone="orange">{metadata.rank ? `#${metadata.rank}` : metadata.source_name || metadata.tag || item.platform}</Badge>
         <span>赞 {formatNumber(likes)}</span>
       </div>
       <span className="topic-analysis-mark">{item.analysis_status === "succeeded" ? "已拆解" : "仅快照"}</span>
-    </div>
+    </div>}
     <div className="topic-research-body">
       <h3>{item.title}</h3>
       <div className="topic-author"><span>{String(author).slice(0, 1)}</span><div><strong>{author}</strong><small>{metadata.author_followers != null ? `粉丝 ${formatNumber(metadata.author_followers)}` : "粉丝未读取"}</small></div></div>
