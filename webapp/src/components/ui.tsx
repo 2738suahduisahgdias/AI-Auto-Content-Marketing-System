@@ -22,8 +22,8 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
   return <label className="field"><span className="field-label">{label}</span>{children}{hint && <small>{hint}</small>}</label>;
 }
 
-export const Input = (props: InputHTMLAttributes<HTMLInputElement>) => <input className="input" {...props} />;
-export const Textarea = (props: TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea className="textarea" {...props} />;
+export const Input = ({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) => <input className={cn("input", className)} {...props} />;
+export const Textarea = ({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea className={cn("textarea", className)} {...props} />;
 
 export function PageHeader({ eyebrow, title, description, actions }: { eyebrow?: string; title: string; description?: string; actions?: ReactNode }) {
   return <header className="page-header"><div>{eyebrow && <p className="eyebrow">{eyebrow}</p>}<h1>{title}</h1>{description && <p className="page-description">{description}</p>}</div>{actions && <div className="page-actions">{actions}</div>}</header>;

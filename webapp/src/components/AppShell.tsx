@@ -1,9 +1,10 @@
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Bot, CalendarDays, FileText, Home, Library, Menu, PenTool, Settings, Share2, ShieldCheck, TrendingUp, Video, X } from "lucide-react";
+import { Bot, CalendarDays, ChevronDown, Crosshair, FileText, Home, Library, Menu, PenTool, Settings, Share2, ShieldCheck, TrendingUp, Video, X } from "lucide-react";
 import { useApp } from "@/AppContext";
+import { SetupPrompt } from "@/components/SetupPrompt";
 import { Busy, ErrorBox } from "@/components/ui";
 import { cn } from "@/components/ui";
 
@@ -23,16 +24,40 @@ const groups: { label: string; items: { to: string; label: string; icon: LucideI
   { label: "数据", items: [
     { to: "/accounts", label: "账号日报", icon: CalendarDays },
     { to: "/retrospective", label: "内容复盘", icon: TrendingUp },
+    { to: "/competitors", label: "竞对分析", icon: Crosshair },
   ] },
   { label: "系统", items: [
     { to: "/knowledge", label: "知识库", icon: Library },
+    { to: "/setup", label: "接入向导", icon: ShieldCheck },
     { to: "/settings", label: "设置", icon: Settings },
   ] },
 ];
-const titles: Record<string, string> = { "/": "今天", "/topics/industry": "行业热点", "/topics/douyin": "抖音选题", "/topics/wechat": "视频号选题", "/topics/xiaohongshu": "小红书选题", "/accounts": "账号日报", "/retrospective": "内容复盘", "/articles": "文章任务", "/tasks": "视频任务", "/review": "短视频审核", "/publish": "发布中心", "/knowledge": "Ontology 知识库", "/settings": "设置" };
+const titles: Record<string, string> = { "/": "今天", "/topics/industry": "行业热点", "/topics/douyin": "抖音选题", "/topics/wechat": "视频号选题", "/topics/xiaohongshu": "小红书选题", "/accounts": "日报总览", "/accounts/douyin": "抖音日报", "/accounts/wechat_channels": "视频号日报", "/accounts/xiaohongshu": "小红书日报", "/accounts/wechat_official_account": "公众号日报", "/competitors": "竞对分析", "/retrospective": "内容复盘", "/articles": "文章任务", "/tasks": "视频任务", "/review": "短视频审核", "/publish": "发布中心", "/knowledge": "Ontology 知识库", "/setup": "接入向导", "/settings": "设置" };
+
+const topicSources = [
+  { to: "/topics/industry", label: "行业热点" },
+  { to: "/topics/douyin", label: "抖音选题" },
+  { to: "/topics/wechat", label: "视频号选题" },
+  { to: "/topics/xiaohongshu", label: "小红书选题" },
+];
+const accountSources = [
+  { to: "/accounts", label: "日报总览", end: true },
+  { to: "/accounts/douyin", label: "抖音" },
+  { to: "/accounts/wechat_channels", label: "视频号" },
+  { to: "/accounts/xiaohongshu", label: "小红书" },
+  { to: "/accounts/wechat_official_account", label: "公众号" },
+];
+
+function NavDropdown({ label, path, icon: Icon, items, onNavigate }: { label: string; path: string; icon: LucideIcon; items: { to: string; label: string; end?: boolean }[]; onNavigate?: () => void }) {
+  const location = useLocation();
+  const menuId = useId();
+  const active = location.pathname.startsWith(path);
+  const [open, setOpen] = useState(active);
+  return <div className="nav-dropdown"><button type="button" className={cn("nav-link nav-dropdown-toggle", active && "active")} aria-expanded={open} aria-controls={menuId} onClick={() => setOpen(value => !value)}><Icon size={16} /><span>{label}</span><ChevronDown className={cn("nav-dropdown-chevron", open && "open")} size={14} /></button>{open && <div className="nav-dropdown-menu" id={menuId}>{items.map(item => <NavLink key={item.to} to={item.to} end={item.end} onClick={onNavigate} className={({ isActive }) => cn("nav-link nav-sublink", isActive && "active")}><span>{item.label}</span></NavLink>)}</div>}</div>;
+}
 
 function Navigation({ onNavigate }: { onNavigate?: () => void }) {
-  return <nav className="main-nav" aria-label="主导航">{groups.map(group => <div className="nav-group" key={group.label}><p>{group.label}</p>{group.items.map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} onClick={onNavigate} className={({ isActive }) => cn("nav-link", isActive && "active")}><Icon size={16} /><span>{label}</span></NavLink>)}</div>)}</nav>;
+  return <nav className="main-nav" aria-label="主导航">{groups.map(group => <div className="nav-group" key={group.label}><p>{group.label}</p>{group.label === "选题" ? <NavDropdown label="选题中心" path="/topics/" icon={TrendingUp} items={topicSources} onNavigate={onNavigate} /> : group.label === "数据" ? <><NavDropdown label="账号日报" path="/accounts" icon={CalendarDays} items={accountSources} onNavigate={onNavigate} />{group.items.filter(item => item.to !== "/accounts").map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} onClick={onNavigate} className={({ isActive }) => cn("nav-link", isActive && "active")}><Icon size={16} /><span>{label}</span></NavLink>)}</> : group.items.map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} onClick={onNavigate} className={({ isActive }) => cn("nav-link", isActive && "active")}><Icon size={16} /><span>{label}</span></NavLink>)}</div>)}</nav>;
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -48,5 +73,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     </div>
     <nav className="mobile-bottom" aria-label="高频导航">{[{ to: "/", label: "今天", icon: Home, end: true }, { to: "/topics/douyin", label: "选题", icon: TrendingUp }, { to: "/tasks", label: "制作", icon: Video }, { to: "/publish", label: "发布", icon: Share2 }].map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} className={({ isActive }) => cn(isActive && "active")}><Icon size={18} /><span>{label}</span></NavLink>)}</nav>
     {notice && <div className={cn("toast", notice.error && "toast-error")} role="status">{notice.text}</div>}
+    <SetupPrompt />
   </div>;
 }

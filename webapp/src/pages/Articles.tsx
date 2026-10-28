@@ -132,7 +132,7 @@ export default function Articles() {
       <main className="article-main">
         {!selected ? <Empty title={id ? "没有找到这篇文章" : "开始第一条独立文章任务"} description={id ? "它可能已被移除，或链接不完整。请从左侧选择真实文章。" : "创建后，大纲和正文都会保存为可追溯版本。"} action={<Button variant="primary" onClick={() => setCreateOpen(true)}><FilePlus2 size={15} />新建文章</Button>} /> : <>
           <div className="article-title-block"><div><p className="eyebrow">公众号文章 · {selected.id}</p><h2>{String(selected.campaign.title)}</h2><p>当前版本 v{selected.version} · 每次保存生成新版本</p></div><Badge tone={["approved", "exported", "published"].includes(selected.state) ? "green" : selected.state === "in_review" ? "orange" : "neutral"}>{articleStateNames[selected.state] || selected.state}</Badge></div>
-          <div className="article-steps">{["真实需求", "论证大纲", "完整正文", "人工终审", "交付文档"].map((name, index) => <span key={name} className={`article-step${index + 1 <= currentStep ? " active" : ""}`}>{index + 1} {name}</span>)}</div>
+          <div className="article-steps" aria-label="文章生产步骤">{["真实需求", "论证大纲", "完整正文", "人工终审", "交付文档"].map((name, index) => <span key={name} aria-current={index + 1 === currentStep ? "step" : undefined} className={`article-step${index + 1 < currentStep ? " done" : index + 1 === currentStep ? " current" : ""}`}>{index + 1} {name}</span>)}</div>
           {hasActiveJob && <div className="article-review-note">后台任务正在运行。当前编辑内容会保留；生成完成后仅在新版本出现时更新编辑器。</div>}
           <Card className="article-card">
             <div className="article-card-head"><div><h3>文章要求</h3><p>生成时作为本次输入，不覆盖其他 Agent，也不会自动保存为正文。</p></div></div>

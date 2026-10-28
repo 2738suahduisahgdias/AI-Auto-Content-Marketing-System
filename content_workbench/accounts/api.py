@@ -1,5 +1,6 @@
 import re
 
+from content_workbench.accounts.setup import setup_status
 from content_workbench.domain.errors import DomainError
 
 
@@ -10,10 +11,23 @@ class AccountAPI:
         self.jobs = app.jobs
 
     def handle(self, handler, method, path, body):
+        if method == "GET" and path == "/api/accounts/setup":
+            data = setup_status(self.service.db_path)
+            data["csrf_token"] = self.app.csrf(self.app.cookie(handler))
+            return self.app.response(handler, data)
         if method == "GET" and path == "/api/accounts/bootstrap":
             data = self.service.bootstrap()
             data["csrf_token"] = self.app.csrf(self.app.cookie(handler))
             return self.app.response(handler, data)
+        if method == "GET" and path == "/api/accounts/leads":
+            return self.app.response(handler, {"items": self.service.leads.list()})
+        if method == "POST" and path == "/api/accounts/leads":
+            return self.app.response(handler, self.service.leads.create(body), 201)
+        if method == "POST" and path == "/api/accounts/leads/delete":
+            return self.app.response(handler, self.service.leads.delete((body or {}).get("ids")))
+        if method == "POST" and re.fullmatch(r"/api/accounts/leads/([^/]+)", path):
+            lead_id = re.fullmatch(r"/api/accounts/leads/([^/]+)", path).group(1)
+            return self.app.response(handler, self.service.leads.update(lead_id, body))
         if method == "POST" and path == "/api/accounts/sync":
             return self.app.response(handler, self.jobs.enqueue("accounts.sync", {}, "accounts", resource_key="browser"), 202)
         if method == "POST" and path == "/api/accounts/recommend":

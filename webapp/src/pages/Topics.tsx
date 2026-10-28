@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Download, ExternalLink, RefreshCw } from "lucide-react";
-import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useApp } from "@/AppContext";
 import { TopicCard } from "@/components/TopicCard";
 import { Badge, Busy, Button, Card, Empty, ErrorBox, Field, Input, Modal, PageHeader, Progress, Textarea } from "@/components/ui";
@@ -154,7 +154,7 @@ export default function Topics() {
 
   return <>
     <PageHeader eyebrow={copy.eyebrow} title={copy.title} description={copy.description} actions={<><Button onClick={() => setManualOpen(true)}>手动创建选题</Button>{["industry", "douyin"].includes(topicSource) && <Button variant="primary" disabled={!!busy} onClick={() => void perform(`recommend-${recommendationAgent}`, () => api("/api/topics/recommend", jsonOptions("POST", { agent: recommendationAgent })), "选题 Agent 已加入后台，正在分析真实快照")}>生成今日推荐</Button>}</>} />
-    <nav className="topic-source-tabs" aria-label="选题平台">{(Object.keys(sourceCopy) as TopicSource[]).map(key => <Link key={key} to={`/topics/${key}`} className={`topic-source-tab ${topicSource === key ? "active" : ""}`}>{sourceCopy[key].title}</Link>)}</nav>
+    {topicSource === "douyin" && <nav className="topic-subtabs" aria-label="抖音选题分类">{douyinViews.map(view => <button type="button" className={`topic-filter ${douyinView === view.id ? "active" : ""}`} aria-pressed={douyinView === view.id} key={view.id} onClick={() => setDouyinView(view.id)}>{view.label}{view.id === "hot" ? ` · 实际 ${data.hot_count || 0}/20` : ""}</button>)}</nav>}
     {loadError && <ErrorBox>{loadError}<br /><Button size="small" onClick={() => void refresh()}>重新读取</Button></ErrorBox>}
     {actionError && <ErrorBox>{actionError}<br /><Button size="small" onClick={() => setActionError("")}>关闭错误详情</Button></ErrorBox>}
     <div className="topic-intro"><div><Badge tone={data.connection?.connection_status === "ready" ? "green" : "orange"}>{topicSource === "douyin" ? `采集状态：${data.connection?.connection_status || "未配置"}` : topicSource === "xiaohongshu" ? "同步后才知道登录状态" : topicSource === "wechat" ? "手动入库可用" : "公开资讯元数据"}</Badge><h2>{topicSource === "wechat" ? "把聊天里的灵感变成可回溯快照" : topicSource === "xiaohongshu" ? "从自己的近期笔记寻找下一步实验" : "先看证据，再决定做什么"}</h2><p>{topicSource === "wechat" ? "OpenClaw 与聊天卡片自动转发尚未接入；当前真实可用的是下方手动入库。" : topicSource === "xiaohongshu" ? "需要登录时会明确报错；不把打开登录窗口写成已连接。" : "推荐、快照和拆解各自保留状态，失败不会用静态内容补齐。"}</p></div>{topicSource === "industry" && <Button disabled={!!busy} onClick={() => void perform("industry", () => api("/api/topics/industry", jsonOptions("POST", { agent: "industry" })), "行业热点与推荐已加入后台")}><RefreshCw size={14} />同步行业热点</Button>}{topicSource === "douyin" && <Button disabled={!!busy} onClick={() => void perform("sync", () => api("/api/topics/sync", jsonOptions("POST")), "抖音快照同步已加入后台，此阶段不下载视频")}><RefreshCw size={14} />同步快照</Button>}</div>
@@ -162,7 +162,6 @@ export default function Topics() {
     <JobList jobs={jobs} />
 
     {["industry", "douyin"].includes(topicSource) && <div className="topic-layout"><div>
-      {topicSource === "douyin" && <div className="topic-subtabs">{douyinViews.map(view => <button className={`topic-filter ${douyinView === view.id ? "active" : ""}`} key={view.id} onClick={() => setDouyinView(view.id)}>{view.label}{view.id === "hot" ? ` · 实际 ${data.hot_count || 0}/20` : ""}</button>)}</div>}
       {(topicSource === "industry" || douyinView === "hot") && <><div className="section-heading"><h2>{topicSource === "industry" ? "行业今日推荐" : "抖音今日推荐"}</h2><p>{recommendations.length} 条 · 事实与待核实项分开</p></div><Recommendations items={recommendations} agent={recommendationAgent} /></>}
       <div className="section-heading"><h2>{topicSource === "industry" ? "行业资讯快照" : douyinViews.find(view => view.id === douyinView)?.label}</h2><p>{sourceItems.length} 条 · 保留采集时间和原链接</p></div>
       {sourceItems.length ? <div className="topic-grid">{sourceItems.slice(0, topicSource === "industry" ? 20 : undefined).map(item => <TopicCard key={item.id} item={item} busy={!!busy} allowAnalyze={topicSource === "douyin"} onCreate={item => void createResearchTask(item)} onAnalyze={item => void perform(`analyze-${item.id}`, () => api(`/api/topics/items/${encodeURIComponent(item.id)}/analyze`, jsonOptions("POST")), "已选择该视频，开始按需下载、抽帧和 OCR")} onDetail={item => void showDetail(item)} />)}</div> : <Empty title="当前来源还没有作品快照" description={topicSource === "industry" ? "点击“同步行业热点”读取公开资讯。" : "检查收藏夹名称并同步；不会用收藏数量冒充已抓取作品。"} />}

@@ -28,6 +28,9 @@ describe("Articles delivery and pagination", () => {
     expect(screen.getByRole("link", { name: "下载 Markdown" })).toHaveAttribute("href", "/api/v2/assets/markdown-1/content?download=1");
     expect(screen.getByRole("link", { name: "下载 HTML" })).toHaveAttribute("href", "/api/v2/assets/html-1/content?download=1");
     expect(container.querySelector(".article-outline-editor")).toHaveValue("一、第一段\n\n二、第二段");
+    expect(container.querySelector(".article-outline-editor")).toHaveClass("textarea");
+    expect(container.querySelector(".article-draft-editor")).toHaveClass("textarea");
+    expect(screen.getByText("5 交付文档")).toHaveAttribute("aria-current", "step");
     expect(screen.queryByRole("button", { name: "记录真实发布" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "下一页" }));
     expect(screen.getByText("2 / 2 页")).toBeInTheDocument();

@@ -1,3 +1,5 @@
+from content_workbench.accounts.analytics import AccountAnalytics
+from content_workbench.accounts.leads import LeadService
 from content_workbench.storage.db import connect, dumps, immediate, loads, new_id, utcnow
 
 
@@ -5,6 +7,7 @@ class AccountService:
     def __init__(self, db_path, topics):
         self.db_path = str(db_path)
         self.topics = topics
+        self.leads = LeadService(self.db_path)
 
     def conn(self, readonly=False):
         return connect(self.db_path, readonly=readonly)
@@ -13,6 +16,7 @@ class AccountService:
         with self.conn() as conn:
             conn.execute("""CREATE TABLE IF NOT EXISTS account_daily_snapshots(
                 id TEXT PRIMARY KEY,platform TEXT NOT NULL,snapshot_json TEXT NOT NULL,captured_at TEXT NOT NULL)""")
+        self.leads.ensure_tables()
 
     def save_snapshot(self, platform, profile, items):
         self.ensure_tables()
@@ -39,7 +43,9 @@ class AccountService:
             payload = loads(row["payload_json"], {})
             if payload.get("agent") == "account_analysis":
                 recommendations.append({**payload, "id": row["id"], "created_at": row["created_at"]})
-        return {"accounts": latest, "recommendations": recommendations,
+        analytics = AccountAnalytics(self.db_path).bootstrap()
+        return {"accounts": latest, "recommendations": recommendations, "analytics": analytics,
+                "competitor_analytics": analytics["competitor_analytics"],
                 "jobs": [job for job in self.topics.jobs.list() if job["kind"].startswith("accounts.") or job["kind"] == "publish.douyin"][:20]}
 
 
