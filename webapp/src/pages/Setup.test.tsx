@@ -19,5 +19,7 @@ describe("Setup", () => {
     for (const name of ["抖音", "小红书", "视频号", "公众号"]) expect(screen.getByText(name)).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "打开登录窗口" })).toHaveLength(4);
     expect(screen.getByText("不读取账号凭据")).toBeInTheDocument();
+    expect(screen.getByText(/刘洋 · liuyangfjnu/)).toBeInTheDocument();
+    expect(screen.getByText(/Gmail 或其他可接收验证邮件的邮箱均可注册 GitHub/)).toBeInTheDocument();
   });
 });
