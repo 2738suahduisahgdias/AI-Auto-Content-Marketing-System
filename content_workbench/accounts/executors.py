@@ -18,9 +18,11 @@ class AccountExecutors:
 
     def login(self, job, context):
         platform = job["input"].get("platform")
-        if platform not in ("xiaohongshu", "douyin_publish"):
+        actions = {"xiaohongshu": "xiaohongshu_login", "douyin_publish": "douyin_publish_login",
+                   "wechat_channels": "channels_login", "wechat_official_account": "official_login"}
+        if platform not in actions:
             raise DomainError("ACCOUNT_BROWSER_PLATFORM_INVALID", "登录平台无效", 422, "platform", "重新选择登录入口")
-        return self.platform(context, platform + "_login", platform + "_login")
+        return self.platform(context, actions[platform], platform + "_login")
 
     def platform(self, context, action, stage, **kwargs):
         config = require_agent_enabled(self.topics.db_path, "hotspot_agent")

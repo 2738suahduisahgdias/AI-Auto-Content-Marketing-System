@@ -34,8 +34,8 @@ class AccountAPI:
             return self.app.response(handler, self.jobs.enqueue("accounts.recommend", {}, "accounts", resource_key="cloud_text"), 202)
         if method == "POST" and path == "/api/accounts/browser/open":
             platform = (body or {}).get("platform")
-            if platform not in ("xiaohongshu", "douyin_publish"):
-                raise DomainError("ACCOUNT_BROWSER_PLATFORM_INVALID", "登录窗口仅支持小红书或抖音发布后台", 422, "platform", "使用页面提供的登录入口")
+            if platform not in ("xiaohongshu", "douyin_publish", "wechat_channels", "wechat_official_account"):
+                raise DomainError("ACCOUNT_BROWSER_PLATFORM_INVALID", "登录窗口仅支持抖音、小红书、视频号或公众号", 422, "platform", "使用页面提供的登录入口")
             return self.app.response(handler, self.jobs.enqueue("accounts.login", {"platform": platform}, "accounts", resource_key="browser"), 202)
         if method == "POST" and path == "/api/publish/douyin/preview":
             data = body or {}

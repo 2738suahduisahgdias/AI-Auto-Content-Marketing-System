@@ -54,6 +54,13 @@ class AccountCollectionCase(unittest.TestCase):
             self.assertIn(platform, caught.exception.message)
         self.service.save_snapshot.assert_not_called()
 
+    def test_all_login_actions_use_the_same_collection_profile(self):
+        with mock.patch.object(self.executor, "platform", return_value={"status": "browser_closed"}) as open_browser:
+            for platform in ("xiaohongshu", "douyin_publish", "wechat_channels", "wechat_official_account"):
+                self.executor.login({"input": {"platform": platform}}, mock.Mock())
+        actions = [call.args[1] for call in open_browser.call_args_list]
+        self.assertEqual(["xiaohongshu_login", "douyin_publish_login", "channels_login", "official_login"], actions)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -150,7 +150,7 @@ def publish_preview(page, video, title, description):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--action", choices=("xhs_notes", "douyin_account", "channels_account", "official_account", "publish_preview", "xiaohongshu_login", "douyin_publish_login"), required=True)
+    parser.add_argument("--action", choices=("xhs_notes", "douyin_account", "channels_account", "official_account", "publish_preview", "xiaohongshu_login", "douyin_publish_login", "channels_login", "official_login"), required=True)
     parser.add_argument("--profile", required=True)
     parser.add_argument("--video")
     parser.add_argument("--title", default="")
@@ -173,11 +173,14 @@ def main():
                 print(json.dumps(channels_account(page), ensure_ascii=False))
             elif args.action == "official_account":
                 print(json.dumps(official_account(page), ensure_ascii=False))
-            elif args.action in ("xiaohongshu_login", "douyin_publish_login"):
-                url = "https://creator.xiaohongshu.com/" if args.action == "xiaohongshu_login" else "https://creator.douyin.com/creator-micro/content/upload"
-                page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            elif args.action in ("xiaohongshu_login", "douyin_publish_login", "channels_login", "official_login"):
+                urls = {"xiaohongshu_login": "https://creator.xiaohongshu.com/",
+                        "douyin_publish_login": "https://creator.douyin.com/creator-micro/content/upload",
+                        "channels_login": "https://channels.weixin.qq.com/login.html",
+                        "official_login": "https://mp.weixin.qq.com/"}
+                page.goto(urls[args.action], wait_until="domcontentloaded", timeout=60000)
                 page.wait_for_timeout(300000)
-                print(json.dumps({"status": "browser_closed", "login_verified": False, "next_action": "返回工作台重新同步或创建发布预览"}, ensure_ascii=False))
+                print(json.dumps({"status": "browser_closed", "login_verified": False, "next_action": "返回接入向导点击验证并同步"}, ensure_ascii=False))
             else:
                 if not args.video:
                     raise ValueError("video required")
