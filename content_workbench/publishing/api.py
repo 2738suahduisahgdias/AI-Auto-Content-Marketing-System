@@ -1,6 +1,7 @@
 import re
 
 from content_workbench.domain.errors import DomainError
+from content_workbench.publishing.knowledge import publish_knowledge
 
 
 class PublishingAPI:
@@ -10,6 +11,11 @@ class PublishingAPI:
 
     def handle(self, handler, method, path, query, body):
         body = body or {}
+        if method == "GET" and path == "/api/publishing/knowledge":
+            return self.app.response(handler, publish_knowledge())
+        match = re.fullmatch(r"/api/publishing/knowledge/([^/]+)/([^/]+)", path)
+        if method == "GET" and match:
+            return self.app.response(handler, publish_knowledge(platform=match.group(1), content_kind=match.group(2)))
         if method == "GET" and path == "/api/publishing/bootstrap":
             data = self.service.bootstrap(query.get("kind", [None])[0], query.get("source_id", [None])[0])
             data["csrf_token"] = self.app.csrf(self.app.cookie(handler))

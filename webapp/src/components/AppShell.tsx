@@ -32,7 +32,7 @@ const groups: { label: string; items: { to: string; label: string; icon: LucideI
     { to: "/settings", label: "设置", icon: Settings },
   ] },
 ];
-const titles: Record<string, string> = { "/": "今天", "/topics/industry": "行业热点", "/topics/douyin": "抖音选题", "/topics/wechat": "视频号选题", "/topics/xiaohongshu": "小红书选题", "/accounts": "日报总览", "/accounts/douyin": "抖音日报", "/accounts/wechat_channels": "视频号日报", "/accounts/xiaohongshu": "小红书日报", "/accounts/wechat_official_account": "公众号日报", "/competitors": "竞对分析", "/retrospective": "内容复盘", "/articles": "文章任务", "/tasks": "视频任务", "/review": "短视频审核", "/publish": "发布中心", "/knowledge": "Ontology 知识库", "/knowledge/collection": "采集知识库", "/setup": "接入向导", "/settings": "设置" };
+const titles: Record<string, string> = { "/": "今天", "/topics/industry": "行业热点", "/topics/douyin": "抖音选题", "/topics/wechat": "视频号选题", "/topics/xiaohongshu": "小红书选题", "/accounts": "日报总览", "/accounts/douyin": "抖音日报", "/accounts/wechat_channels": "视频号日报", "/accounts/xiaohongshu": "小红书日报", "/accounts/wechat_official_account": "公众号日报", "/competitors": "竞对分析", "/retrospective": "内容复盘", "/articles": "文章任务", "/tasks": "视频任务", "/review": "短视频审核", "/publish": "发布中心", "/knowledge": "Ontology 知识库", "/knowledge/collection": "采集知识库", "/knowledge/publishing": "发布知识库", "/setup": "接入向导", "/settings": "设置" };
 
 const topicSources = [
   { to: "/topics/industry", label: "行业热点" },

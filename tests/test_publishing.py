@@ -8,6 +8,7 @@ from content_workbench.domain.errors import DomainError
 from content_workbench.domain.services import Workbench
 from content_workbench.jobs.worker import UnknownRemote
 from content_workbench.publishing.executors import PublishingExecutors
+from content_workbench.publishing.knowledge import publish_knowledge
 from content_workbench.publishing.service import PublishingService
 from content_workbench.storage.db import connect, expand_schema
 
@@ -186,6 +187,21 @@ class PublishingCase(unittest.TestCase):
         self.assertEqual([], data["platforms"]["douyin"]["items"])
         self.assertIn("暂不能判断传播效果", data["platforms"]["douyin"]["data_boundary"])
         self.assertIn("不是平台效果结论", data["platforms"]["xiaohongshu"]["suggestion_kind"])
+
+    def test_publish_knowledge_matches_actual_validation_contract(self):
+        official = publish_knowledge(platform="wechat_official_account", content_kind="article")["platforms"][0]
+        fields = {field["name"]: field for field in official["content_types"][0]["fields"]}
+        self.assertEqual(64, fields["title"]["max_length"])
+        self.assertEqual(200000, fields["body"]["max_length"])
+        self.assertTrue(fields["cover_asset_id"]["required"])
+        self.assertEqual(8, fields["author"]["max_length"])
+        self.assertEqual(120, fields["summary"]["max_length"])
+        video = publish_knowledge(platform="douyin", content_kind="video")["platforms"][0]
+        video_fields = {field["name"]: field for field in video["content_types"][0]["fields"]}
+        self.assertEqual(300, video_fields["title"]["max_length"])
+        self.assertEqual(5000, video_fields["description"]["max_length"])
+        self.assertTrue(video_fields["video_path"]["required"])
+        self.assertEqual("已验证发布字段", video["verification"])
 
 
 if __name__ == "__main__":
