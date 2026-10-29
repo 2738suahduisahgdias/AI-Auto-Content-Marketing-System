@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+from content_workbench.accounts.existing_browser import run as run_existing_browser
 from content_workbench.agents.registry import require_agent_enabled
 from content_workbench.domain.errors import DomainError
 from content_workbench.topics.executors import TopicExecutors
@@ -29,18 +30,11 @@ class AccountExecutors:
         return {**result, "sync": snapshot, "refresh": "all_account_data"}
 
     def platform(self, context, action, stage, **kwargs):
-        config = require_agent_enabled(self.topics.db_path, "hotspot_agent")
-        arguments = [str(self.root / ".venv-topics/bin/python"), str(self.root / "content_workbench/accounts/platform_worker.py"),
-                     "--action", action, "--profile", str(self.root / "data/topic-browser-profile")]
-        for key, value in kwargs.items():
-            if value is not None:
-                arguments += ["--" + key.replace("_", "-"), str(value)]
-        stdout, _ = context.run_process(arguments, timeout=config["timeout_seconds"], stage=stage, cwd=self.root)
-        result = json.loads(stdout.strip().splitlines()[-1])
+        result = run_existing_browser(action)
         if result.get("status") == "login_required":
             raise DomainError("LOGIN_REQUIRED", result.get("error") or "平台创作者后台需要登录", 409, "browser", result.get("action") or "请重新发起登录并完成扫码")
         if result.get("status") == "error":
-            raise DomainError("PLATFORM_SYNC_FAILED", "平台采集失败：" + result.get("error", "未知错误"), 502, "browser", "检查账号会话和页面结构")
+            raise DomainError("PLATFORM_SYNC_FAILED", "平台采集失败：" + result.get("error", "未知错误"), 502, "browser", result.get("action") or "检查现有浏览器连接后手动重试，不会自动新建浏览器或重复拉取")
         return result
 
     def sync(self, job, context):

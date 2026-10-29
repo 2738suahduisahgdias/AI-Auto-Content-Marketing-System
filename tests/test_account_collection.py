@@ -3,8 +3,10 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from content_workbench.accounts.existing_browser import verified
 from content_workbench.accounts.executors import AccountExecutors
 from content_workbench.accounts.platform_worker import fill_channels_titles, labeled_metrics, wait_for_login
+from content_workbench.topics.browser_worker import open_context
 from content_workbench.domain.errors import DomainError
 
 
@@ -81,6 +83,21 @@ class AccountCollectionCase(unittest.TestCase):
         body = "2026年10月27日 22:27\n279\n置顶\n分享\n删除\n真实视频标题\n2026年10月26日 18:00"
         result = fill_channels_titles(items, body)
         self.assertEqual("真实视频标题", result[0]["title"])
+
+    def test_browser_only_attaches_to_existing_process(self):
+        context = mock.Mock()
+        browser = mock.Mock()
+        browser.contexts = [context]
+        playwright = mock.Mock()
+        playwright.chromium.connect_over_cdp.return_value = browser
+        self.assertEqual(context, open_context(playwright, "unused-profile"))
+        playwright.chromium.connect_over_cdp.assert_called_once()
+        self.assertFalse(playwright.chromium.launch_persistent_context.called)
+
+    def test_existing_browser_login_verification(self):
+        snapshot = {"url": "https://channels.weixin.qq.com/platform/post/list", "tree": ["视频管理"]}
+        self.assertTrue(verified(snapshot, "channels_login"))
+        self.assertFalse(verified({"url": "https://channels.weixin.qq.com/login.html", "tree": ["登录视频号助手"]}, "channels_login"))
 
 
 if __name__ == "__main__":

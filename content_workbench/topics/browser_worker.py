@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import re
 import subprocess
 import time
@@ -60,10 +61,10 @@ def logged_in(context):
 def open_context(playwright, profile):
     if playwright is None:
         raise RuntimeError("浏览器采集需要在 .venv-topics 隔离环境运行 Playwright")
-    return playwright.chromium.launch_persistent_context(
-        user_data_dir=str(profile), channel="chrome", headless=False,
-        viewport={"width": 1440, "height": 960}, accept_downloads=True,
-    )
+    browser = playwright.chromium.connect_over_cdp(os.environ.get("CONTENT_AGENT_CDP_URL", "http://127.0.0.1:9222"))
+    if not browser.contexts:
+        raise RuntimeError("现有浏览器没有可复用的页面上下文，请在已打开的浏览器中操作")
+    return browser.contexts[0]
 
 
 def sync_hot(page):
