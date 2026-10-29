@@ -54,11 +54,11 @@ def xhs_notes(page):
 def douyin_account(page):
     page.goto("https://www.douyin.com/user/self", wait_until="domcontentloaded", timeout=60000)
     page.wait_for_timeout(3500)
-    if "login" in page.url or "登录后查看" in page.locator("body").inner_text():
+    if "login" in page.url or "登录后查看" in page.locator("body").first.inner_text():
         return {"status": "login_required"}
     page.mouse.wheel(0, 2200)
     page.wait_for_timeout(3000)
-    body = page.locator("body").inner_text()
+    body = page.locator("body").first.inner_text()
     def match(pattern):
         found = re.search(pattern, body)
         return found.group(1) if found else None
@@ -108,26 +108,73 @@ def linked_items(page, platform):
     return raw_items
 
 
+def body_text(page):
+    bodies = page.locator("body")
+    texts = [bodies.nth(index).inner_text() for index in range(bodies.count())]
+    return max(texts, key=len, default="")
+
+
+def channels_cards(page):
+    cards = page.locator(".post-feed-item")
+    items = []
+    ignored = {"置顶", "分享", "弹幕管理", "评论管理", "修改描述和封面", "可见权限", "删除", "已声明原创", "仅自己可见", "作者修改过视频信息"}
+    for index in range(cards.count()):
+        card = cards.nth(index)
+        text = card.inner_text()
+        lines = [line.strip() for line in text.split("\n") if line.strip()]
+        titles = [line for line in lines if len(line) > 4 and line not in ignored and not re.fullmatch(r"[\d.,]+[万wW]?", line) and not re.match(r"20\d{2}年", line)]
+        title = max(titles, key=len, default="未读取标题")
+        counts = card.locator(".post-data .data-item .count")
+        values = [counts.nth(i).inner_text() for i in range(counts.count())]
+        keys = ["views", "likes", "comments", "shares", "favorites"]
+        metrics = {key: values[i] if i < len(values) else None for i, key in enumerate(keys)}
+        items.append({"title": title, "canonical_url": "https://channels.weixin.qq.com/platform/post/list",
+                      "metadata": {"title": title, "visible_text": text[:2000], "cover_url": card.locator("img").first.get_attribute("src") if card.locator("img").count() else "",
+                                   "published_at": next((line for line in lines if re.match(r"20\d{2}年", line)), None)}, "metrics": metrics})
+    return items
+
+
+def fill_channels_titles(items, body):
+    lines = [line.strip() for line in body.split("\n") if line.strip()]
+    ignored = {"置顶", "分享", "弹幕管理", "评论管理", "修改描述和封面", "可见权限", "删除", "已声明原创", "仅自己可见", "作者修改过视频信息"}
+    for item in items:
+        if item["title"] != "未读取标题":
+            continue
+        published_at = item["metadata"].get("published_at")
+        try:
+            start = lines.index(published_at)
+        except ValueError:
+            continue
+        for line in lines[start + 1:]:
+            if re.match(r"20\d{2}年", line):
+                break
+            if len(line) > 4 and line not in ignored and not re.fullmatch(r"[\d.,]+[万wW]?", line):
+                item["title"] = line
+                item["metadata"]["title"] = line
+                break
+    return items
+
+
 def channels_account(page):
     page.goto("https://channels.weixin.qq.com/platform/post/list", wait_until="domcontentloaded", timeout=60000)
     page.wait_for_timeout(5000)
-    body = page.locator("body").inner_text()
+    body = body_text(page)
     if "login" in page.url or "登录视频号助手" in body:
         return {"status": "login_required"}
-    return {"status": "ok", "profile": labeled_metrics(body, "wechat_channels"), "items": linked_items(page, "wechat_channels")}
+    return {"status": "ok", "profile": labeled_metrics(body, "wechat_channels"), "items": fill_channels_titles(channels_cards(page), body)}
 
 
 def official_account(page):
     page.goto("https://mp.weixin.qq.com/", wait_until="domcontentloaded", timeout=60000)
     page.wait_for_timeout(5000)
-    body = page.locator("body").inner_text()
+    body = page.locator("body").first.inner_text()
     if "使用账号登录" in body or "扫码登录" in body:
         return {"status": "login_required"}
     query = re.search(r"[?&]token=(\d+)", page.url)
     if query:
         page.goto("https://mp.weixin.qq.com/cgi-bin/appmsg?t=media/appmsg_list&action=list&token=" + query.group(1), wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(4000)
-        body = page.locator("body").inner_text()
+        body = page.locator("body").first.inner_text()
     return {"status": "ok", "profile": labeled_metrics(body, "wechat_official_account"), "items": linked_items(page, "wechat_official_account")}
 
 
@@ -151,7 +198,7 @@ def publish_preview(page, video, title, description):
 
 def login_verified(page, action):
     try:
-        body = page.locator("body").inner_text()
+        body = page.locator("body").first.inner_text()
     except Exception:
         return False
     if action == "xiaohongshu_login":

@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest import mock
 
 from content_workbench.accounts.executors import AccountExecutors
-from content_workbench.accounts.platform_worker import labeled_metrics, wait_for_login
+from content_workbench.accounts.platform_worker import fill_channels_titles, labeled_metrics, wait_for_login
 from content_workbench.domain.errors import DomainError
 
 
@@ -75,6 +75,12 @@ class AccountCollectionCase(unittest.TestCase):
             timeout = wait_for_login(page, "official_login", timeout_seconds=0)
         self.assertEqual("login_required", timeout["status"])
         self.assertIn("重新发起登录", timeout["action"])
+
+    def test_channels_title_uses_date_and_action_boundaries(self):
+        items = [{"title": "未读取标题", "metadata": {"published_at": "2026年10月27日 22:27", "title": "未读取标题"}}]
+        body = "2026年10月27日 22:27\n279\n置顶\n分享\n删除\n真实视频标题\n2026年10月26日 18:00"
+        result = fill_channels_titles(items, body)
+        self.assertEqual("真实视频标题", result[0]["title"])
 
 
 if __name__ == "__main__":
