@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest import mock
 
 from content_workbench.accounts.executors import AccountExecutors
-from content_workbench.accounts.platform_worker import labeled_metrics
+from content_workbench.accounts.platform_worker import labeled_metrics, wait_for_login
 from content_workbench.domain.errors import DomainError
 
 
@@ -60,6 +60,21 @@ class AccountCollectionCase(unittest.TestCase):
                 self.executor.login({"input": {"platform": platform}}, mock.Mock())
         actions = [call.args[1] for call in open_browser.call_args_list]
         self.assertEqual(["xiaohongshu_login", "douyin_publish_login", "channels_login", "official_login"], actions)
+
+    def test_login_success_runs_full_sync_and_timeout_guides_retry(self):
+        page = mock.Mock()
+        with mock.patch("content_workbench.accounts.platform_worker.login_verified", side_effect=[False, True]):
+            result = wait_for_login(page, "channels_login", timeout_seconds=180)
+        self.assertTrue(result["login_verified"])
+        page.wait_for_timeout.assert_called_once_with(3000)
+        with mock.patch.object(self.executor, "platform", return_value=result), mock.patch.object(self.executor, "sync", return_value={"accounts": {"douyin": 15}}) as sync:
+            completed = self.executor.login({"input": {"platform": "wechat_channels"}}, mock.Mock())
+        sync.assert_called_once()
+        self.assertEqual("all_account_data", completed["refresh"])
+        with mock.patch("content_workbench.accounts.platform_worker.login_verified", return_value=False):
+            timeout = wait_for_login(page, "official_login", timeout_seconds=0)
+        self.assertEqual("login_required", timeout["status"])
+        self.assertIn("重新发起登录", timeout["action"])
 
 
 if __name__ == "__main__":

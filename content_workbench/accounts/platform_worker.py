@@ -2,6 +2,7 @@ import argparse
 import json
 import re
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -148,6 +149,31 @@ def publish_preview(page, video, title, description):
     return {"status": "preview_ready", "title": title, "description": description, "auto_published": False}
 
 
+def login_verified(page, action):
+    try:
+        body = page.locator("body").inner_text()
+    except Exception:
+        return False
+    if action == "xiaohongshu_login":
+        return xhs_logged_in(page.context) and "login" not in page.url
+    if action == "douyin_publish_login":
+        return "login" not in page.url and "短信验证" not in body and "扫码登录" not in body
+    if action == "channels_login":
+        return "login" not in page.url and "登录视频号助手" not in body
+    if action == "official_login":
+        return bool(re.search(r"[?&]token=\d+", page.url)) or ("使用账号登录" not in body and "扫码登录" not in body)
+    return False
+
+
+def wait_for_login(page, action, timeout_seconds=180, sleep_seconds=3):
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        if login_verified(page, action):
+            return {"status": "ok", "login_verified": True, "next_action": "自动同步全部账号并刷新数据"}
+        page.wait_for_timeout(sleep_seconds * 1000)
+    return {"status": "login_required", "error": "3 分钟内未完成登录", "action": "请重新发起登录，在打开的页面完成扫码或验证"}
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--action", choices=("xhs_notes", "douyin_account", "channels_account", "official_account", "publish_preview", "xiaohongshu_login", "douyin_publish_login", "channels_login", "official_login"), required=True)
@@ -179,8 +205,7 @@ def main():
                         "channels_login": "https://channels.weixin.qq.com/login.html",
                         "official_login": "https://mp.weixin.qq.com/"}
                 page.goto(urls[args.action], wait_until="domcontentloaded", timeout=60000)
-                page.wait_for_timeout(300000)
-                print(json.dumps({"status": "browser_closed", "login_verified": False, "next_action": "返回接入向导点击验证并同步"}, ensure_ascii=False))
+                print(json.dumps(wait_for_login(page, args.action), ensure_ascii=False))
             else:
                 if not args.video:
                     raise ValueError("video required")
