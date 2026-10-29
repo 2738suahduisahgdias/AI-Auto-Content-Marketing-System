@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Download, ExternalLink, RefreshCw } from "lucide-react";
+import { Archive, Download, ExternalLink, RefreshCw } from "lucide-react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useApp } from "@/AppContext";
 import { TopicCard } from "@/components/TopicCard";
@@ -57,6 +57,7 @@ export default function Topics() {
   const navigate = useNavigate();
   const { resources, refresh, notify, loadError } = useApp();
   const [douyinView, setDouyinView] = useState<DouyinView>("hot");
+  const [showArchived, setShowArchived] = useState(false);
   const [busy, setBusy] = useState("");
   const [actionError, setActionError] = useState("");
   const [settings, setSettings] = useState<Settings>(() => ({ ...emptySettings, ...resources?.topics?.settings }));
@@ -130,7 +131,13 @@ export default function Topics() {
     await perform("settings", () => api("/api/topics/settings", jsonOptions("POST", settings)), "行业范围、提示词和每日任务已保存");
   }
 
-  const sourceItems: TopicItem[] = topicSource === "industry" ? data.sources?.industry || [] : topicSource === "wechat" ? data.sources?.wechat_inbox || [] : topicSource === "xiaohongshu" ? data.sources?.xhs_notes || [] : data.sources?.[douyinView] || [];
+  async function archiveItem(item: TopicItem) {
+    const archived = !item.archived;
+    await perform(`archive-${item.id}`, () => api(`/api/topics/items/${encodeURIComponent(item.id)}/archive`, jsonOptions("POST", { archived })), archived ? "选题已归档，可在已归档中恢复" : "选题已恢复到当前列表");
+  }
+
+  const sourceKey = topicSource === "industry" ? "industry" : topicSource === "wechat" ? "wechat_inbox" : topicSource === "xiaohongshu" ? "xhs_notes" : douyinView;
+  const sourceItems: TopicItem[] = showArchived ? (data.archived || []).filter((item: TopicItem) => item.source_key === sourceKey) : topicSource === "industry" ? data.sources?.industry || [] : topicSource === "wechat" ? data.sources?.wechat_inbox || [] : topicSource === "xiaohongshu" ? data.sources?.xhs_notes || [] : data.sources?.[douyinView] || [];
   const recommendationAgent = topicSource === "industry" ? "industry" : "douyin";
   const recommendations: Json[] = data.recommendations?.[recommendationAgent] || [];
   const legacyTopics: Json[] = resources?.core.topics || [];
@@ -153,7 +160,7 @@ export default function Topics() {
   </Card>;
 
   return <>
-    <PageHeader eyebrow={copy.eyebrow} title={copy.title} description={copy.description} actions={<><Button onClick={() => setManualOpen(true)}>手动创建选题</Button>{["industry", "douyin"].includes(topicSource) && <Button variant="primary" disabled={!!busy} onClick={() => void perform(`recommend-${recommendationAgent}`, () => api("/api/topics/recommend", jsonOptions("POST", { agent: recommendationAgent })), "选题 Agent 已加入后台，正在分析真实快照")}>生成今日推荐</Button>}</>} />
+    <PageHeader eyebrow={copy.eyebrow} title={showArchived ? "已归档选题" : copy.title} description={copy.description} actions={<><Button onClick={() => setShowArchived(value => !value)}><Archive size={15} />{showArchived ? "返回当前选题" : `已归档 ${data.archived_count || 0}`}</Button><Button onClick={() => setManualOpen(true)}>手动创建选题</Button>{["industry", "douyin"].includes(topicSource) && <Button variant="primary" disabled={!!busy} onClick={() => void perform(`recommend-${recommendationAgent}`, () => api("/api/topics/recommend", jsonOptions("POST", { agent: recommendationAgent })), "选题 Agent 已加入后台，正在分析真实快照")}>生成今日推荐</Button>}</>} />
     {topicSource === "douyin" && <nav className="topic-subtabs" aria-label="抖音选题分类">{douyinViews.map(view => <button type="button" className={`topic-filter ${douyinView === view.id ? "active" : ""}`} aria-pressed={douyinView === view.id} key={view.id} onClick={() => setDouyinView(view.id)}>{view.label}{view.id === "hot" ? ` · 实际 ${data.hot_count || 0}/20` : ""}</button>)}</nav>}
     {loadError && <ErrorBox>{loadError}<br /><Button size="small" onClick={() => void refresh()}>重新读取</Button></ErrorBox>}
     {actionError && <ErrorBox>{actionError}<br /><Button size="small" onClick={() => setActionError("")}>关闭错误详情</Button></ErrorBox>}
@@ -164,20 +171,20 @@ export default function Topics() {
     {["industry", "douyin"].includes(topicSource) && <div className="topic-layout"><div>
       {(topicSource === "industry" || douyinView === "hot") && <><div className="section-heading"><h2>{topicSource === "industry" ? "行业今日推荐" : "抖音今日推荐"}</h2><p>{recommendations.length} 条 · 事实与待核实项分开</p></div><Recommendations items={recommendations} agent={recommendationAgent} /></>}
       <div className="section-heading"><h2>{topicSource === "industry" ? "行业资讯快照" : douyinViews.find(view => view.id === douyinView)?.label}</h2><p>{sourceItems.length} 条 · 保留采集时间和原链接</p></div>
-      {sourceItems.length ? <div className="topic-grid">{sourceItems.slice(0, topicSource === "industry" ? 20 : undefined).map(item => <TopicCard key={item.id} item={item} busy={!!busy} allowAnalyze={topicSource === "douyin"} onCreate={item => void createResearchTask(item)} onAnalyze={item => void perform(`analyze-${item.id}`, () => api(`/api/topics/items/${encodeURIComponent(item.id)}/analyze`, jsonOptions("POST")), "已选择该视频，开始按需下载、抽帧和 OCR")} onDetail={item => void showDetail(item)} />)}</div> : <Empty title="当前来源还没有作品快照" description={topicSource === "industry" ? "点击“同步行业热点”读取公开资讯。" : "检查收藏夹名称并同步；不会用收藏数量冒充已抓取作品。"} />}
+      {sourceItems.length ? <div className="topic-grid">{sourceItems.slice(0, topicSource === "industry" ? 20 : undefined).map(item => <TopicCard key={item.id} item={item} busy={!!busy} allowAnalyze={topicSource === "douyin"} onCreate={item => void createResearchTask(item)} onAnalyze={item => void perform(`analyze-${item.id}`, () => api(`/api/topics/items/${encodeURIComponent(item.id)}/analyze`, jsonOptions("POST")), "已选择该视频，开始按需下载、抽帧和 OCR")} onDetail={item => void showDetail(item)} onArchive={archiveItem} archived={showArchived} />)}</div> : <Empty title={showArchived ? "没有已归档选题" : "当前来源还没有作品快照"} description={topicSource === "industry" ? "点击“同步行业热点”读取公开资讯。" : "检查收藏夹名称并同步；不会用收藏数量冒充已抓取作品。"} />}
     </div><aside className="topic-side">{settingsPanel}</aside></div>}
 
     {topicSource === "wechat" && <>
       <div className="wechat-columns"><Card><h3>微信 ClawBot 接入边界</h3><ol className="topic-guide"><li>OpenClaw 官方渠道列表目前没有微信，需要另做合规机器人或自定义渠道。</li><li>约定消息格式：<code>视频号链接 + 空格 + #精选</code>，也支持 #竞品、#高赞、#行业。</li><li>机器人应保存原始链接、文本、标签和发送时间，不自动下载或公开转发。</li><li>聊天卡片回调尚未接入，请先用右侧表单保存。</li></ol><div className="button-row"><a className="button button-small" href="https://channels.weixin.qq.com/login.html" target="_blank" rel="noreferrer">打开视频号助手 <ExternalLink size={13} /></a><a className="button button-small" href="https://docs.openclaw.ai/" target="_blank" rel="noreferrer">OpenClaw 官方文档 <ExternalLink size={13} /></a></div></Card>
       <Card><form onSubmit={submitWechat}><h3>保存一条微信消息</h3><p className="topic-boundary">保存研究快照不代表获得转载授权。</p><Field label="视频号 / 公众号链接（可选）"><Input type="url" value={wechat.url} onChange={event => setWechat({ ...wechat, url: event.target.value })} placeholder="https://" /></Field><Field label="标签"><select value={wechat.tag} onChange={event => setWechat({ ...wechat, tag: event.target.value })}>{["精选", "竞品", "高赞", "行业"].map(tag => <option key={tag}>{tag}</option>)}</select></Field><Field label="标题或灵感文本"><Textarea required maxLength={12000} value={wechat.text} onChange={event => setWechat({ ...wechat, text: event.target.value })} placeholder="粘贴标题、口播文字或自己的选题备注" /></Field><Button variant="primary" type="submit" disabled={!!busy}>{busy === "wechat" ? "正在保存…" : "保存到视频号选题"}</Button></form></Card></div>
       <div className="section-heading"><h2>微信选题快照</h2><p>{sourceItems.length} 条 · 先研究，再创作</p></div>
-      {sourceItems.length ? <><div className="topic-tag-row">{[...new Set<string>(sourceItems.map(item => item.metadata?.tag).filter(Boolean))].map(tag => <Badge key={tag}>{tag}</Badge>)}</div><div className="topic-grid">{sourceItems.map(item => <TopicCard key={item.id} item={item} busy={!!busy} allowAnalyze={false} onCreate={value => void createResearchTask(value)} onDetail={value => void showDetail(value)} />)}</div></> : <Empty title="还没有微信消息" description="使用上方表单保存第一条链接或灵感。" />}
+      {sourceItems.length ? <><div className="topic-tag-row">{[...new Set<string>(sourceItems.map(item => item.metadata?.tag).filter(Boolean))].map(tag => <Badge key={tag}>{tag}</Badge>)}</div><div className="topic-grid">{sourceItems.map(item => <TopicCard key={item.id} item={item} busy={!!busy} allowAnalyze={false} onCreate={value => void createResearchTask(value)} onDetail={value => void showDetail(value)} onArchive={archiveItem} archived={showArchived} />)}</div></> : <Empty title="还没有微信消息" description="使用上方表单保存第一条链接或灵感。" />}
     </>}
 
     {topicSource === "xiaohongshu" && <>
       <Card><div className="topic-intro"><div><h2>连接自己的小红书创作者后台</h2><p>同步同时尝试账号日报所需的小红书笔记和抖音快照。页面结构变化或登录失效会返回具体错误。</p></div><div className="button-row"><Button disabled={!!busy} onClick={() => void perform("xhs-login", () => api("/api/accounts/browser/open", jsonOptions("POST", { platform: "xiaohongshu" })), "小红书专用登录窗口正在打开，请在 5 分钟内完成扫码")}>打开小红书登录窗口</Button><Button variant="primary" disabled={!!busy} onClick={() => void perform("xhs-sync", () => api("/api/accounts/sync", jsonOptions("POST")), "账号同步已加入后台，请在专用窗口处理登录")}><RefreshCw size={14} />同步小红书与账号</Button></div></div></Card>
       <div className="section-heading"><h2>近期笔记快照</h2><p>{sourceItems.length} 条 · 阅读数缺失时保持未读取</p></div>
-      {sourceItems.length ? <div className="topic-grid">{sourceItems.map(item => <TopicCard key={item.id} item={item} busy={!!busy} allowAnalyze={false} onCreate={value => void createResearchTask(value)} onDetail={value => void showDetail(value)} />)}</div> : <Empty title="尚未读取小红书笔记" description="点击“同步小红书与账号”；不会补造指标或显示虚假连接状态。" />}
+      {sourceItems.length ? <div className="topic-grid">{sourceItems.map(item => <TopicCard key={item.id} item={item} busy={!!busy} allowAnalyze={false} onCreate={value => void createResearchTask(value)} onDetail={value => void showDetail(value)} onArchive={archiveItem} archived={showArchived} />)}</div> : <Empty title="尚未读取小红书笔记" description="点击“同步小红书与账号”；不会补造指标或显示虚假连接状态。" />}
     </>}
 
     <div className="section-heading"><h2>保留：账号候选选题</h2><p>{legacyTopics.length} 个历史候选</p></div>

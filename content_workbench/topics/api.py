@@ -60,9 +60,16 @@ class TopicAPI:
         match = re.fullmatch(r"/api/topics/items/([^/]+)/analyze", path)
         if method == "POST" and match:
             return self.app.response(handler, self.jobs.enqueue("research.analyze", {}, match.group(1), resource_key="download"), 202)
+        match = re.fullmatch(r"/api/topics/items/([^/]+)/archive", path)
+        if method == "POST" and match:
+            item_id = match.group(1)
+            self.service.set_archived(item_id, bool((body or {}).get("archived", True)))
+            return self.app.response(handler, self.service.get_item(item_id))
         match = re.fullmatch(r"/api/topics/items/([^/]+)/create-task", path)
         if method == "POST" and match:
             item = self.service.get_item(match.group(1))
+            if item.get("archived"):
+                raise DomainError("TOPIC_ARCHIVED", "已归档选题不能创建生产任务", 409, "id", "先在已归档列表恢复该选题")
             payload = {"title": item["title"][:200], "pillar": "enterprise_ai", "audience": "business_owners",
                        "angle": "从真实热点或收藏结构切入，不复制原文；先核对来源与事实", "pain_point": ""}
             task = self.legacy_task_creator(payload)

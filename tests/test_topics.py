@@ -124,6 +124,18 @@ class TopicCase(unittest.TestCase):
         result = analyze_video(self.workbench, self.service, item_id, self.root / "short.mp4", DummyContext())
         self.assertGreaterEqual(result["frames"], 1)
 
+    def test_archive_and_restore_keep_research_snapshot(self):
+        item_id = self.service.upsert_item({"title": "不想继续的选题", "canonical_url": "https://example.com/archive"}, "featured", collection_title="选题")
+        self.service.set_archived(item_id, True)
+        data = self.service.bootstrap()
+        self.assertEqual([], data["sources"]["featured"])
+        self.assertEqual(1, data["archived_count"])
+        self.assertTrue(data["archived"][0]["archived"])
+        self.service.set_archived(item_id, False)
+        restored = self.service.bootstrap()
+        self.assertEqual(0, restored["archived_count"])
+        self.assertEqual(item_id, restored["sources"]["featured"][0]["id"])
+
 
 if __name__ == "__main__":
     unittest.main()

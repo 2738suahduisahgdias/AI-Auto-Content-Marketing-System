@@ -179,9 +179,14 @@ class TopicService:
         latest = analyses[0] if analyses else None
         return {"id": row["id"], "platform": row["platform"], "url": row["canonical_url"],
                 "title": metadata.get("title") or "未读取标题", "metadata": metadata,
+                "archived": bool(metadata.get("archived_at")),
                 "source_key": metadata.get("source_key"), "first_seen_at": row["first_seen_at"],
                 "last_seen_at": row["last_seen_at"], "analysis_status": latest["status"] if latest else "not_started",
                 "analysis_id": latest["id"] if latest else None}
+
+    def set_archived(self, item_id, archived):
+        self.get_item(item_id)
+        return self.update_metadata(item_id, {"archived_at": utcnow() if archived else None})
 
     def bootstrap(self):
         settings = self.settings()
@@ -197,9 +202,13 @@ class TopicService:
         for row in analysis_rows:
             by_item.setdefault(row["item_id"], []).append(row)
         grouped = {key: [] for key in SOURCE_KEYS}
+        archived = []
         for row in rows:
             item = self.item_dict(row, by_item.get(row["id"]))
             item["collections"] = [m["title"] for m in memberships if m["item_id"] == row["id"]]
+            if item["archived"]:
+                archived.append(item)
+                continue
             source = item["source_key"]
             if source in ("hot", "industry", "xhs_notes", "wechat_inbox"):
                 grouped[source].append(item)
@@ -216,6 +225,7 @@ class TopicService:
             if agent in recommendations and len(recommendations[agent]) < 10 and not any(c.get("title") == payload.get("title") for c in recommendations[agent]):
                 recommendations[agent].append({**payload, "id": row["id"], "status": row["status"], "created_at": row["created_at"]})
         return {"settings": settings, "sources": grouped, "recommendations": recommendations,
+                "archived": archived, "archived_count": len(archived),
                 "hot_complete": len(grouped["hot"]) >= 20, "hot_count": len(grouped["hot"]),
                 "last_sync": dict(sync) if sync else None, "connection": dict(account) if account else {"connection_status": "not_configured"},
                 "jobs": [job for job in self.jobs.list() if job["kind"].startswith("topics.") or job["kind"] == "research.analyze"][:20],
