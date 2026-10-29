@@ -11,6 +11,10 @@ class PublishingAPI:
 
     def handle(self, handler, method, path, query, body):
         body = body or {}
+        if method == "POST" and path == "/api/publishing/generate-fields":
+            job = self.service.generate_fields(body.get("content_kind"), body.get("source_id"), body.get("platforms"),
+                                               body.get("prompt", ""), handler.headers.get("Idempotency-Key"))
+            return self.app.response(handler, job, 202)
         if method == "GET" and path == "/api/publishing/knowledge":
             return self.app.response(handler, publish_knowledge())
         match = re.fullmatch(r"/api/publishing/knowledge/([^/]+)/([^/]+)", path)

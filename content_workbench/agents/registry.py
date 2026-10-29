@@ -12,7 +12,7 @@ AGENTS = {
     "caption_agent": {"name": "字幕转写Agent", "description": "faster-whisper 本地字幕", "engines": ["faster_whisper"], "engine": "faster_whisper", "model": "small", "variants": ["small", "base"], "timeout": 3600, "attempts": 2, "concurrency": 1, "prompt": False, "connected": True},
     "remotion_agent": {"name": "Remotion视频Agent", "description": "Remotion 与 FFmpeg 视频构建", "engines": ["remotion", "ffmpeg"], "engine": "remotion", "model": "TalkingHead", "timeout": 1800, "attempts": 2, "concurrency": 1, "prompt": False, "connected": True},
     "quality_agent": {"name": "合规质检Agent", "description": "自动规格与内容质检", "engines": ["manual"], "engine": "manual", "model": "not_connected", "timeout": 600, "attempts": 1, "concurrency": 1, "prompt": False, "connected": False},
-    "publish_agent": {"name": "发布助手Agent", "description": "发布检查、预览填充与人工确认", "engines": ["playwright"], "engine": "playwright", "model": "preview_only", "timeout": 1800, "attempts": 2, "concurrency": 1, "prompt": False, "connected": True},
+    "publish_agent": {"name": "发布助手Agent", "description": "平台字段生成、发布检查、预览填充与人工确认", "engines": ["kimi_cli", "playwright"], "engine": "kimi_cli", "model": "default_unpinned", "timeout": 1800, "attempts": 2, "concurrency": 1, "prompt": True, "connected": True},
     "retro_agent": {"name": "发布复盘Agent", "description": "复盘结论与下一轮建议", "engines": ["manual"], "engine": "manual", "model": "not_connected", "timeout": 600, "attempts": 1, "concurrency": 1, "prompt": False, "connected": False},
     "analytics_agent": {"name": "数据分析Agent", "description": "账号指标采集与比较", "engines": ["manual"], "engine": "manual", "model": "not_connected", "timeout": 600, "attempts": 1, "concurrency": 1, "prompt": False, "connected": False},
     "account_analysis_agent": {"name": "账号分析Agent", "description": "账号日报、表现分析与今日推荐", "engines": ["kimi_cli"], "engine": "kimi_cli", "model": "default_unpinned", "timeout": 600, "attempts": 3, "concurrency": 2, "prompt": True, "connected": True},
@@ -28,6 +28,7 @@ DEFAULT_PROMPTS = {
     "asset_planning_agent": "优先真实业务画面、录屏、流程图和简洁文字卡。",
     "account_analysis_agent": "区分事实、推断和待验证实验，不编造指标或稳定规律。",
     "article_agent": "先明确读者、真实任务和核心结论，用证据组织步骤、边界与行动清单。",
+    "publish_agent": "按平台分别生成可直接检查的标题、正文或简介、摘要和标签；保留事实边界，不生成人工选项，不执行发布。",
     "video_review_agent": "只基于实际证据指出风险位置与核查建议，不判断事实、版权或平台合规结论。",
 }
 

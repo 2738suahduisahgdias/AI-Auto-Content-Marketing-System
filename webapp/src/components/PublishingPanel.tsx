@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ExternalLink, LoaderCircle, LogIn, RotateCcw, Save, Send, ShieldAlert } from "lucide-react";
+import { ExternalLink, LoaderCircle, LogIn, RotateCcw, Save, Send, ShieldAlert, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useApp } from "@/AppContext";
 import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, Textarea } from "@/components/ui";
 import { api, jsonOptions, uploadOptions } from "@/lib/api";
 import { platformNames, publishStatusNames } from "@/lib/names";
-import type { ContentKind, Json, PublishBatch, PublishTarget } from "@/lib/types";
+import type { ContentKind, Job, Json, PublishBatch, PublishTarget } from "@/lib/types";
 import "./PublishingPanel.css";
 
 export interface PublishingSource {
@@ -23,12 +23,15 @@ interface TargetForm {
   coverAssetId: string;
   coverName: string;
   tags: string;
+  original: boolean;
+  commentsEnabled: boolean;
 }
 
 const platformsFor = (kind: ContentKind) => kind === "article"
   ? ["wechat_official_account", "xiaohongshu"]
   : ["douyin", "xiaohongshu", "wechat_channels"];
 const activeStatuses = new Set(["preparing", "publishing"]);
+const generationStatuses = new Set(["queued", "retry_wait", "leased", "running", "cancel_requested"]);
 const lockedStatuses = new Set(["published", "unknown_remote", "preparing", "publishing"]);
 
 function targetDefaults(source: PublishingSource, platform: string, kind: ContentKind, target?: PublishTarget): TargetForm {
@@ -44,6 +47,8 @@ function targetDefaults(source: PublishingSource, platform: string, kind: Conten
     coverAssetId: String(payload.cover_asset_id || ""),
     coverName: payload.cover_asset_id ? "已关联封面资产" : "",
     tags: String(payload.tags || "#企业AI #AI应用"),
+    original: Boolean(payload.original || false),
+    commentsEnabled: payload.comments_enabled === undefined ? true : Boolean(payload.comments_enabled),
   };
 }
 
@@ -62,6 +67,8 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
   const { run, notify } = useApp();
   const platforms = useMemo(() => platformsFor(kind), [kind]);
   const [batch, setBatch] = useState<PublishBatch | null>(null);
+  const [fieldJobs, setFieldJobs] = useState<Job[]>([]);
+  const [generationPrompt, setGenerationPrompt] = useState("");
   const [forms, setForms] = useState<Record<string, TargetForm>>(() => source ? Object.fromEntries(platforms.map(platform => [platform, targetDefaults(source, platform, kind)])) : {});
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -69,6 +76,7 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [dirtyPlatforms, setDirtyPlatforms] = useState<Set<string>>(new Set());
   const dirty = useRef(new Set<string>());
+  const appliedJob = useRef("");
   const sourceId = source?.id || "";
   const sourceTitle = source?.title || "";
   const sourceBody = source?.body || "";
@@ -77,8 +85,9 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
     if (!sourceId) return;
     if (!silent) setLoading(true);
     try {
-      const data = await api<{ batch: PublishBatch | null }>(`/api/publishing/bootstrap?kind=${kind}&source_id=${encodeURIComponent(sourceId)}`);
+      const data = await api<{ batch: PublishBatch | null; field_jobs: Job[] }>(`/api/publishing/bootstrap?kind=${kind}&source_id=${encodeURIComponent(sourceId)}`);
       setBatch(data.batch);
+      setFieldJobs(data.field_jobs || []);
       const currentSource = { id: sourceId, title: sourceTitle, body: sourceBody };
       setForms(current => Object.fromEntries(platforms.map(platform => {
         const target = data.batch?.targets.find(item => item.platform === platform);
@@ -99,11 +108,36 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
   }, [loadBatch]);
 
   const active = Boolean(batch?.targets.some(target => activeStatuses.has(target.status)));
+  const generationJob = fieldJobs[0];
+  const generationActive = Boolean(generationJob && generationStatuses.has(generationJob.status));
   useEffect(() => {
-    if (!active) return;
+    if (!active && !generationActive) return;
     const timer = window.setInterval(() => void loadBatch(true), 3000);
     return () => window.clearInterval(timer);
-  }, [active, loadBatch]);
+  }, [active, generationActive, loadBatch]);
+
+  useEffect(() => {
+    if (!generationJob || generationJob.status !== "succeeded" || appliedJob.current === generationJob.id) return;
+    const payloads = generationJob.result?.platforms;
+    if (!payloads) return;
+    appliedJob.current = generationJob.id;
+    Object.keys(payloads).forEach(platform => dirty.current.add(platform));
+    setDirtyPlatforms(new Set(dirty.current));
+    setForms(current => Object.fromEntries(platforms.map(platform => {
+      const generated = payloads[platform];
+      const form = current[platform];
+      if (!generated || !form) return [platform, form];
+      return [platform, {
+        ...form,
+        title: String(generated.title ?? form.title),
+        body: String(generated[kind === "article" ? "body" : "description"] ?? form.body),
+        author: String(generated.author ?? form.author),
+        summary: String(generated.summary ?? form.summary),
+        tags: String(generated.tags ?? form.tags),
+      }];
+    })));
+    notify("发布字段已回填，尚未保存或发布；请逐平台检查后保存批次");
+  }, [generationJob, kind, notify, platforms]);
 
   const update = (platform: string, patch: Partial<TargetForm>) => {
     dirty.current.add(platform);
@@ -119,6 +153,25 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
       if (result !== null) await loadBatch(true);
       return result;
     } finally { setBusy(""); }
+  };
+
+  const generatablePlatforms = platforms.filter(platform => {
+    const target = batch?.targets.find(item => item.platform === platform);
+    return forms[platform]?.enabled && platform in platformNames && !lockedStatuses.has(target?.status || "draft");
+  });
+
+  const generateFields = async () => {
+    if (!source || !generatablePlatforms.length) {
+      notify("至少选择一个可编辑的平台，发布 Agent 才能生成字段", true);
+      return;
+    }
+    const job = await execute("generate-fields", () => api("/api/publishing/generate-fields", jsonOptions("POST", {
+      content_kind: kind,
+      source_id: source.id,
+      platforms: generatablePlatforms,
+      prompt: generationPrompt,
+    })), "字段生成任务已提交，不会自动保存或发布") as Job | null;
+    if (job?.id) setFieldJobs(current => current.some(item => item.id === job.id) ? current : [job, ...current]);
   };
 
   const saveBatch = async () => {
@@ -137,6 +190,8 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
       if (kind === "article" && platform === "wechat_official_account") {
         payload.author = form.author;
         payload.summary = form.summary;
+        payload.original = form.original;
+        payload.comments_enabled = form.commentsEnabled;
       }
       return { platform, payload };
     });
@@ -179,6 +234,13 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
     </div>
     {loadError && <ErrorBox>{loadError}<br />请检查本地服务后重试；不会把读取失败当作发布结果。</ErrorBox>}
     {loading && <p className="publishing-loading"><LoaderCircle className="spin" size={15} />正在读取真实发布批次…</p>}
+    <Card className="publishing-generator">
+      <div className="publishing-generator-head"><div><h3><Sparkles size={17} />发布 Agent 字段生成</h3><p>根据当前已批准内容，分别生成选中平台的标题、{kind === "article" ? "正文、作者和摘要" : "简介和标签"}。</p></div><Badge tone={dirtyPlatforms.size ? "orange" : "neutral"}>{dirtyPlatforms.size ? `${dirtyPlatforms.size} 个平台未保存` : "字段可编辑"}</Badge></div>
+      <Field label="补充要求（选填，最多 2000 字）"><Textarea value={generationPrompt} disabled={Boolean(busy) || generationActive} maxLength={2000} placeholder="例如：标题面向企业主，少用术语；保留原文事实，不增加案例和数字。" onChange={event => setGenerationPrompt(event.target.value)} /></Field>
+      <div className="publishing-generator-actions"><p>只回填文本；{kind === "article" ? "封面、原创和评论选项" : "封面与视频"}由你处理。生成后不会自动保存或发布。</p><Button variant="primary" disabled={Boolean(busy) || generationActive || !generatablePlatforms.length} title={!generatablePlatforms.length ? "先勾选至少一个可编辑平台" : "生成后会覆盖选中平台的当前文本字段，请检查后保存"} onClick={() => void generateFields()}><Sparkles size={15} />{busy === "generate-fields" ? "正在提交…" : generationActive ? "发布 Agent 生成中…" : "发布 Agent 生成选中平台字段"}</Button></div>
+      {generationActive && <p className="publishing-loading"><LoaderCircle className="spin" size={15} />正在生成 {generatablePlatforms.map(platform => platformNames[platform]).join("、")} 的字段，页面可保留打开。</p>}
+      {generationJob?.status === "failed" && <ErrorBox><strong>字段生成失败：{String(generationJob.error?.code || "MODEL_GENERATION_FAILED")}</strong><br />{String(generationJob.error?.message || "模型没有完成字段生成")}{generationJob.error?.action && <><br />怎么改：{String(generationJob.error.action)}</>}</ErrorBox>}
+    </Card>
     <div className="publishing-target-grid">
       {platforms.map(platform => {
         const target = batch?.targets.find(item => item.platform === platform);
@@ -195,10 +257,11 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
           </div>
           <>
             <Button size="small" variant="ghost" disabled={Boolean(busy)} onClick={() => void execute(`login:${platform}`, () => api(`/api/publishing/connections/${platform}/login`, jsonOptions("POST")), "登录页面已打开；登录后重新生成预览")}><LogIn size={14} />{["wechat_channels", "wechat_official_account"].includes(platform) ? "在已登录 Chrome 中打开" : "打开专用登录窗口"}</Button>
-            <Field label="发布标题"><Input value={form.title} disabled={locked || Boolean(busy)} maxLength={platform === "wechat_official_account" ? 64 : kind === "article" ? 200 : 300} onChange={event => update(platform, { title: event.target.value })} /></Field>
-            {kind === "article" && platform === "wechat_official_account" && <div className="publishing-two-columns"><Field label="作者（最多 8 字）"><Input value={form.author} disabled={locked || Boolean(busy)} maxLength={8} onChange={event => update(platform, { author: event.target.value })} /></Field><Field label="摘要（最多 120 字）"><Textarea value={form.summary} disabled={locked || Boolean(busy)} maxLength={120} onChange={event => update(platform, { summary: event.target.value })} /></Field></div>}
-            <Field label={kind === "article" ? "正文" : "发布简介"}><Textarea className="publishing-body" value={form.body} disabled={locked || Boolean(busy)} onChange={event => update(platform, { body: event.target.value })} /></Field>
-            {kind === "video" && <Field label="标签"><Input value={form.tags} disabled={locked || Boolean(busy)} maxLength={1000} onChange={event => update(platform, { tags: event.target.value })} /></Field>}
+            <Field label={`发布标题（必填，最多 ${platform === "wechat_official_account" ? 64 : kind === "article" ? 200 : 300} 字）`}><Input value={form.title} disabled={locked || Boolean(busy)} maxLength={platform === "wechat_official_account" ? 64 : kind === "article" ? 200 : 300} onChange={event => update(platform, { title: event.target.value })} /></Field>
+            {kind === "article" && platform === "wechat_official_account" && <div className="publishing-two-columns"><Field label="作者（选填，最多 8 字）"><Input value={form.author} disabled={locked || Boolean(busy)} maxLength={8} onChange={event => update(platform, { author: event.target.value })} /></Field><Field label="摘要（选填，最多 120 字）"><Textarea value={form.summary} disabled={locked || Boolean(busy)} maxLength={120} onChange={event => update(platform, { summary: event.target.value })} /></Field></div>}
+            <Field label={kind === "article" ? "正文（必填，最多 200000 字）" : "发布简介（必填，最多 5000 字）"}><Textarea className="publishing-body" value={form.body} disabled={locked || Boolean(busy)} maxLength={kind === "article" ? 200000 : 5000} onChange={event => update(platform, { body: event.target.value })} /></Field>
+            {kind === "article" && platform === "wechat_official_account" && <div className="publishing-options"><label><input type="checkbox" checked={form.original} disabled={locked || Boolean(busy)} onChange={event => update(platform, { original: event.target.checked })} />声明原创（需本人确认内容符合平台要求）</label><label><input type="checkbox" checked={form.commentsEnabled} disabled={locked || Boolean(busy)} onChange={event => update(platform, { commentsEnabled: event.target.checked })} />开启评论</label></div>}
+            {kind === "video" && <Field label="标签（选填，最多 1000 字）"><Input value={form.tags} disabled={locked || Boolean(busy)} maxLength={1000} onChange={event => update(platform, { tags: event.target.value })} /></Field>}
             <Field label={coverRequired ? "封面（必传，仅保存为本地资产）" : "封面（可选本地资产）"} hint="仅上传你有权使用的图片；上传封面不会公开发布。">
               <Input type="file" accept=".png,.jpg,.jpeg,.webp" disabled={locked || Boolean(busy)} onChange={event => void uploadCover(platform, event.target.files?.[0])} />
               <span className={`publishing-cover-name${coverRequired && !form.coverAssetId ? " is-missing" : ""}`}>{busy === `cover:${platform}` ? "正在上传并校验封面…" : form.coverName || (form.coverAssetId ? "已关联封面资产" : coverRequired ? "尚未上传封面" : "未设置封面")}</span>

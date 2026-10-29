@@ -1,4 +1,5 @@
 import base64
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -187,6 +188,37 @@ class PublishingCase(unittest.TestCase):
         self.assertEqual([], data["platforms"]["douyin"]["items"])
         self.assertIn("暂不能判断传播效果", data["platforms"]["douyin"]["data_boundary"])
         self.assertIn("不是平台效果结论", data["platforms"]["xiaohongshu"]["suggestion_kind"])
+
+    def test_field_generation_returns_only_editable_text_without_publishing(self):
+        job = self.service.generate_fields("article", self.article["id"], ["wechat_official_account"], "面向企业主", "generate-request")
+        self.assertEqual("publish.fields", job["kind"])
+        self.assertEqual("cloud_text", job["resource_key"])
+        self.assertEqual(job["id"], self.service.bootstrap("article", self.article["id"])["field_jobs"][0]["id"])
+        model_fields = {"title": "生成标题", "body": "生成正文", "author": "老刘", "summary": "生成摘要",
+                        "cover_asset_id": "模型不能指定封面", "original": True}
+        stdout = json.dumps({"type": "assistant", "content": json.dumps({"platforms": {"wechat_official_account": model_fields}}, ensure_ascii=False)})
+        context = mock.Mock()
+        context.run_process.return_value = (stdout, "")
+        config = {"prompt": "保留事实", "timeout_seconds": 600}
+        with mock.patch("content_workbench.publishing.executors.require_agent_enabled", return_value=config), \
+                mock.patch("content_workbench.providers.local.LocalExecutors.kimi", return_value="/fake/kimi"):
+            result = PublishingExecutors(self.service).generate_fields(job, context)
+        generated = result["platforms"]["wechat_official_account"]
+        self.assertEqual("生成标题", generated["title"])
+        self.assertNotIn("cover_asset_id", generated)
+        self.assertNotIn("original", generated)
+        self.assertFalse(result["auto_saved"])
+        self.assertFalse(result["auto_published"])
+        self.assertIsNone(self.service.bootstrap("article", self.article["id"])["batch"])
+
+    def test_generated_fields_enforce_platform_limits(self):
+        payload = {"platforms": {"douyin": {"title": "长" * 301, "description": "简介"}}}
+        with self.assertRaises(DomainError) as caught:
+            PublishingExecutors.validate_generated_fields("video", ["douyin"], payload)
+        self.assertEqual("PUBLISH_GENERATED_FIELD_TOO_LONG", caught.exception.code)
+        self.assertEqual("douyin.title", caught.exception.field)
+        with self.assertRaises(DomainError):
+            self.service.generate_fields("article", self.article["id"], ["douyin"])
 
     def test_publish_knowledge_matches_actual_validation_contract(self):
         official = publish_knowledge(platform="wechat_official_account", content_kind="article")["platforms"][0]
