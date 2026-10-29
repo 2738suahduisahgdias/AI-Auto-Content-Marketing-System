@@ -4,7 +4,7 @@ from pathlib import Path
 
 from content_workbench.accounts.collection_knowledge import error_type
 from content_workbench.accounts.existing_browser import run as run_existing_browser
-from content_workbench.accounts.exports import douyin_metrics, xhs_metrics
+from content_workbench.accounts.exports import channels_metrics, douyin_metrics, official_metrics, xhs_metrics
 from content_workbench.accounts.snapshot_rules import snapshot_has_data
 from content_workbench.agents.registry import require_agent_enabled
 from content_workbench.domain.errors import DomainError
@@ -44,20 +44,42 @@ class AccountExecutors:
         return result
 
     def export_metrics(self, platform):
-        names = {
-            "douyin": ["数据表现_短视频全量指标.xlsx", "数据表现_粉丝全量指标.xlsx"],
-            "xiaohongshu": ["近7日观看数据.xlsx", "近7日互动数据.xlsx", "近7日涨粉数据.xlsx", "近7日发布数据.xlsx"],
-        }
-        if platform not in names:
-            return {}
-        paths = [self.downloads / name for name in names[platform]]
         cutoff = time.time() - 36 * 3600
+        if platform in ("wechat_channels", "wechat_official_account"):
+            candidates = sorted(self.downloads.glob(".com.google.Chrome.*"), key=lambda path: path.stat().st_mtime, reverse=True)
+            for path in candidates:
+                if path.stat().st_mtime < cutoff:
+                    break
+                try:
+                    if platform == "wechat_channels" and "视频号视频详情数据" in path.read_text(encoding="utf-8-sig")[:200]:
+                        metrics = channels_metrics(path)
+                    elif platform == "wechat_official_account":
+                        metrics = official_metrics(path)
+                    else:
+                        continue
+                    metrics["export_files"] = [path.name]
+                    metrics["export_imported_at"] = utcnow()
+                    return metrics
+                except (OSError, ValueError, KeyError, IndexError):
+                    continue
+            return {}
+        names = {"douyin": ["数据表现_短视频全量指标.xlsx", "数据表现_粉丝全量指标.xlsx"],
+                 "xiaohongshu": ["近7日观看数据.xlsx", "近7日互动数据.xlsx", "近7日涨粉数据.xlsx", "近7日发布数据.xlsx"]}
+        if platform == "xiaohongshu":
+            monthly = [name.replace("近7日", "近30日") for name in names[platform]]
+            monthly_paths = [self.downloads / name for name in monthly]
+            if all(path.is_file() and path.stat().st_mtime >= cutoff for path in monthly_paths):
+                paths = monthly_paths
+            else:
+                paths = [self.downloads / name for name in names[platform]]
+        elif platform == "douyin":
+            paths = [self.downloads / name for name in names[platform]]
+        else:
+            return {}
         if not all(path.is_file() and path.stat().st_mtime >= cutoff for path in paths):
             return {}
-        if platform == "douyin":
-            metrics = douyin_metrics(*paths)
-        else:
-            metrics = xhs_metrics({"watch": paths[0], "interaction": paths[1], "followers": paths[2], "publishing": paths[3]})
+        metrics = douyin_metrics(*paths) if platform == "douyin" else xhs_metrics(
+            {"watch": paths[0], "interaction": paths[1], "followers": paths[2], "publishing": paths[3]})
         metrics["export_files"] = [path.name for path in paths]
         metrics["export_imported_at"] = utcnow()
         return metrics
@@ -80,7 +102,12 @@ class AccountExecutors:
                             self.topics.cache_cover(item_id)
                         except Exception:
                             pass
+                collected_count = len(items)
+                if not items:
+                    items = self.service.latest_items(platform)
                 profile = {**(snapshot.get("profile") or {}), "connection": "ready" if items else "empty"}
+                if not collected_count and items:
+                    profile["content_preserved"] = True
                 if platform in analytics_actions:
                     try:
                         analytics = self.platform(context, analytics_actions[platform], platform + "_analytics")
@@ -102,8 +129,8 @@ class AccountExecutors:
                 if snapshot_has_data({"profile": profile, "items": items}):
                     self.service.save_snapshot(platform, profile, items)
                     collected.add(platform)
-                result["accounts"][platform] = len(items)
-                if not items:
+                result["accounts"][platform] = collected_count
+                if not collected_count:
                     result["accounts"][platform + "_warning"] = "已打开后台但未读取到内容；账号可能无内容，也可能页面结构已变化，请检查后台列表"
                     result["errors"].append({"platform": platform, "type": "EMPTY_RESULT", "message": "未读取到内容，需确认账号无内容还是结构变化", "action": "检查后台列表，不自动重试", "captured_at": utcnow()})
             except DomainError as error:

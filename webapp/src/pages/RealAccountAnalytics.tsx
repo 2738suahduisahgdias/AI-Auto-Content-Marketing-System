@@ -76,12 +76,12 @@ export default function RealAccountAnalytics() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [contentMode, setContentMode] = useState<"published" | "recorded">("published");
+  const [contentMode, setContentMode] = useState<"published" | "recorded">("recorded");
   const data = resources?.accounts?.analytics as RealAnalytics | undefined;
   if (view !== "overview" && !platformViews.includes(view as PlatformKey)) return <Navigate to="/accounts" replace />;
   const platform = view === "overview" ? null : view as PlatformKey;
   const requestedRange = searchParams.get("range") as DimensionRange;
-  const range: DimensionRange = ["today", "yesterday", "7d", "30d", "custom"].includes(requestedRange) ? requestedRange : "today";
+  const range: DimensionRange = ["all", "today", "yesterday", "7d", "30d", "custom"].includes(requestedRange) ? requestedRange : "all";
   const start = searchParams.get("start") || "";
   const end = searchParams.get("end") || "";
   const period = periodFor(range, start, end);
@@ -115,7 +115,7 @@ export default function RealAccountAnalytics() {
 
   if (!data) return <><PageHeader title="账号日报" description="读取真实发布与账号快照。" /><Card><Empty title="当前服务还没有真实分析数据" description="请确认本地服务已加载最新后端，并重新读取页面。" action={<Button onClick={() => void refresh()}>重新读取</Button>} /></Card></>;
   const leads = data.leads || [];
-  const metrics = range === "custom" ? aggregateCustom(data.contents, leads, period, platform || undefined) : platform ? data.platforms[platform].metrics[range] : data.totals[range];
+  const metrics = (range === "custom" || range === "all") ? aggregateCustom(data.contents, leads, period, platform || undefined) : platform ? data.platforms[platform].metrics[range] : data.totals[range];
   const snapshot = platform ? data.platforms[platform].snapshot : null;
   const hasPropagation = ["reach", "likes", "comments", "shares", "favorites"].some(key => metrics[key as keyof typeof metrics] != null);
   const scopedContents = platform ? data.contents.filter(item => item.platform === platform) : data.contents;
@@ -140,7 +140,7 @@ export default function RealAccountAnalytics() {
       <TrendChart title="已核验发布趋势" description={`${rangeTitle}发布条次；这是生产趋势，不是播放趋势`} labels={trend.labels} bars={trend.values} line={movingAverage} barLabel="发布条次" lineLabel="移动平均" />
       <section className="analytics-section"><SectionTitle title="传播与内容质量" description={hasPropagation ? "基于同内容 ID 的最近一次前后快照差值；首次基线不伪造新增" : "需要同内容、同指标的前后快照才能计算今日新增"} />{hasPropagation ? <div className="analytics-metrics-grid four"><MetricCard accent label="阅读 / 播放增量" value={numberText(metrics.reach)} hint="最近两次快照差值" /><MetricCard label="点赞增量" value={numberText(metrics.likes)} hint="同内容 ID 去重" /><MetricCard label="评论增量" value={numberText(metrics.comments)} hint="没有前值时不计算" /><MetricCard label="分享增量" value={numberText(metrics.shares)} hint="缺失不按 0 计算" /></div> : <Card><Empty title="暂无可计算的新增传播指标" description="当前账号快照主要是累计公开数据，不能与今日发布记录直接拼成新增播放。完成连续同步后，这里会展示阅读/播放、互动、完成率和真实趋势。" /></Card>}</section>
       <section className="analytics-section"><SectionTitle title="获客与业务结果" description="私信只存本机；有效、高意向和成交由你人工确认" /><LeadPanel leads={visibleLeads} metrics={metrics} contents={data.contents} /></section>
-      <section className="analytics-section"><SectionTitle title="各平台数据拆分" description="发布为真实新增；快照为累计公开数据，两种口径不混算" /><Card className="analytics-table-card"><div className="analytics-table-scroll"><table className="analytics-table platform"><thead><tr><th>平台</th><th>原创</th><th>发布条次</th><th>累计点赞快照</th><th>累计评论快照</th><th>最近快照</th><th>竞对内容</th></tr></thead><tbody>{platformOrder.map(key => { const item = data.platforms[key]; const platformMetric = range === "custom" ? aggregateCustom(data.contents, leads, period, key) : item.metrics[range]; const count = data.competitor_analytics.items.filter(content => content.platform === key).length; return <tr key={key}><td><Link className="analytics-platform-link" to={`/accounts/${key}${query ? `?${query}` : ""}`}>{platformLabels[key]}<span>查看日报 →</span></Link></td><td>{platformMetric.originals}</td><td>{platformMetric.publications}</td><td>{numberText(item.snapshot?.totals.likes ?? null)}</td><td>{numberText(item.snapshot?.totals.comments ?? null)}</td><td>{dateText(item.snapshot?.captured_at)}</td><td>{count}</td></tr>; })}</tbody></table></div></Card></section>
+      <section className="analytics-section"><SectionTitle title="各平台数据拆分" description="发布为真实新增；快照为累计公开数据，两种口径不混算" /><Card className="analytics-table-card"><div className="analytics-table-scroll"><table className="analytics-table platform"><thead><tr><th>平台</th><th>原创</th><th>发布条次</th><th>累计点赞快照</th><th>累计评论快照</th><th>最近快照</th><th>竞对内容</th></tr></thead><tbody>{platformOrder.map(key => { const item = data.platforms[key]; const platformMetric = (range === "custom" || range === "all") ? aggregateCustom(data.contents, leads, period, key) : item.metrics[range]; const count = data.competitor_analytics.items.filter(content => content.platform === key).length; return <tr key={key}><td><Link className="analytics-platform-link" to={`/accounts/${key}${query ? `?${query}` : ""}`}>{platformLabels[key]}<span>查看日报 →</span></Link></td><td>{platformMetric.originals}</td><td>{platformMetric.publications}</td><td>{numberText(item.snapshot?.totals.likes ?? null)}</td><td>{numberText(item.snapshot?.totals.comments ?? null)}</td><td>{dateText(item.snapshot?.captured_at)}</td><td>{count}</td></tr>; })}</tbody></table></div></Card></section>
     </>}
 
     {platform && <>

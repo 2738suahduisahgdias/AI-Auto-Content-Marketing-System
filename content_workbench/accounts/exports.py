@@ -1,7 +1,12 @@
+import csv
+import json
 import re
+import subprocess
 import zipfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+from content_workbench.storage.db import PROJECT_ROOT
 
 MAIN = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
@@ -76,6 +81,49 @@ def total(rows, key):
     return sum(present) if present else None
 
 
+def trend(path):
+    result = {}
+    for name, rows in list(read_xlsx(path).items())[1:]:
+        result[name] = [{"date": row[0], "value": number(row[1])} for row in rows[1:] if len(row) >= 2]
+    return result
+
+
+def read_xls(path):
+    python = PROJECT_ROOT / ".venv-accounts/Scripts/python.exe" if (PROJECT_ROOT / ".venv-accounts/Scripts/python.exe").is_file() \
+        else PROJECT_ROOT / ".venv-accounts/bin/python"
+    process = subprocess.run([str(python), str(PROJECT_ROOT / "workers/xls_reader.py"), str(path)],
+                             capture_output=True, text=True, timeout=60)
+    if process.returncode:
+        raise ValueError("XLS 读取失败：" + (process.stderr or "无法解析文件")[:300])
+    return json.loads(process.stdout)
+
+
+def official_metrics(path):
+    rows = read_xls(path)
+    history = []
+    for row in rows:
+        if row.get("渠道") != "全部":
+            continue
+        history.append({"date": row.get("日期"), "views": number(row.get("阅读次数")), "readers": number(row.get("阅读人数")),
+                        "shares": number(row.get("分享次数")), "favorites": number(row.get("收藏次数")),
+                        "publications": number(row.get("群发篇数"))})
+    latest = history[0] if history else {}
+    return {"views": latest.get("views"), "readers": latest.get("readers"), "shares": latest.get("shares"),
+            "favorites": latest.get("favorites"), "daily_history": history, "analytics_source": "公众号内容分析官方明细"}
+
+
+def channels_metrics(path):
+    with open(path, encoding="utf-8-sig", newline="") as handle:
+        rows = list(csv.DictReader(handle.readlines()[2:]))
+    history = [{"date": row.get("时间"), "views": number(row.get("播放")), "likes": number(row.get("喜欢")),
+                "comments": number(row.get("评论")), "shares": number(row.get("分享")),
+                "newFollowers": number(row.get("关注"))} for row in rows]
+    return {"views": history[0]["views"] if history else None, "daily_history": history,
+            "periodViews": total(history, "views"), "likes": total(history, "likes"),
+            "comments": total(history, "comments"), "shares": total(history, "shares"),
+            "newFollowers": total(history, "newFollowers"), "analytics_source": "视频号官方逐日导出"}
+
+
 def xhs_metrics(paths):
     watch = summary(paths["watch"])
     interaction = summary(paths["interaction"])
@@ -90,6 +138,8 @@ def xhs_metrics(paths):
         "profileVisits": followers.get("主页访客"), "profileConversionRate": followers.get("主页转粉率(%)"),
         "periodPublications": publishing.get("总发布"), "videoPublications": publishing.get("发布视频"),
         "imagePublications": publishing.get("发布图文"), "analytics_source": "小红书数据看板官方导出",
+        "daily_history": {"watch": trend(paths["watch"]), "interaction": trend(paths["interaction"]),
+                          "followers": trend(paths["followers"]), "publishing": trend(paths["publishing"])},
     }
 
 

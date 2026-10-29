@@ -1,5 +1,5 @@
 export type PlatformKey = "douyin" | "wechat_channels" | "xiaohongshu" | "wechat_official_account";
-export type RangeKey = "today" | "yesterday" | "7d" | "30d";
+export type RangeKey = "all" | "today" | "yesterday" | "7d" | "30d";
 export type WindowKey = "24h" | "72h" | "7d";
 
 export interface PlatformMetrics {
@@ -67,7 +67,7 @@ export interface CompetitorContent {
   insight: string;
 }
 
-export const rangeLabels: Record<RangeKey, string> = { today: "今日", yesterday: "昨日", "7d": "近 7 天", "30d": "近 30 天" };
+export const rangeLabels: Record<RangeKey, string> = { all: "全部历史", today: "今日", yesterday: "昨日", "7d": "近 7 天", "30d": "近 30 天" };
 export const windowLabels: Record<WindowKey, string> = { "24h": "24 小时", "72h": "72 小时", "7d": "7 天" };
 export const platformOrder: PlatformKey[] = ["douyin", "wechat_channels", "xiaohongshu", "wechat_official_account"];
 export const platformLabels: Record<PlatformKey, string> = { douyin: "抖音", wechat_channels: "视频号", xiaohongshu: "小红书", wechat_official_account: "公众号" };

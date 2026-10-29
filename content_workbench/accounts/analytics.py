@@ -107,6 +107,30 @@ class AccountAnalytics:
                            "_time": local_time.astimezone(ZoneInfo("Asia/Shanghai"))})
         return result
 
+    def history_items(self, conn, tables):
+        if "account_daily_snapshots" not in tables:
+            return []
+        rows = conn.execute("SELECT * FROM account_daily_snapshots ORDER BY captured_at DESC").fetchall()
+        result = []
+        seen = set()
+        generic_urls = {"https://channels.weixin.qq.com/platform/post/list", "https://creator.xiaohongshu.com/new/note-manager"}
+        for row in rows:
+            value = loads(row["snapshot_json"], {})
+            if not snapshot_has_data(value):
+                continue
+            for item in value.get("items") or []:
+                metadata = item.get("metadata") or {}
+                if metadata.get("record_scope") == "asset":
+                    continue
+                url = item.get("canonical_url") or item.get("url")
+                key = item.get("platform_item_id") or (url if url not in generic_urls else None) \
+                    or (metadata.get("title") or item.get("title"), metadata.get("published_at"))
+                if key in seen:
+                    continue
+                seen.add(key)
+                result.append({**item, "platform": row["platform"], "captured_at": row["captured_at"]})
+        return result
+
     def snapshots(self, conn, tables):
         if "account_daily_snapshots" not in tables:
             return {}
@@ -188,6 +212,7 @@ class AccountAnalytics:
         with self.conn() as conn:
             tables = self.tables(conn)
             publications = self.publications(conn, tables, local_now)
+            history = self.history_items(conn, tables)
             snapshots = self.snapshots(conn, tables)
             leads = self.leads(conn, tables)
             competitors = self.competitors(conn, tables)
@@ -227,15 +252,15 @@ class AccountAnalytics:
                     metrics[key] = sum(values) if values else None
             totals[range_key] = metrics
         contents = [{key: value for key, value in item.items() if key != "_time"} for item in sorted(publications, key=lambda value: value["_time"], reverse=True)]
-        for platform, snapshot in snapshots.items():
-            for index, item in enumerate(snapshot["items"]):
-                metadata = item.get("metadata") or {}
-                contents.append({"id": "{}-{}".format(platform, index), "source_id": None, "platform": platform,
-                                 "kind": "article" if platform == "wechat_official_account" else "video",
-                                 "title": item.get("title") or metadata.get("title") or "未读取标题",
-                                 "published_at": metadata.get("published_at"), "url": item.get("canonical_url") or item.get("url"),
-                                 "verified": False, "captured_at": snapshot["captured_at"],
-                                 "metrics": {key: item_metric(item, key) for key in METRICS[:5]}})
+        for index, item in enumerate(history):
+            platform = item["platform"]
+            metadata = item.get("metadata") or {}
+            contents.append({"id": "{}-{}".format(platform, index), "source_id": None, "platform": platform,
+                             "kind": "article" if platform == "wechat_official_account" else "video",
+                             "title": item.get("title") or metadata.get("title") or "未读取标题",
+                             "published_at": metadata.get("published_at"), "url": item.get("canonical_url") or item.get("url"),
+                             "verified": False, "captured_at": item["captured_at"],
+                             "metrics": {key: item_metric(item, key) for key in METRICS[:5]}})
         labels = [(today - timedelta(days=6 - index)) for index in range(7)]
         trend = []
         for day in labels:

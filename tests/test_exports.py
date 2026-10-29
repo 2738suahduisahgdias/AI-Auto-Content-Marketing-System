@@ -4,7 +4,9 @@ import zipfile
 from pathlib import Path
 from xml.sax.saxutils import escape
 
-from content_workbench.accounts.exports import douyin_metrics, read_xlsx, xhs_metrics
+from unittest import mock
+
+from content_workbench.accounts.exports import channels_metrics, douyin_metrics, official_metrics, read_xlsx, xhs_metrics
 
 
 def workbook(path, rows):
@@ -63,6 +65,19 @@ class ExportCase(unittest.TestCase):
         self.assertEqual(1, metrics["periodPublications"])
         self.assertEqual(45, metrics["fans"])
         self.assertEqual(2, metrics["returningFans"])
+    def test_channels_csv_and_official_history(self):
+        path = self.root / "channels.csv"
+        path.write_text("视频号视频详情数据,,,,,\n说明,,,,,\n时间,播放,推荐,喜欢,评论,分享,关注\n2026/10/28,10,0,1,0,0,0\n2026/10/27,20,0,2,0,0,1\n", encoding="utf-8-sig")
+        metrics = channels_metrics(path)
+        self.assertEqual(10, metrics["views"])
+        self.assertEqual(30, metrics["periodViews"])
+        self.assertEqual(3, metrics["likes"])
+        rows = [{"日期": "20251028", "阅读次数": 5, "阅读人数": 4, "分享次数": 1, "收藏次数": 2, "群发篇数": 1, "渠道": "全部"}]
+        with mock.patch("content_workbench.accounts.exports.read_xls", return_value=rows):
+            official = official_metrics("unused.xls")
+        self.assertEqual(5, official["views"])
+        self.assertEqual(2, official["favorites"])
+        self.assertEqual(1, len(official["daily_history"]))
 
 
 if __name__ == "__main__":

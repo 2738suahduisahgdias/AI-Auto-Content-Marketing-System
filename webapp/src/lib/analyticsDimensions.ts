@@ -20,6 +20,7 @@ export function localDay(date: Date) {
 export function periodFor(range: DimensionRange, start?: string, end?: string, now = new Date()): Period {
   const todayText = localDay(now);
   const today = new Date(`${todayText}T00:00:00+08:00`);
+  if (range === "all") return { start: new Date(0), end: now };
   if (range === "custom") {
     const customStart = new Date(`${start || localDay(new Date(today.getTime() - 6 * 86400000))}T00:00:00+08:00`);
     const customEnd = new Date(`${end || todayText}T00:00:00+08:00`);

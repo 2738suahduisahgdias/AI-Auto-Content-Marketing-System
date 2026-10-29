@@ -36,7 +36,18 @@ class AccountService:
             row = conn.execute("SELECT snapshot_json FROM account_daily_snapshots WHERE platform=? ORDER BY captured_at DESC LIMIT 1", (platform,)).fetchone()
         current = loads(row[0], {}) if row else {}
         profile = {**(current.get("profile") or {}), **metrics}
-        return self.save_snapshot(platform, profile, current.get("items") or [])
+        items = current.get("items") or self.latest_items(platform)
+        return self.save_snapshot(platform, profile, items)
+
+    def latest_items(self, platform):
+        self.ensure_tables()
+        with self.conn(readonly=True) as conn:
+            rows = conn.execute("SELECT snapshot_json FROM account_daily_snapshots WHERE platform=? ORDER BY captured_at DESC", (platform,)).fetchall()
+        for row in rows:
+            items = [item for item in loads(row[0], {}).get("items") or [] if (item.get("metadata") or {}).get("record_scope") != "asset"]
+            if items:
+                return items
+        return []
 
     def bootstrap(self):
         self.ensure_tables()

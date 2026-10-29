@@ -72,6 +72,18 @@ class AccountAnalyticsCase(unittest.TestCase):
         self.assertEqual(1, len(accounts))
         self.assertEqual("有效作品", accounts[0]["items"][0]["title"])
 
+    def test_history_is_merged_and_metrics_only_snapshot_preserves_content(self):
+        item = {"title": "历史笔记", "platform_item_id": "note-1", "canonical_url": "https://example.com/note-1",
+                "metadata": {"published_at": "2026-08-01"}}
+        self.accounts.save_snapshot("xiaohongshu", {}, [item, {"title": "素材记录", "metadata": {"record_scope": "asset"}}])
+        self.accounts.save_snapshot("xiaohongshu", {"views": 100, "analytics_source": "官方导出"}, [])
+        data = AccountAnalytics(self.db).bootstrap(datetime(2026, 10, 28, 12, tzinfo=ZoneInfo("Asia/Shanghai")))
+        history = [content for content in data["contents"] if content["platform"] == "xiaohongshu" and content["title"] == "历史笔记"]
+        self.assertEqual(1, len(history))
+        self.assertEqual("2026-08-01", history[0]["published_at"])
+        self.assertNotIn("素材记录", [content["title"] for content in data["contents"]])
+        self.assertEqual(1, len(self.accounts.latest_items("xiaohongshu")))
+
     def test_empty_database_and_public_number(self):
         data = AccountAnalytics(self.db).bootstrap(datetime(2026, 10, 28, 12, tzinfo=ZoneInfo("Asia/Shanghai")))
         self.assertEqual(0, data["totals"]["today"]["publications"])

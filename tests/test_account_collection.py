@@ -21,6 +21,7 @@ class AccountCollectionCase(unittest.TestCase):
         self.service.topics.db_path = Path(self.temp.name) / "accounts.db"
         self.executor = AccountExecutors(self.service)
         self.executor.downloads = Path(self.temp.name) / "empty-downloads"
+        self.service.latest_items.return_value = []
 
     def tearDown(self):
         self.temp.cleanup()

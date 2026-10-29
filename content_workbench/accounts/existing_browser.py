@@ -181,7 +181,9 @@ def official_account(bridge):
         published_at = re.search(r"20\d{2}[-/年]\d{1,2}[-/月]\d{1,2}", item["metadata"].get("visible_text", ""))
         item["metadata"]["published_at"] = published_at.group(0) if published_at else None
         item["metrics"] = labeled_metrics(item["metadata"].get("visible_text", ""), "wechat_official_account")
-    return {"status": "ok", "profile": labeled_metrics(current, "wechat_official_account"), "items": items}
+        item["metadata"]["record_scope"] = "asset"
+    return {"status": "ok", "profile": {**labeled_metrics(current, "wechat_official_account"),
+            "content_scope": "素材库/商品消息，非发表历史"}, "items": items}
 
 
 def metric(text, label):
