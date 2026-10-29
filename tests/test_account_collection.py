@@ -5,7 +5,7 @@ from unittest import mock
 
 from content_workbench.accounts.collection_knowledge import collection_bootstrap, error_type
 from content_workbench.accounts.collection_ontology import collection_ontology
-from content_workbench.accounts.existing_browser import data_period, metric, verified, xhs_card_title
+from content_workbench.accounts.existing_browser import data_period, douyin_content_metrics, metric, verified, xhs_card_title
 from content_workbench.accounts.executors import AccountExecutors
 from content_workbench.accounts.platform_worker import fill_channels_titles, labeled_metrics, wait_for_login
 from content_workbench.publishing.webbridge_worker import Bridge
@@ -125,6 +125,12 @@ class AccountCollectionCase(unittest.TestCase):
         self.assertEqual(1128.0, metric(text, "观看总时长"))
         self.assertEqual(0.8, metric(text, "视频完播率"))
         self.assertEqual("10-22 至 10-28", data_period(text))
+
+    def test_douyin_content_metrics_include_favorites_and_weighted_completion(self):
+        text = "播放\n100\n点赞\n1\n评论\n0\n分享\n0\n收藏\n2\n完播率\n10%\n播放\n300\n点赞\n2\n评论\n0\n分享\n0\n收藏\n4\n完播率\n20%"
+        metrics = douyin_content_metrics(text)
+        self.assertEqual(6, metrics["favorites"])
+        self.assertEqual(17.5, metrics["completionRate"])
 
     def test_collection_knowledge_is_complete_and_errors_are_typed(self):
         data = collection_bootstrap()

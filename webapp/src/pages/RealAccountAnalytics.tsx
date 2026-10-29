@@ -62,6 +62,14 @@ function dateText(value?: string | null) {
   return value ? value.replace("T", " ").slice(0, 16) : "未读取";
 }
 
+function rateText(value: unknown) {
+  return value === null || value === undefined || value === "" ? "未读取" : `${value}%`;
+}
+
+function secondsText(value: unknown) {
+  return value === null || value === undefined || value === "" ? "未读取" : `${value} 秒`;
+}
+
 export default function RealAccountAnalytics() {
   const { view = "overview" } = useParams();
   const { resources, refresh, notify } = useApp();
@@ -138,7 +146,7 @@ export default function RealAccountAnalytics() {
     {platform && <>
       <Card className="analytics-account-hero"><div className="analytics-account-identity"><span>{platformLabels[platform].slice(0, 1)}</span><div><Badge tone={snapshot ? "green" : "orange"}>{snapshot ? "真实累计快照" : "未同步"}</Badge><h2>{String(snapshot?.profile.account_name || `刘量 · ${platformLabels[platform]}`)}</h2><p>最近快照 {dateText(snapshot?.captured_at)} · 当前有 {competitorCount} 条竞对研究快照</p></div></div><Link className="button button-small" to="/competitors">查看真实竞对 <ExternalLink size={13} /></Link></Card>
       <section className="analytics-section"><SectionTitle title="账号累计公开快照" description="以下不是今日新增；只有明确读取到的指标才显示" /><div className="analytics-metrics-grid four"><MetricCard label="累计阅读 / 播放" value={numberText(snapshot?.totals.reach ?? null)} hint="无公开分母时保持未读取" /><MetricCard label="累计点赞" value={numberText(snapshot?.totals.likes ?? null)} hint="来自最近账号快照" /><MetricCard label="累计评论" value={numberText(snapshot?.totals.comments ?? null)} hint="不根据其他指标推算" /><MetricCard label="累计分享" value={numberText(snapshot?.totals.shares ?? null)} hint="平台未提供时保持未读取" /></div></section>
-      <section className="analytics-section"><SectionTitle title="消费质量" description="平台未提供或未接入时不生成趋势" /><Card><Empty title="完成率与留存尚未接入" description="需要创作者后台质量指标。当前只展示可核验发布和累计公开快照。" /></Card></section>
+      <section className="analytics-section"><SectionTitle title="消费质量" description="来自平台数据中心与官方导出；曝光等未提供字段保持未读取" /><div className="analytics-metrics-grid four"><MetricCard label="完播率" value={rateText(snapshot?.profile.completionRate)} hint="按作品播放加权或平台汇总" /><MetricCard label="平均观看时长" value={secondsText(snapshot?.profile.avgConsumptionSeconds)} hint="平台消费质量指标" /><MetricCard label="主页访客" value={numberText((snapshot?.profile.profileVisits ?? null) as number | null)} hint="账号主页访问人数/次数" /><MetricCard label="收藏" value={numberText((snapshot?.profile.favorites ?? null) as number | null)} hint="当前已加载作品汇总" /><MetricCard label="封面点击率" value={rateText(snapshot?.profile.coverClickRate)} hint="平台后台口径" /><MetricCard label="曝光" value={numberText((snapshot?.profile.impressions ?? null) as number | null)} hint="平台未提供时不以播放量替代" /></div></section>
       <section className="analytics-section"><SectionTitle title={`${platformLabels[platform]}私信与获客`} description="在本页面直接标注是否有效，不回写外部平台" /><LeadPanel leads={visibleLeads} metrics={metrics} contents={data.contents} platform={platform} /></section>
     </>}
 

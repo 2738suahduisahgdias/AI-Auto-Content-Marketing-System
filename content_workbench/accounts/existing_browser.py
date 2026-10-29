@@ -214,15 +214,38 @@ def data_period(text):
     return match.group(1).strip() if match else None
 
 
+def douyin_content_metrics(text):
+    lines = [line.strip() for line in text.split("\n") if line.strip()]
+    favorites = 0
+    weighted = []
+    for index, line in enumerate(lines):
+        if line == "收藏" and index + 1 < len(lines):
+            value = number(lines[index + 1])
+            if value is not None:
+                favorites += value
+        if line == "完播率" and index + 1 < len(lines):
+            rate = number(lines[index + 1])
+            views = None
+            for previous in range(index - 1, max(-1, index - 13), -1):
+                if lines[previous] == "播放" and previous + 1 < index:
+                    views = number(lines[previous + 1])
+                    break
+            if rate is not None and views:
+                weighted.append((rate, views))
+    total_weight = sum(weight for _, weight in weighted)
+    completion = round(sum(rate * weight for rate, weight in weighted) / total_weight, 2) if total_weight else None
+    return {"favorites": favorites, "completionRate": completion,
+            "content_metrics_scope": "内容管理当前已加载作品"}
+
+
 def douyin_analytics(bridge):
     bridge.goto("https://creator.douyin.com/creator-micro/data-center/operation")
-    bridge.wait_for_text("数据总览", 20)
-    current = body(bridge)
+    current = wait_for_metric(bridge, "播放量", 40)
     if "登录" in current and "数据总览" not in current:
         return {"status": "login_required"}
     if "数据总览" not in current:
         return {"status": "error", "error": "抖音数据中心尚未加载完成", "action": "打开数据中心/运营数据后重新读取，不自动重试"}
-    return {"status": "ok", "profile": {
+    profile = {
         "views": metric(current, "总播放量"), "likes": metric(current, "总点赞量"), "shares": metric(current, "总分享量"),
         "comments": metric(current, "总评论量"), "engagementRate": metric(current, "互动率"),
         "completionRate": metric(current, "完播率"), "fiveSecondCompletionRate": metric(current, "5秒完播率"),
@@ -232,7 +255,23 @@ def douyin_analytics(bridge):
         "gainedFollowers": metric(current, "吸粉量"), "lostFollowers": metric(current, "脱粉量"),
         "returningFans": metric(current, "回访粉丝量"), "data_period": data_period(current),
         "analytics_source": "抖音数据中心/运营数据",
-    }}
+    }
+    bridge.goto("https://creator.douyin.com/creator-micro/content/manage")
+    bridge.wait_for_text("内容管理", 20)
+    current = body(bridge)
+    for _ in range(5):
+        previous = current
+        bridge.evaluate("() => { window.scrollTo(0, document.body.scrollHeight); return true; }")
+        time.sleep(1.5)
+        current = body(bridge)
+        if current == previous:
+            break
+    profile.update(douyin_content_metrics(current))
+    bridge.goto("https://creator.douyin.com/creator-micro/home")
+    current = wait_for_metric(bridge, "主页访问量", 40)
+    profile["profileVisits"] = metric(current, "主页访问量")
+    profile["unavailable_fields"] = {"impressions": "当前账号运营页、内容管理和官方导出未提供独立曝光指标；播放量不冒充曝光"}
+    return {"status": "ok", "profile": profile}
 
 
 def xhs_analytics(bridge):
