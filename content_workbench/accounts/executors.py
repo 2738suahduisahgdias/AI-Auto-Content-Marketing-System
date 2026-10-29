@@ -1,9 +1,11 @@
 import json
 from pathlib import Path
 
+from content_workbench.accounts.collection_knowledge import error_type
 from content_workbench.accounts.existing_browser import run as run_existing_browser
 from content_workbench.agents.registry import require_agent_enabled
 from content_workbench.domain.errors import DomainError
+from content_workbench.storage.db import utcnow
 from content_workbench.topics.executors import TopicExecutors
 
 
@@ -38,7 +40,7 @@ class AccountExecutors:
         return result
 
     def sync(self, job, context):
-        result = {"accounts": {}, "media_downloaded": 0}
+        result = {"accounts": {}, "media_downloaded": 0, "errors": []}
         sources = [("xiaohongshu", "xhs_notes"), ("douyin", "douyin_account"),
                    ("wechat_channels", "channels_account"), ("wechat_official_account", "official_account")]
         for platform, action in sources:
@@ -57,8 +59,10 @@ class AccountExecutors:
                 result["accounts"][platform] = len(items)
                 if not items:
                     result["accounts"][platform + "_warning"] = "已打开后台但未读取到内容；账号可能无内容，也可能页面结构已变化，请检查后台列表"
+                    result["errors"].append({"platform": platform, "type": "EMPTY_RESULT", "message": "未读取到内容，需确认账号无内容还是结构变化", "action": "检查后台列表，不自动重试", "captured_at": utcnow()})
             except DomainError as error:
                 result["accounts"][platform + "_error"] = error.message
+                result["errors"].append({"platform": platform, "type": error_type(error.message), "message": error.message, "action": error.action or "按错误类型处理后手动重试", "captured_at": utcnow()})
         errors = [key for key in result["accounts"] if key.endswith("_error")]
         if len(errors) == len(sources):
             details = "；".join("{}：{}".format(key, result["accounts"][key]) for key in errors)

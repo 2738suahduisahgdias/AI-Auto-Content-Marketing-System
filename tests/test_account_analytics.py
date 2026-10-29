@@ -70,6 +70,24 @@ class AccountAnalyticsCase(unittest.TestCase):
         self.assertEqual(340, public_number("340"))
         self.assertIsNone(public_number("未读取"))
 
+    def test_incremental_metrics_use_previous_snapshot_baseline(self):
+        item = {"title": "同一内容", "canonical_url": "https://example.com/video/1", "metrics": {"views": 100, "likes": 5}}
+        self.accounts.save_snapshot("wechat_channels", {}, [item])
+        first = AccountAnalytics(self.db).bootstrap(datetime(2026, 10, 28, 12, tzinfo=ZoneInfo("Asia/Shanghai")))
+        self.assertFalse(first["platforms"]["wechat_channels"]["snapshot"]["baseline_available"])
+        self.assertEqual("initial", first["platforms"]["wechat_channels"]["snapshot"]["profile"]["sync_mode"])
+        item["metrics"]["views"] = 150
+        item["metrics"]["likes"] = 8
+        self.accounts.save_snapshot("wechat_channels", {}, [item])
+        second = AccountAnalytics(self.db).bootstrap(datetime(2026, 10, 28, 13, tzinfo=ZoneInfo("Asia/Shanghai")))
+        snapshot = second["platforms"]["wechat_channels"]["snapshot"]
+        self.assertTrue(snapshot["baseline_available"])
+        self.assertEqual("incremental", snapshot["profile"]["sync_mode"])
+        self.assertEqual(50, snapshot["delta"]["reach"])
+        self.assertEqual(3, snapshot["delta"]["likes"])
+        self.assertEqual(50, second["platforms"]["wechat_channels"]["metrics"]["today"]["reach"])
+        self.assertEqual(50, second["totals"]["today"]["reach"])
+
 
 if __name__ == "__main__":
     unittest.main()

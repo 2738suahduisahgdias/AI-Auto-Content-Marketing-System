@@ -1,4 +1,5 @@
 from content_workbench.accounts.analytics import AccountAnalytics
+from content_workbench.accounts.collection_knowledge import collection_bootstrap
 from content_workbench.accounts.leads import LeadService
 from content_workbench.storage.db import connect, dumps, immediate, loads, new_id, utcnow
 
@@ -22,6 +23,8 @@ class AccountService:
         self.ensure_tables()
         snapshot_id = new_id("account")
         with self.conn() as conn, immediate(conn):
+            initial = not conn.execute("SELECT 1 FROM account_daily_snapshots WHERE platform=? LIMIT 1", (platform,)).fetchone()
+            profile = {**profile, "sync_mode": "initial" if initial else "incremental"}
             conn.execute("INSERT INTO account_daily_snapshots VALUES (?,?,?,?)", (snapshot_id, platform, dumps({"profile": profile, "items": items}), utcnow()))
         return snapshot_id
 
@@ -45,6 +48,7 @@ class AccountService:
                 recommendations.append({**payload, "id": row["id"], "created_at": row["created_at"]})
         analytics = AccountAnalytics(self.db_path).bootstrap()
         return {"accounts": latest, "recommendations": recommendations, "analytics": analytics,
+                "collection_knowledge": collection_bootstrap(),
                 "competitor_analytics": analytics["competitor_analytics"],
                 "jobs": [job for job in self.topics.jobs.list() if job["kind"].startswith("accounts.") or job["kind"] == "publish.douyin"][:20]}
 

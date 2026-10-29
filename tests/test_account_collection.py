@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from content_workbench.accounts.collection_knowledge import collection_bootstrap, error_type
 from content_workbench.accounts.existing_browser import verified
 from content_workbench.accounts.executors import AccountExecutors
 from content_workbench.accounts.platform_worker import fill_channels_titles, labeled_metrics, wait_for_login
@@ -98,6 +99,17 @@ class AccountCollectionCase(unittest.TestCase):
         snapshot = {"url": "https://channels.weixin.qq.com/platform/post/list", "tree": ["视频管理"]}
         self.assertTrue(verified(snapshot, "channels_login"))
         self.assertFalse(verified({"url": "https://channels.weixin.qq.com/login.html", "tree": ["登录视频号助手"]}, "channels_login"))
+
+    def test_collection_knowledge_is_complete_and_errors_are_typed(self):
+        data = collection_bootstrap()
+        self.assertEqual(4, len(data["platforms"]))
+        for item in data["platforms"]:
+            self.assertIn("selectors", item)
+            self.assertIn("incremental", item)
+            self.assertIn("version", item)
+        self.assertIn("STRUCTURE_CHANGED", data["error_types"])
+        self.assertEqual("STRUCTURE_CHANGED", error_type("strict mode violation"))
+        self.assertEqual("LOGIN_REQUIRED", error_type("需要扫码登录"))
 
 
 if __name__ == "__main__":

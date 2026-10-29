@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { ExternalLink, RefreshCw, Search, X } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useApp } from "@/AppContext";
 import { Badge, Button, Card, Empty, ErrorBox, Input, PageHeader } from "@/components/ui";
 import { api, errorText, jsonOptions } from "@/lib/api";
@@ -63,6 +64,7 @@ export default function Knowledge() {
 
   return <>
     <PageHeader eyebrow="ACCOUNT ONTOLOGY" title="把碎片信息连成知识网络" description="定位、受众、痛点、证据与内容任务保存在本地 SQLite；每条自动关系保留来源，研究证据可以回跳原链接。" actions={<Button variant="primary" disabled={!!busy} onClick={() => void backfill()}><RefreshCw size={14} />{busy === "backfill" ? "正在回填…" : "同步现有数据到知识库"}</Button>} />
+    <nav className="knowledge-tabs" aria-label="知识库视图"><Link className="active" to="/knowledge">账号 Ontology</Link><Link to="/knowledge/collection">采集知识库</Link></nav>
     {loadError && <ErrorBox>{loadError}<br /><Button size="small" onClick={() => void refresh()}>重新读取</Button></ErrorBox>}
     {actionError && <ErrorBox>{actionError}<br /><Button size="small" onClick={() => setActionError("")}>关闭错误详情</Button></ErrorBox>}
     <form className="knowledge-toolbar" onSubmit={submitSearch}><Input aria-label="搜索实体或摘要" value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索实体名称或摘要" /><select aria-label="实体类型" value={type} onChange={event => setType(event.target.value)}><option value="">全部类型</option>{allTypes.map(value => <option key={value} value={value}>{value}</option>)}</select><Button type="submit" disabled={!!busy}><Search size={14} />{busy === "search" ? "搜索中…" : "搜索"}</Button><div className="knowledge-count"><Badge>{entities.length} 实体 · {relations.length} 关系</Badge></div></form>

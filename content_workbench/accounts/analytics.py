@@ -108,8 +108,22 @@ class AccountAnalytics:
             return {}
         rows = conn.execute("SELECT * FROM account_daily_snapshots ORDER BY captured_at DESC").fetchall()
         result = {}
+        previous = {}
         for row in rows:
-            if row["platform"] in result:
+            platform = row["platform"]
+            if platform in result:
+                if platform not in previous:
+                    value = loads(row["snapshot_json"], {})
+                    previous_totals = {}
+                    for key in METRICS[:5]:
+                        values = [item_metric(item, key) for item in value.get("items") or []]
+                        present = [value for value in values if value is not None]
+                        previous_totals[key] = sum(present) if present else None
+                    previous[platform] = {"totals": previous_totals}
+                    result[platform]["delta"] = {key: result[platform]["totals"][key] - previous[platform]["totals"][key]
+                        if result[platform]["totals"][key] is not None and previous[platform]["totals"][key] is not None else None
+                        for key in METRICS[:5]}
+                    result[platform]["baseline_available"] = True
                 continue
             value = loads(row["snapshot_json"], {})
             items = value.get("items") or []
@@ -118,8 +132,9 @@ class AccountAnalytics:
                 values = [item_metric(item, key) for item in items]
                 present = [value for value in values if value is not None]
                 totals[key] = sum(present) if present else None
-            result[row["platform"]] = {"captured_at": row["captured_at"], "profile": value.get("profile") or {},
-                                       "totals": totals, "items": items}
+            result[platform] = {"captured_at": row["captured_at"], "profile": value.get("profile") or {},
+                                "totals": totals, "items": items, "baseline_available": False,
+                                "delta": {key: None for key in METRICS[:5]}}
         return result
 
     def leads(self, conn, tables):
@@ -184,6 +199,9 @@ class AccountAnalytics:
                                 "articles": len({item["source_id"] for item in selected if item["kind"] == "article"}),
                                 "videos": len({item["source_id"] for item in selected if item["kind"] == "video"})})
                 apply_leads(metrics, selected_leads, selected_deals)
+                if range_key == "today" and snapshots.get(platform, {}).get("baseline_available"):
+                    for key in METRICS[:5]:
+                        metrics[key] = snapshots[platform]["delta"][key]
                 ranges[range_key] = metrics
             snapshot = snapshots.get(platform)
             platforms[platform] = {"metrics": ranges, "snapshot": snapshot}
@@ -198,6 +216,10 @@ class AccountAnalytics:
                             "articles": len({item["source_id"] for item in selected if item["kind"] == "article"}),
                             "videos": len({item["source_id"] for item in selected if item["kind"] == "video"})})
             apply_leads(metrics, selected_leads, selected_deals)
+            if range_key == "today":
+                for key in METRICS[:5]:
+                    values = [snapshot["delta"][key] for snapshot in snapshots.values() if snapshot.get("baseline_available") and snapshot["delta"][key] is not None]
+                    metrics[key] = sum(values) if values else None
             totals[range_key] = metrics
         contents = [{key: value for key, value in item.items() if key != "_time"} for item in sorted(publications, key=lambda value: value["_time"], reverse=True)]
         for platform, snapshot in snapshots.items():
