@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest import mock
 
 from content_workbench.accounts.collection_knowledge import collection_bootstrap, error_type
+from content_workbench.accounts.collection_ontology import collection_ontology
 from content_workbench.accounts.existing_browser import verified
 from content_workbench.accounts.executors import AccountExecutors
 from content_workbench.accounts.platform_worker import fill_channels_titles, labeled_metrics, wait_for_login
@@ -110,6 +111,20 @@ class AccountCollectionCase(unittest.TestCase):
         self.assertIn("STRUCTURE_CHANGED", data["error_types"])
         self.assertEqual("STRUCTURE_CHANGED", error_type("strict mode violation"))
         self.assertEqual("LOGIN_REQUIRED", error_type("需要扫码登录"))
+
+    def test_ontology_supports_agent_filters_and_verification_boundaries(self):
+        entities = collection_ontology()["entities"]
+        self.assertGreaterEqual(len(entities), 30)
+        categories = {item["category"] for item in entities}
+        for required in ("identity_access", "content_management", "analytics", "interaction", "research", "publishing", "scheduling", "assets", "export"):
+            self.assertIn(required, categories)
+        channels = collection_ontology(platform="wechat_channels", category="content_management")["entities"]
+        self.assertEqual(1, len(channels))
+        self.assertEqual("verified", channels[0]["status"])
+        self.assertIn("agent_usage", channels[0])
+        analytics = collection_ontology(platform="douyin", category="analytics")["entities"]
+        self.assertEqual("unverified", analytics[0]["status"])
+        self.assertNotRegex(str(entities), r"token=\d{3,}")
 
 
 if __name__ == "__main__":

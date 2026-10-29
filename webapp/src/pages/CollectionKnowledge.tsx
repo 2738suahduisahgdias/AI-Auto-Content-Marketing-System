@@ -1,21 +1,45 @@
-import { useState } from "react";
-import { BookOpen, ExternalLink, FileDown, GitBranch } from "lucide-react";
+import { useMemo, useState } from "react";
+import { BookOpen, Braces, ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useApp } from "@/AppContext";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import "./Knowledge.css";
 
+interface OntologyEntity {
+  id: string;
+  platform: string;
+  category: string;
+  category_name: string;
+  title: string;
+  url: string;
+  status: string;
+  verification: string;
+  capabilities: { read: boolean; write: boolean };
+  fields: Record<string, string>;
+  agent_usage: string[];
+  errors: string[];
+  refresh: string;
+  version: string;
+}
+
+const platformNames: Record<string, string> = { douyin: "抖音", xiaohongshu: "小红书", wechat_channels: "视频号", wechat_official_account: "公众号" };
+
 export default function CollectionKnowledge() {
   const { resources } = useApp();
-  const data = resources?.accounts?.collection_knowledge || { platforms: [], error_types: [] };
+  const data = resources?.accounts?.collection_knowledge || { entities: [], categories: [], error_types: [] };
+  const entities: OntologyEntity[] = useMemo(() => data.entities || [], [data]);
+  const [platform, setPlatform] = useState("");
+  const [category, setCategory] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
-  const current = data.platforms.find((item: any) => item.platform === selected) || data.platforms[0];
+  const visible = useMemo(() => entities.filter(item => (!platform || item.platform === platform) && (!category || item.category === category)), [entities, platform, category]);
+  const current = visible.find(item => item.id === selected) || visible[0];
+  const verifiedCount = entities.filter(item => item.status === "verified").length;
 
   return <div className="collection-knowledge-page">
-    <PageHeader eyebrow="COLLECTION ADAPTERS" title="采集知识库" description="只保存后台结构、指标口径和适配版本。首次建库后做增量更新，结构变化按类型报错，不反复重试。" actions={<Link className="button" to="/knowledge"><BookOpen size={15} />账号 Ontology</Link>} />
+    <PageHeader eyebrow="COLLECTION ONTOLOGY" title="采集 Ontology" description="把平台后台结构整理为 Agent 可调用的数据契约：身份权限、内容、分析、互动、热点、发布、任务、素材与导出。" actions={<Link className="button" to="/knowledge"><BookOpen size={15} />账号 Ontology</Link>} />
     <nav className="knowledge-tabs" aria-label="知识库视图"><Link to="/knowledge">账号 Ontology</Link><Link className="active" to="/knowledge/collection">采集知识库</Link></nav>
-    <div className="collection-boundary"><GitBranch size={17} /><p>{data.boundary}</p></div>
-    {current ? <div className="collection-layout"><div className="collection-platform-list">{data.platforms.map((item: any) => <button key={item.platform} className={current.platform === item.platform ? "active" : ""} onClick={() => setSelected(item.platform)}><strong>{item.name}</strong><small>{item.version}</small></button>)}</div><Card className="collection-detail"><div className="collection-detail-head"><div><Badge tone="blue">{current.name}</Badge><h2>{current.page}</h2><p>{current.url}</p></div><Badge tone="orange">导出待验证</Badge></div><div className="collection-info-grid"><section><h3>页面与登录检查</h3><pre>{JSON.stringify(current.login_check, null, 2)}</pre></section><section><h3>字段与指标映射</h3><pre>{JSON.stringify(current.selectors, null, 2)}</pre>{current.metric_map && <pre>{JSON.stringify(current.metric_map, null, 2)}</pre>}</section><section><h3>结构校验</h3><pre>{JSON.stringify(current.validation, null, 2)}</pre></section><section><h3>增量更新</h3><p>游标：{current.incremental.cursor}</p><p>重叠校验：{current.incremental.overlap} 条</p><p>{current.incremental.history}</p></section></div><div className="collection-export"><FileDown size={17} /><div><strong>导出优先级</strong><p>{current.export.priority.join(" → ")}。尚无真实导出验证时显示 EXPORT_NOT_FOUND，不伪造导出结果。</p></div><a href={current.url} target="_blank" rel="noreferrer" aria-label={`打开${current.name}后台`}><ExternalLink size={16} /></a></div></Card></div> : <Empty title="还没有采集知识定义" description="请先加载真实账号数据，不会生成空平台定义。" />}
-    <Card className="collection-errors"><h2>同步错误类型</h2><div>{data.error_types.map((type: string) => <Badge key={type} tone={type === "STRUCTURE_CHANGED" ? "orange" : "neutral"}>{type}</Badge>)}</div><p>每种错误都包含平台、原因、处理动作和时间；只暂停对应平台，不自动重试。</p></Card>
+    <div className="collection-boundary"><Braces size={17} /><p>{data.boundary}</p></div>
+    <div className="collection-toolbar"><label>平台<select value={platform} onChange={event => { setPlatform(event.target.value); setSelected(null); }}><option value="">全部平台</option>{Object.entries(platformNames).map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select></label><label>知识类别<select value={category} onChange={event => { setCategory(event.target.value); setSelected(null); }}><option value="">全部类别</option>{data.categories.map((item: any) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><Badge tone="blue">{visible.length} 个实体</Badge><Badge tone="green">{verifiedCount} 个已验证</Badge><Badge tone="orange">{entities.length - verifiedCount} 个待验证</Badge></div>
+    {current ? <div className="collection-layout"><div className="collection-entity-list">{visible.map(item => <button key={item.id} className={current.id === item.id ? "active" : ""} onClick={() => setSelected(item.id)}><div><strong>{item.title}</strong><small>{platformNames[item.platform]} · {item.category_name}</small></div><Badge tone={item.status === "verified" ? "green" : "orange"}>{item.verification}</Badge></button>)}</div><Card className="collection-detail"><div className="collection-detail-head"><div><Badge tone="blue">{current.category_name}</Badge><h2>{current.title}</h2><p>{platformNames[current.platform]} · 适配版本 {current.version}</p></div><Badge tone={current.status === "verified" ? "green" : "orange"}>{current.verification}</Badge></div><div className="collection-info-grid"><section><h3>数据契约</h3><pre>{JSON.stringify(current.fields, null, 2)}</pre></section><section><h3>能力与用途</h3><p>读取：{current.capabilities.read ? "允许" : "不允许"} · 写入：{current.capabilities.write ? "允许" : "不允许"}</p><p>Agent 用途：{current.agent_usage.join("、")}</p><p>更新：{current.refresh}</p></section><section><h3>错误边界</h3><div className="collection-error-tags">{current.errors.map(error => <Badge key={error} tone={error === "STRUCTURE_CHANGED" ? "orange" : "neutral"}>{error}</Badge>)}</div></section><section><h3>Agent 调用</h3><p>只读接口，按平台与类别返回上述结构，不返回 Cookie、Token 或密码。</p><a className="button button-small" href={`/api/accounts/collection-knowledge/${current.platform}/${current.category}`} target="_blank" rel="noreferrer">查看机器可读 JSON <ExternalLink size={13} /></a></section></div><div className="collection-export"><strong>后台页面</strong><p>{current.url}</p>{/^https?:/.test(current.url) && <a href={current.url} target="_blank" rel="noreferrer" aria-label={`打开${current.title}`}><ExternalLink size={16} /></a>}</div></Card></div> : <Empty title="当前筛选没有知识实体" description="调整平台或类别。待验证能力不会冒充已接入。" />}
   </div>;
 }

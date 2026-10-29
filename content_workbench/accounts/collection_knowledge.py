@@ -1,3 +1,5 @@
+from content_workbench.accounts.collection_ontology import collection_ontology
+
 ERROR_TYPES = [
     "LOGIN_REQUIRED", "PERMISSION_DENIED", "STRUCTURE_CHANGED", "RATE_LIMITED", "EMPTY_RESULT",
     "PARSING_FAILED", "VALIDATION_FAILED", "NETWORK_ERROR", "EXPORT_NOT_FOUND",
@@ -45,7 +47,9 @@ COLLECTION_KNOWLEDGE = [
 
 
 def collection_bootstrap():
+    ontology = collection_ontology()
     return {"platforms": COLLECTION_KNOWLEDGE, "error_types": ERROR_TYPES,
+            "entities": ontology["entities"], "categories": ontology["categories"],
             "boundary": "只保存页面结构、字段口径与适配版本；不保存 Cookie、Token、密码或私信。原始导出文件仅本机保存。"}
 
 

@@ -1,5 +1,6 @@
 import re
 
+from content_workbench.accounts.collection_ontology import collection_ontology
 from content_workbench.accounts.setup import setup_status
 from content_workbench.domain.errors import DomainError
 
@@ -15,6 +16,14 @@ class AccountAPI:
             data = setup_status(self.service.db_path)
             data["csrf_token"] = self.app.csrf(self.app.cookie(handler))
             return self.app.response(handler, data)
+        if method == "GET" and path == "/api/accounts/collection-knowledge":
+            return self.app.response(handler, collection_ontology())
+        match = re.fullmatch(r"/api/accounts/collection-knowledge/([^/]+)/([^/]+)", path)
+        if method == "GET" and match:
+            return self.app.response(handler, collection_ontology(platform=match.group(1), category=match.group(2)))
+        match = re.fullmatch(r"/api/accounts/collection-knowledge/([^/]+)", path)
+        if method == "GET" and match:
+            return self.app.response(handler, collection_ontology(platform=match.group(1)))
         if method == "GET" and path == "/api/accounts/bootstrap":
             data = self.service.bootstrap()
             data["csrf_token"] = self.app.csrf(self.app.cookie(handler))
