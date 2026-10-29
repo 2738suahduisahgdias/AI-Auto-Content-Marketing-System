@@ -1,5 +1,5 @@
-import base64
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -30,7 +30,8 @@ class PublishingCase(unittest.TestCase):
         self.wb = Workbench(self.db, self.root)
         self.service = PublishingService(self.db, self.root)
         image = self.root / "cover.png"
-        image.write_bytes(base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="))
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "color=c=white:s=900x383",
+                        "-frames:v", "1", str(image)], check=True, capture_output=True)
         self.cover = self.wb.register_asset(image, {"kind": "cover"}, "owned")
         self.article = self.make_article()
         self.video = self.make_video()
@@ -49,7 +50,8 @@ class PublishingCase(unittest.TestCase):
     def make_video(self):
         path = self.root / "renders/test/video.mp4"
         path.parent.mkdir(parents=True)
-        path.write_bytes(b"video")
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "color=c=black:s=360x640:d=1",
+                        "-c:v", "libx264", "-pix_fmt", "yuv420p", str(path)], check=True, capture_output=True)
         with connect(self.db) as conn:
             conn.execute("INSERT INTO tasks VALUES ('video-1','已批准视频','approved','{}','2026-10-27')")
             conn.execute("INSERT INTO files(content_id,kind,relative_path) VALUES ('video-1','video','renders/test/video.mp4')")
@@ -220,20 +222,52 @@ class PublishingCase(unittest.TestCase):
         with self.assertRaises(DomainError):
             self.service.generate_fields("article", self.article["id"], ["douyin"])
 
+    def test_platform_specific_limits_and_long_article_description(self):
+        from content_workbench.publishing.schemas import validate_payload
+        for platform, kind, payload, field in [
+            ("douyin", "video", {"title": "长" * 31, "description": "简介"}, "title"),
+            ("xiaohongshu", "video", {"title": "长" * 21, "description": "正文"}, "title"),
+            ("wechat_channels", "video", {"short_title": "长" * 17, "description": "描述"}, "short_title"),
+        ]:
+            with self.assertRaises(DomainError) as caught:
+                validate_payload(kind, platform, payload)
+            self.assertEqual(field, caught.exception.field)
+        article = validate_payload("article", "xiaohongshu", {"title": "长文标题", "body": "长文正文", "description": "独立描述"})
+        self.assertEqual("长文正文", article["body"])
+        self.assertEqual("独立描述", article["description"])
+        with self.assertRaises(DomainError) as caught:
+            validate_payload("article", "wechat_official_account", {"title": "标题", "body": "正文", "cover_asset_id": self.cover,
+                                                                     "original": False, "reward_enabled": True})
+        self.assertEqual("PUBLISH_FIELD_DEPENDENCY", caught.exception.code)
+        with self.assertRaises(DomainError) as caught:
+            self.service.create_batch("video", self.video, [{"platform": "wechat_channels", "payload": {
+                "short_title": "短标题", "description": "描述", "original": True}}])
+        self.assertEqual("PUBLISH_ORIGINAL_DURATION_CONFLICT", caught.exception.code)
+
+    def test_unsupported_nondefault_fields_block_preview(self):
+        from content_workbench.publishing.coverage import unsupported_payload_field
+        supported = {"title", "author", "summary", "body", "cover_asset_id"}
+        payload = {"title": "标题", "body": "正文", "cover_asset_id": self.cover, "original": True}
+        error = unsupported_payload_field("wechat_official_account", "article", payload, supported)
+        self.assertEqual("original", error["field"])
+        self.assertIn("不能静默忽略", error["error"])
+        payload["original"] = False
+        self.assertIsNone(unsupported_payload_field("wechat_official_account", "article", payload, supported))
+
     def test_publish_knowledge_matches_actual_validation_contract(self):
         official = publish_knowledge(platform="wechat_official_account", content_kind="article")["platforms"][0]
         fields = {field["name"]: field for field in official["content_types"][0]["fields"]}
         self.assertEqual(64, fields["title"]["max_length"])
-        self.assertEqual(200000, fields["body"]["max_length"])
+        self.assertIsNone(fields["body"]["max_length"])
         self.assertTrue(fields["cover_asset_id"]["required"])
         self.assertEqual(8, fields["author"]["max_length"])
         self.assertEqual(120, fields["summary"]["max_length"])
         video = publish_knowledge(platform="douyin", content_kind="video")["platforms"][0]
         video_fields = {field["name"]: field for field in video["content_types"][0]["fields"]}
-        self.assertEqual(300, video_fields["title"]["max_length"])
-        self.assertEqual(5000, video_fields["description"]["max_length"])
+        self.assertEqual(30, video_fields["title"]["max_length"])
+        self.assertEqual(1000, video_fields["description"]["max_length"])
         self.assertTrue(video_fields["video_path"]["required"])
-        self.assertEqual("已验证发布字段", video["verification"])
+        self.assertIn("基础字段已接入", video["verification"])
 
 
 if __name__ == "__main__":

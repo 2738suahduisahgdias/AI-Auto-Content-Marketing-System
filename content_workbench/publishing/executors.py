@@ -31,7 +31,7 @@ class PublishingExecutors:
             if not isinstance(fields, dict):
                 raise DomainError("MODEL_SCHEMA_INVALID", PLATFORM_NAMES[platform] + "缺少字段对象", 502, platform, "重试生成该平台或人工填写")
             contract = publish_knowledge(platform=platform, content_kind=kind)["platforms"][0]["content_types"][0]
-            generated_names = {"title", "body", "author", "summary"} if kind == "article" else {"title", "description", "tags"}
+            generated_names = {definition["name"] for definition in contract["fields"] if definition["agent_generated"]}
             output = {}
             for definition in contract["fields"]:
                 name = definition["name"]
@@ -53,6 +53,12 @@ class PublishingExecutors:
                                       "{}的 {} 不能超过 {} 字，当前 {} 字".format(PLATFORM_NAMES[platform], name, definition["max_length"], len(value)),
                                       502, platform + "." + name, "缩短该字段后保存，或重新生成")
                 output[name] = value
+            for definition in contract["fields"]:
+                if definition.get("combined_with"):
+                    total = len(output.get(definition["combined_with"], "")) + len(output.get(definition["name"], "")) + 1
+                    if total > definition["combined_max"]:
+                        raise DomainError("PUBLISH_GENERATED_FIELD_TOO_LONG", PLATFORM_NAMES[platform] + "的描述与话题合计超长",
+                                          502, platform + "." + definition["name"], "缩短描述或话题后重试")
             result[platform] = output
         return result
 
@@ -85,7 +91,7 @@ class PublishingExecutors:
         data = job["input"]
         kind = data["content_kind"]
         platforms = data["platforms"]
-        source = self.service.source(kind, data["source_id"])
+        source = self.service.source(kind, data["source_id"], data.get("source_file_id"))
         contracts = {platform: publish_knowledge(platform=platform, content_kind=kind)["platforms"][0] for platform in platforms}
         prompt = json.dumps({"operation": "publish.fields", "source": {"title": source["title"],
                              "text": source.get("body") if kind == "article" else source.get("description")},
@@ -129,7 +135,7 @@ class PublishingExecutors:
         if target["status"] == "published":
             raise DomainError("PUBLISH_ALREADY_RECORDED", "该平台已经发布，不能重复预览执行", 409, "platform", "核对平台后台")
         platform = target["platform"]
-        payload = self.service.resolve_assets(target["payload"])
+        payload = self.service.resolve_assets(target["payload"], platform, batch["content_kind"])
         result = self.run(context, "prepare", platform, {"source": source, "payload": payload, "target_id": target["id"]})
         if result.get("status") == "preview_ready" and result.get("fields_verified"):
             self.service.set_target_result(target["id"], "ready", result, job_id=job["id"])
@@ -144,7 +150,7 @@ class PublishingExecutors:
             raise DomainError("PUBLISH_CONFIRMATION_REQUIRED", "缺少有效的一键发布确认", 409, "confirmed_at", "先完成预览并由用户确认")
         source = self.service.assert_current(batch)
         platform = target["platform"]
-        payload = self.service.resolve_assets(target["payload"])
+        payload = self.service.resolve_assets(target["payload"], platform, batch["content_kind"])
         result = self.run(context, "execute", platform, {"source": source, "payload": payload, "target_id": target["id"]})
         if result.get("status") == "published" and result.get("published_evidence"):
             self.service.set_target_result(target["id"], "published", result, job_id=job["id"], external_url=result.get("url"))
@@ -161,7 +167,7 @@ class PublishingExecutors:
         batch, target = self.service.target(job["input"]["target_id"])
         source = self.service.assert_current(batch)
         platform = target["platform"]
-        payload = self.service.resolve_assets(target["payload"])
+        payload = self.service.resolve_assets(target["payload"], platform, batch["content_kind"])
         result = self.run(context, "verify", platform, {"source": source, "payload": payload, "target_id": target["id"]})
         if result.get("status") == "published" and result.get("published_evidence"):
             self.service.set_target_result(target["id"], "published", result, job_id=job["id"], external_url=result.get("url"))

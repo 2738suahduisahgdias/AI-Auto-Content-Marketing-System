@@ -1,3 +1,13 @@
+from content_workbench.publishing.knowledge import publish_knowledge
+
+
+def publishing_fields(platform, content_kind):
+    content = publish_knowledge(platform=platform, content_kind=content_kind)["platforms"][0]["content_types"][0]
+    return {field["name"]: {"type": field["control"], "required": field["required"], "max_length": field["max_length"],
+                            "sync_status": field["sync_status"], "verification": field["verification"]}
+            for field in content["fields"]}
+
+
 CATEGORY_LABELS = {
     "identity_access": "身份与权限", "account_profile": "账号资料", "content_management": "内容管理",
     "analytics": "数据分析", "interaction": "评论与私信", "research": "热点与收藏",
@@ -31,7 +41,7 @@ def douyin_entities():
         entity("douyin", "interaction", "评论与私信", "创作者互动管理（待验证）", {"comment_id": "string|null", "message_text": "string|null", "author_alias": "string|null", "occurred_at": "datetime|null"}, "unverified", ["lead_review", "comment_analysis"]),
         entity("douyin", "research", "抖音热榜", "https://www.douyin.com/hot", {"rank": "number", "title": "string", "heat": "string|null", "canonical_url": "string", "captured_at": "datetime"}, "verified", ["topic_research", "hotspot_agent"], refresh="每日热点快照，归档保留"),
         entity("douyin", "research", "收藏夹精选/竞品/高赞", "https://www.douyin.com/user/self?showSubTab=favorite_folder&showTab=favorite_collection", {"collection": "string", "title": "string", "author": "string|null", "likes": "number|null", "cover_url": "string|null", "archived": "boolean"}, "verified", ["topic_research", "competitor_analysis"]),
-        entity("douyin", "publishing", "视频发布与核验", "https://creator.douyin.com/creator-micro/content/upload", {"title": "string", "description": "string", "video_path": "string", "cover_asset_id": "string|null", "status": "draft|ready|published|unknown_remote"}, "verified", ["publish_preview", "publish_verify"], write=True),
+        entity("douyin", "publishing", "视频发布与核验", "https://creator.douyin.com/creator-micro/content/upload", publishing_fields("douyin", "video"), "verified", ["publish_preview", "publish_verify"], write=True),
     ]
 
 
@@ -41,7 +51,7 @@ def xhs_entities():
         entity("xiaohongshu", "analytics", "笔记数据看板", "创作者数据看板（待验证）", {"views": "number|null", "likes": "number|null", "comments": "number|null", "shares": "number|null", "favorites": "number|null", "search_rate": "number|null"}, "unverified", ["account_daily", "search_analysis"]),
         entity("xiaohongshu", "interaction", "笔记评论与私信", "创作者互动管理（待验证）", {"comment_id": "string|null", "message_text": "string|null", "author_alias": "string|null", "occurred_at": "datetime|null"}, "unverified", ["lead_review", "comment_analysis"]),
         entity("xiaohongshu", "research", "近期笔记研究快照", "https://creator.xiaohongshu.com/new/note-manager", {"noteId": "string", "title": "string", "cover_url": "string|null", "published_at": "datetime", "visible_metrics": "array"}, "verified", ["topic_research", "content_review"]),
-        entity("xiaohongshu", "publishing", "笔记发布与核验", "小红书创作者发布页", {"title": "string", "description": "string", "video_path": "string|null", "body": "string|null", "status": "draft|ready|published|unknown_remote"}, "verified", ["publish_preview", "publish_verify"], write=True),
+        entity("xiaohongshu", "publishing", "笔记发布与核验", "小红书创作者发布页", {**publishing_fields("xiaohongshu", "video"), **publishing_fields("xiaohongshu", "article")}, "verified", ["publish_preview", "publish_verify"], write=True),
     ]
 
 
@@ -51,7 +61,7 @@ def channels_entities():
         entity("wechat_channels", "analytics", "视频号数据中心", "视频号数据中心（待验证）", {"views": "number|null", "likes": "number|null", "comments": "number|null", "shares": "number|null", "followers": "number|null", "retention": "object|null"}, "unverified", ["account_daily", "quality_analysis"]),
         entity("wechat_channels", "interaction", "评论、弹幕与私信", "互动管理（待验证）", {"comment_id": "string|null", "message_text": "string|null", "author_alias": "string|null", "occurred_at": "datetime|null"}, "unverified", ["lead_review", "comment_analysis"]),
         entity("wechat_channels", "research", "微信消息选题收件箱", "本地微信消息快照", {"tag": "精选|竞品|高赞|行业", "text": "string", "original_url": "string|null", "created_at": "datetime", "archived": "boolean"}, "verified", ["topic_research", "wechat_inbox"], refresh="手动入库，不回写微信"),
-        entity("wechat_channels", "publishing", "视频号发表与核验", "https://channels.weixin.qq.com/platform/post/create", {"short_title": "string", "description": "string", "video_path": "string", "cover_asset_id": "string|null", "status": "draft|ready|published|unknown_remote"}, "verified", ["publish_preview", "publish_verify"], write=True),
+        entity("wechat_channels", "publishing", "视频号发表与核验", "https://channels.weixin.qq.com/platform/post/create", publishing_fields("wechat_channels", "video"), "verified", ["publish_preview", "publish_verify"], write=True),
     ]
 
 
@@ -61,7 +71,7 @@ def official_entities():
         entity("wechat_official_account", "analytics", "阅读与关注数据", "公众号数据分析（待验证）", {"readers": "number|null", "completion_rate": "number|null", "shares": "number|null", "new_followers": "number|null", "read_source": "object|null"}, "unverified", ["account_daily", "quality_analysis"]),
         entity("wechat_official_account", "interaction", "留言与关注者消息", "公众号互动管理（待验证）", {"message_id": "string|null", "message_text": "string|null", "author_alias": "string|null", "occurred_at": "datetime|null"}, "unverified", ["lead_review", "comment_analysis"]),
         entity("wechat_official_account", "research", "公众号历史内容研究", "公众号文章列表", {"title": "string", "canonical_url": "string", "published_at": "datetime|null", "content_kind": "article", "visible_text": "string"}, "verified", ["topic_research", "content_review"]),
-        entity("wechat_official_account", "publishing", "公众号文章发表与核验", "https://mp.weixin.qq.com/cgi-bin/appmsg?t=media/appmsg_edit_v2", {"title": "string", "author": "string|null", "summary": "string|null", "body": "string", "cover_asset_id": "string", "status": "draft|ready|published|unknown_remote"}, "verified", ["publish_preview", "publish_verify"], write=True),
+        entity("wechat_official_account", "publishing", "公众号文章发表与核验", "https://mp.weixin.qq.com/cgi-bin/appmsg?t=media/appmsg_edit_v2", publishing_fields("wechat_official_account", "article"), "verified", ["publish_preview", "publish_verify"], write=True),
     ]
 
 

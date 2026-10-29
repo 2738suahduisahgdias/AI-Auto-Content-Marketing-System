@@ -2,12 +2,16 @@ import argparse
 import json
 import re
 import subprocess
+import sys
 import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+from content_workbench.publishing.coverage import unsupported_payload_field
+
 SESSION = "publishing-live"
 
 
@@ -168,6 +172,9 @@ def channels_form_nodes(bridge):
 
 def prepare_channels(bridge, data, mode):
     source, payload = data["source"], data["payload"]
+    unsupported = unsupported_payload_field("wechat_channels", "video", payload, {"short_title", "description", "tags"})
+    if unsupported:
+        return unsupported
     bridge.goto("https://channels.weixin.qq.com/platform/post/create")
     snapshot = bridge.snapshot()
     text = json.dumps(snapshot.get("tree", []), ensure_ascii=False)
@@ -204,11 +211,12 @@ def prepare_channels(bridge, data, mode):
         parent = node_map.get(parent, {}).get("parentId")
     short_title = payload.get("short_title") or payload["title"]
     if set_channels_value(bridge, title["backendDOMNodeId"], short_title) != short_title:
-        return bridge.error("视频号", "title", "短标题写入后读回不一致", "检查短标题后重试")
-    if not parent or payload["description"][:30] not in set_channels_value(
-            bridge, node_map[parent]["backendDOMNodeId"], payload["description"], True):
-        return bridge.error("视频号", "description", "描述写入后读回不一致", "检查视频描述后重试")
-    fields = {"video", "short_title", "description"}
+        return bridge.error("视频号", "short_title", "短标题写入后读回不一致", "检查短标题后重试")
+    description_text = payload["description"] + ("\n" + payload["tags"] if payload.get("tags") else "")
+    readback = set_channels_value(bridge, node_map[parent]["backendDOMNodeId"], description_text, True) if parent else ""
+    if payload["description"][:30] not in readback or (payload.get("tags") and payload["tags"] not in readback):
+        return bridge.error("视频号", "description", "描述或话题文本写入后读回不一致", "检查视频描述后重试")
+    fields = {"video", "short_title", "description", "tags"} if payload.get("tags") else {"video", "short_title", "description"}
     if mode == "execute":
         return execute_bridge(bridge, "wechat_channels", data["target_id"], "发表")
     return bridge.result(data["target_id"], "preview_ready", fields, {"title": short_title, "transport": "webbridge"})
@@ -267,6 +275,10 @@ def official_editor_matches(bridge, payload):
 
 def prepare_official_account(bridge, data, mode):
     payload = data["payload"]
+    unsupported = unsupported_payload_field("wechat_official_account", "article", payload,
+                                            {"title", "author", "summary", "body", "cover_asset_id"})
+    if unsupported:
+        return unsupported
     fields = {"title", "author", "summary", "body", "cover"}
     if official_editor_matches(bridge, payload):
         if mode == "execute":

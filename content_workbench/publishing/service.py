@@ -1,10 +1,13 @@
+import json
+import subprocess
 from pathlib import Path
 
 from content_workbench.domain.errors import DomainError
 from content_workbench.domain.services import Workbench
 from content_workbench.jobs.store import JobStore
-from content_workbench.storage.db import PROJECT_ROOT, connect, dumps, immediate, loads, new_id, payload_hash, utcnow
-from .schemas import ARTICLE_PLATFORMS, PLATFORM_NAMES, VIDEO_PLATFORMS, prepare_supported, validate_payload
+from content_workbench.storage.db import PROJECT_ROOT, connect, dumps, file_hash, immediate, loads, new_id, payload_hash, utcnow
+from .contracts import contract_fields
+from .schemas import ARTICLE_PLATFORMS, PLATFORM_NAMES, VIDEO_PLATFORMS, prepare_supported, validate_payload, validate_video_source
 
 
 class PublishingService:
@@ -21,8 +24,12 @@ class PublishingService:
     def ensure_schema(self):
         with self.conn() as conn:
             conn.executescript((PROJECT_ROOT / "migrations/003_publishing.sql").read_text())
+            conn.executescript((PROJECT_ROOT / "migrations/005_video_workflow.sql").read_text())
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(publish_batches)")}
+            if "source_file_id" not in columns:
+                conn.execute("ALTER TABLE publish_batches ADD COLUMN source_file_id INTEGER")
 
-    def source(self, kind, source_id):
+    def source(self, kind, source_id, source_file_id=None):
         if kind == "article":
             item = self.workbench.get_item(source_id)
             if item["content_type"] != "article":
@@ -40,35 +47,65 @@ class PublishingService:
             return ReviewService(self.db_path, self.root).source_for_publish(source_id)
         with self.conn(readonly=True) as conn:
             task = conn.execute("SELECT * FROM tasks WHERE content_id=?", (source_id,)).fetchone()
-            file = conn.execute("SELECT * FROM files WHERE content_id=? AND kind='video' ORDER BY id DESC LIMIT 1", (source_id,)).fetchone()
-        if not task or task["state"] != "approved" or not file:
-            raise DomainError("PUBLISH_VIDEO_NOT_APPROVED", "视频任务没有已人工批准的成片", 409, "source_id", "先完成视频质检和人工最终审核", source_id)
+            if source_file_id:
+                file = conn.execute("SELECT * FROM files WHERE id=? AND content_id=? AND kind='video'", (source_file_id, source_id)).fetchone()
+            else:
+                file = conn.execute("SELECT * FROM files WHERE content_id=? AND kind='video' ORDER BY id DESC LIMIT 1", (source_id,)).fetchone()
+            variant = conn.execute("SELECT * FROM video_variants WHERE content_id=? AND file_id=?",
+                                   (source_id, file["id"] if file else None)).fetchone() if file else None
+        if not task or not file or (variant and not variant["approved_at"]) or (not variant and task["state"] != "approved"):
+            raise DomainError("PUBLISH_VIDEO_NOT_APPROVED", "选择的视频版本尚未完成人工批准", 409, "source_file_id", "先完成该版本的质检和人工最终审核", source_id)
         relative = file["relative_path"].replace("\\", "/")
         path = (self.root / relative).resolve()
         if self.root not in path.parents or path.suffix.lower() != ".mp4" or not path.is_file():
-            raise DomainError("PUBLISH_VIDEO_MISSING", "已批准 MP4 不存在或路径无效", 409, "source_id", "重新上传并批准 MP4", source_id)
+            raise DomainError("PUBLISH_VIDEO_MISSING", "已批准 MP4 不存在或路径无效", 409, "source_file_id", "重新上传并批准 MP4", source_id)
+        digest = file_hash(path)
+        if variant and digest != variant["file_sha256"]:
+            raise DomainError("PUBLISH_VIDEO_CHANGED", "视频文件与人工批准时不一致", 409, "source_file_id", "重新质检并批准该文件", source_id)
         scripts = loads(task["scripts_json"], {})
-        return {"kind": kind, "source_id": source_id, "source_hash": payload_hash([task["updated_at"], relative, path.stat().st_size]),
+        return {"kind": kind, "source_id": source_id, "source_file_id": file["id"], "source_hash": digest,
                 "title": task["title"], "description": scripts.get("douyin") or scripts.get("master") or task["title"],
                 "revision_id": file["id"], "video_path": relative, "absolute_video_path": str(path)}
 
-    def resolve_assets(self, payload):
+    def resolve_assets(self, payload, platform=None, kind=None):
         result = dict(payload)
-        asset_id = result.get("cover_asset_id")
-        if not asset_id:
-            return result
-        with self.conn(readonly=True) as conn:
-            asset = conn.execute("SELECT * FROM wb_assets WHERE id=?", (asset_id,)).fetchone()
-        if not asset or not str(asset["mime_type"]).startswith("image/"):
-            raise DomainError("PUBLISH_COVER_INVALID", "封面不是有效图片资产", 422, "cover_asset_id", "上传 PNG、JPG 或 WebP 封面")
-        path = (self.root / asset["storage_key"]).resolve()
-        if self.root not in path.parents or not path.is_file():
-            raise DomainError("PUBLISH_COVER_MISSING", "封面文件不存在", 409, "cover_asset_id", "重新上传封面")
-        result["cover_path"] = str(path)
+        definitions = contract_fields(platform, kind) if platform and kind else [{"name": "cover_asset_id", "label": "封面"}]
+        for definition in definitions:
+            if definition.get("control") != "asset":
+                continue
+            name = definition["name"]
+            asset_id = result.get(name)
+            if not asset_id:
+                continue
+            with self.conn(readonly=True) as conn:
+                asset = conn.execute("SELECT * FROM wb_assets WHERE id=?", (asset_id,)).fetchone()
+            if not asset or not str(asset["mime_type"]).startswith("image/"):
+                raise DomainError("PUBLISH_COVER_INVALID", definition["label"] + "不是有效图片资产", 422, name, "上传 PNG、JPG 或 WebP 图片")
+            path = (self.root / asset["storage_key"]).resolve()
+            if self.root not in path.parents or not path.is_file():
+                raise DomainError("PUBLISH_COVER_MISSING", definition["label"] + "文件不存在", 409, name, "重新上传图片")
+            if definition.get("min_width") or definition.get("aspect_ratio"):
+                process = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+                                          "-show_entries", "stream=width,height", "-of", "json", str(path)],
+                                         capture_output=True, text=True, timeout=30)
+                try:
+                    stream = json.loads(process.stdout or "{}")["streams"][0]
+                    width, height = int(stream["width"]), int(stream["height"])
+                except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError):
+                    raise DomainError("PUBLISH_COVER_PROBE_FAILED", "无法读取" + definition["label"] + "尺寸", 422, name, "重新上传有效图片")
+                if width < definition.get("min_width", 0) or height < definition.get("min_height", 0):
+                    raise DomainError("PUBLISH_COVER_TOO_SMALL", "{}尺寸为 {}×{}，至少需要 {}×{}".format(
+                        definition["label"], width, height, definition.get("min_width", 0), definition.get("min_height", 0)),
+                        422, name, "使用更大尺寸的图片")
+                ratio = definition.get("aspect_ratio")
+                if ratio and abs(width / height - ratio) > definition.get("aspect_tolerance", 0.03):
+                    raise DomainError("PUBLISH_COVER_RATIO_INVALID", definition["label"] + "宽高比不符合要求", 422, name,
+                                      definition.get("description") or "按字段提示裁剪图片")
+            result[name.replace("_asset_id", "_path")] = str(path)
         return result
 
-    def generate_fields(self, kind, source_id, platforms, prompt="", idempotency_key=None):
-        self.source(kind, source_id)
+    def generate_fields(self, kind, source_id, platforms, prompt="", idempotency_key=None, source_file_id=None):
+        self.source(kind, source_id, source_file_id)
         allowed = ARTICLE_PLATFORMS if kind == "article" else VIDEO_PLATFORMS if kind == "video" else ()
         if not isinstance(platforms, list) or not platforms:
             raise DomainError("PUBLISH_TARGETS_REQUIRED", "至少选择一个生成字段的平台", 422, "platforms", "勾选需要发布 Agent 填写的平台")
@@ -80,8 +117,8 @@ class PublishingService:
         return self.jobs.enqueue("publish.fields", {"content_kind": kind, "source_id": source_id, "platforms": platforms, "prompt": prompt},
                                  kind + ":" + source_id, idempotency_key, max_attempts=2, resource_key="cloud_text")
 
-    def create_batch(self, kind, source_id, targets):
-        source = self.source(kind, source_id)
+    def create_batch(self, kind, source_id, targets, source_file_id=None):
+        source = self.source(kind, source_id, source_file_id)
         if not isinstance(targets, list) or not targets:
             raise DomainError("PUBLISH_TARGETS_REQUIRED", "至少选择一个发布平台", 422, "targets", "勾选目标平台")
         seen = set()
@@ -91,7 +128,9 @@ class PublishingService:
                 raise DomainError("PUBLISH_DUPLICATE_TARGET", "同一平台不能重复添加", 422, "platform", "每个平台只保留一个版本")
             seen.add(platform)
             payload = validate_payload(kind, platform, target.get("payload"))
-            self.resolve_assets(payload)
+            self.resolve_assets(payload, platform, kind)
+            if kind == "video":
+                validate_video_source(platform, source, payload)
         with self.conn(readonly=True) as conn:
             published = conn.execute("""SELECT t.platform FROM publish_targets t JOIN publish_batches b ON b.id=t.batch_id
                 WHERE b.content_kind=? AND b.source_id=? AND t.status='published'""", (kind, source_id)).fetchall()
@@ -107,8 +146,9 @@ class PublishingService:
             if row:
                 conn.execute("UPDATE publish_batches SET status='draft',confirmed_by=NULL,confirmed_at=NULL,updated_at=? WHERE id=?", (timestamp, batch_id))
             else:
-                conn.execute("INSERT INTO publish_batches VALUES (?,?,?,?, 'draft',NULL,NULL,?,?)",
-                             (batch_id, kind, source_id, source["source_hash"], timestamp, timestamp))
+                conn.execute("""INSERT INTO publish_batches(id,content_kind,source_id,source_hash,source_file_id,status,
+                                confirmed_by,confirmed_at,created_at,updated_at) VALUES (?,?,?,?,?, 'draft',NULL,NULL,?,?)""",
+                             (batch_id, kind, source_id, source["source_hash"], source.get("source_file_id"), timestamp, timestamp))
             for target in targets:
                 platform = target["platform"]
                 payload = validate_payload(kind, platform, target["payload"])
@@ -193,7 +233,7 @@ class PublishingService:
         return batch, target
 
     def assert_current(self, batch):
-        current = self.source(batch["content_kind"], batch["source_id"])
+        current = self.source(batch["content_kind"], batch["source_id"], batch.get("source_file_id"))
         if current["source_hash"] != batch["source_hash"]:
             raise DomainError("PUBLISH_SOURCE_CHANGED", "内容或审批版本已变化，旧预览不能发布", 409, "source_id", "重新创建批次并生成预览", batch["source_id"])
         return current

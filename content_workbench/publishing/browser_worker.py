@@ -14,6 +14,7 @@ try:
 except ModuleNotFoundError:
     sync_playwright = None
 from content_workbench.topics.browser_worker import open_context
+from content_workbench.publishing.coverage import unsupported_payload_field
 
 ROOT = Path(__file__).resolve().parents[2]
 URLS = {
@@ -217,6 +218,9 @@ def verify_douyin(page, data):
 
 def prepare_douyin(page, data, mode):
     source, payload = data["source"], data["payload"]
+    unsupported = unsupported_payload_field("douyin", "video", payload, {"title", "description", "tags"})
+    if unsupported:
+        return unsupported
     page.goto(URLS["douyin"], wait_until="domcontentloaded", timeout=60000)
     upload = first(page, ["input[type=file]"], 15000)
     if not upload:
@@ -235,19 +239,22 @@ def prepare_douyin(page, data, mode):
     description = first(page, ['textarea[placeholder*="描述"]', 'textarea[placeholder*="简介"]', 'div[contenteditable="true"]', 'textarea'])
     if not description:
         return field_error("douyin", "description", "视频已选择，但未找到简介编辑区；请检查上传是否完成或页面是否变化")
+    description_text = payload["description"] + ("\n" + payload["tags"] if payload.get("tags") else "")
     fields = set()
     if title:
         fill(title, payload["title"])
         fields.add("title")
-        fill(description, payload["description"])
+        fill(description, description_text)
         fields.add("description")
     else:
-        combined = payload["title"] + "\n" + payload["description"]
+        combined = payload["title"] + "\n" + description_text
         fill(description, combined)
         fields.update(("title", "description", "combined_caption"))
+    if payload.get("tags"):
+        fields.add("tags")
     readback = value_of(description)
-    if payload["description"][:30] not in readback:
-        return field_error("douyin", "description", "简介写入后读回不一致")
+    if payload["description"][:30] not in readback or (payload.get("tags") and payload["tags"] not in readback):
+        return field_error("douyin", "description", "简介或话题文本写入后读回不一致")
     if mode == "execute":
         return click_publish(page, "douyin", data["target_id"], payload["title"])
     return evidence(page, data["target_id"], mode, fields, {"title": payload["title"]})
@@ -276,6 +283,9 @@ def verify_xhs_video(page, data):
 
 def prepare_xhs_video(page, data, mode):
     source, payload = data["source"], data["payload"]
+    unsupported = unsupported_payload_field("xiaohongshu", "video", payload, {"title", "description", "tags"})
+    if unsupported:
+        return unsupported
     if not xhs_editor(page):
         return {"status": "login_required", "error": "小红书创作者后台需要登录"}
     upload = first(page, ["input[type=file]"], 15000)
@@ -289,17 +299,23 @@ def prepare_xhs_video(page, data, mode):
         return field_error("xiaohongshu", "title", "视频上传后未找到标题输入框")
     if not body:
         return field_error("xiaohongshu", "description", "视频上传后未找到正文编辑区")
+    description_text = payload["description"] + ("\n" + payload["tags"] if payload.get("tags") else "")
     fill(title, payload["title"])
-    fill(body, payload["description"])
-    if payload["title"] not in value_of(title) or payload["description"][:30] not in value_of(body):
-        return field_error("xiaohongshu", "description", "标题或正文读回不一致")
+    fill(body, description_text)
+    if payload["title"] not in value_of(title) or payload["description"][:30] not in value_of(body) \
+            or (payload.get("tags") and payload["tags"] not in value_of(body)):
+        return field_error("xiaohongshu", "description", "标题、正文或话题文本读回不一致")
     if mode == "execute":
         return click_publish(page, "xiaohongshu", data["target_id"])
-    return evidence(page, data["target_id"], mode, {"title", "description"}, {"title": payload["title"]})
+    fields = {"title", "description", "tags"} if payload.get("tags") else {"title", "description"}
+    return evidence(page, data["target_id"], mode, fields, {"title": payload["title"]})
 
 
 def prepare_xhs_article(page, data, mode):
     payload = data["payload"]
+    unsupported = unsupported_payload_field("xiaohongshu", "article", payload, {"title", "body", "description", "tags", "template_name"})
+    if unsupported:
+        return unsupported
     if not xhs_editor(page):
         return {"status": "login_required", "error": "小红书创作者后台需要登录"}
     if not click_text(page, "写长文", 15000):
@@ -324,9 +340,9 @@ def prepare_xhs_article(page, data, mode):
     fields.add("layout")
     if not visible_text(page, "选择模板", 15000):
         return field_error("xiaohongshu", "layout", "一键排版后未出现模板选择")
-    if not click_text(page, "理性现代", 5000):
-        return field_error("xiaohongshu", "layout", "长文模板未选择，无法进入下一步")
-    fields.add("template")
+    if not click_text(page, payload.get("template_name") or "理性现代", 5000):
+        return field_error("xiaohongshu", "template_name", "指定长文模板未选择，无法进入下一步")
+    fields.add("template_name")
     page.wait_for_timeout(1000)
     for _ in range(4):
         if xhs_publish_control(page):
@@ -341,6 +357,21 @@ def prepare_xhs_article(page, data, mode):
         return field_error("xiaohongshu", "cover", "长文笔记图片仍在生成，请稍后重试，不要跳过图片检查")
     if not visible_text(page, "内容设置") or not xhs_publish_control(page, 30000):
         return field_error("xiaohongshu", "publish_settings", "尚未进入可发布设置页，未找到可用的发布宿主控件")
+    description_text = payload.get("description", "") + ("\n" + payload["tags"] if payload.get("tags") else "")
+    if description_text:
+        publish_description = first(page, ['div[contenteditable="true"]', 'textarea[placeholder*="正文"]',
+                                          'textarea[placeholder*="描述"]', 'textarea'])
+        if not publish_description:
+            return field_error("xiaohongshu", "description", "未找到长文发布设置中的独立描述字段")
+        fill(publish_description, description_text)
+        readback = value_of(publish_description)
+        if (payload.get("description") and payload["description"][:30] not in readback) \
+                or (payload.get("tags") and payload["tags"] not in readback):
+            return field_error("xiaohongshu", "description", "长文发布描述或话题文本读回不一致")
+        if payload.get("description"):
+            fields.add("description")
+        if payload.get("tags"):
+            fields.add("tags")
     fields.update(("publish_settings", "publish_button"))
     if mode == "execute":
         return click_publish(page, "xiaohongshu", data["target_id"])
@@ -354,6 +385,10 @@ def topic_names(value):
 
 def prepare_wechat_channels(page, data, mode):
     source, payload = data["source"], data["payload"]
+    unsupported = unsupported_payload_field("wechat_channels", "video", payload,
+                                            {"short_title", "description", "tags", "scheduled_at", "original"})
+    if unsupported:
+        return unsupported
     invalid = validate_channels_video(source["absolute_video_path"])
     if invalid:
         return field_error("wechat_channels", "video_path", invalid)
@@ -456,6 +491,10 @@ def wechat_cover_ready(control):
 
 def prepare_wechat_article(page, data, mode):
     payload = data["payload"]
+    unsupported = unsupported_payload_field("wechat_official_account", "article", payload,
+                                            {"title", "author", "summary", "body", "cover_asset_id"})
+    if unsupported:
+        return unsupported
     for key, label, maximum in (("title", "标题", 64), ("author", "作者", 8), ("summary", "摘要", 120)):
         if len(str(payload.get(key, ""))) > maximum:
             return field_error("wechat_official_account", key, "{}不能超过{}字".format(label, maximum))

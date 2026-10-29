@@ -1,3 +1,4 @@
+import subprocess
 import tempfile
 import unittest
 from collections import Counter
@@ -41,7 +42,8 @@ class ScheduleCase(unittest.TestCase):
         relative = "renders/{}/video.mp4".format(video_id)
         path = self.root / relative
         path.parent.mkdir(parents=True)
-        path.write_bytes(("video-" + video_id).encode())
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "color=c=black:s=360x640:d=1",
+                        "-c:v", "libx264", "-pix_fmt", "yuv420p", str(path)], check=True, capture_output=True)
         with connect(self.db) as conn:
             conn.execute("INSERT INTO tasks VALUES (?,?,'approved','{}','2026-10-27')", (video_id, "已批准视频 " + video_id))
             conn.execute("INSERT INTO files(content_id,kind,relative_path) VALUES (?,'video',?)", (video_id, relative))
