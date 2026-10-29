@@ -1,8 +1,10 @@
 import json
+import time
 from pathlib import Path
 
 from content_workbench.accounts.collection_knowledge import error_type
 from content_workbench.accounts.existing_browser import run as run_existing_browser
+from content_workbench.accounts.exports import douyin_metrics, xhs_metrics
 from content_workbench.accounts.snapshot_rules import snapshot_has_data
 from content_workbench.agents.registry import require_agent_enabled
 from content_workbench.domain.errors import DomainError
@@ -15,6 +17,7 @@ class AccountExecutors:
         self.service = service
         self.topics = service.topics
         self.root = self.topics.root.resolve()
+        self.downloads = Path.home() / "Downloads"
 
     def mapping(self):
         return {"accounts.sync": self.sync, "accounts.recommend": self.recommend, "accounts.daily": self.daily,
@@ -40,11 +43,32 @@ class AccountExecutors:
             raise DomainError("PLATFORM_SYNC_FAILED", "平台采集失败：" + result.get("error", "未知错误"), 502, "browser", result.get("action") or "检查现有浏览器连接后手动重试，不会自动新建浏览器或重复拉取")
         return result
 
+    def export_metrics(self, platform):
+        names = {
+            "douyin": ["数据表现_短视频全量指标.xlsx", "数据表现_粉丝全量指标.xlsx"],
+            "xiaohongshu": ["近7日观看数据.xlsx", "近7日互动数据.xlsx", "近7日涨粉数据.xlsx", "近7日发布数据.xlsx"],
+        }
+        if platform not in names:
+            return {}
+        paths = [self.downloads / name for name in names[platform]]
+        cutoff = time.time() - 36 * 3600
+        if not all(path.is_file() and path.stat().st_mtime >= cutoff for path in paths):
+            return {}
+        if platform == "douyin":
+            metrics = douyin_metrics(*paths)
+        else:
+            metrics = xhs_metrics({"watch": paths[0], "interaction": paths[1], "followers": paths[2], "publishing": paths[3]})
+        metrics["export_files"] = [path.name for path in paths]
+        metrics["export_imported_at"] = utcnow()
+        return metrics
+
     def sync(self, job, context):
         result = {"accounts": {}, "media_downloaded": 0, "errors": []}
         collected = set()
         sources = [("xiaohongshu", "xhs_notes"), ("douyin", "douyin_account"),
                    ("wechat_channels", "channels_account"), ("wechat_official_account", "official_account")]
+        analytics_actions = {"xiaohongshu": "xhs_analytics", "douyin": "douyin_analytics",
+                             "wechat_channels": "channels_analytics", "wechat_official_account": "official_analytics"}
         for platform, action in sources:
             try:
                 snapshot = self.platform(context, action, platform)
@@ -57,6 +81,24 @@ class AccountExecutors:
                         except Exception:
                             pass
                 profile = {**(snapshot.get("profile") or {}), "connection": "ready" if items else "empty"}
+                if platform in analytics_actions:
+                    try:
+                        analytics = self.platform(context, analytics_actions[platform], platform + "_analytics")
+                        profile.update(analytics.get("profile") or {})
+                    except DomainError as error:
+                        result["accounts"][platform + "_analytics_error"] = error.message
+                        result["errors"].append({"platform": platform, "type": error_type(error.message),
+                                                 "message": "数据中心采集失败：" + error.message,
+                                                 "action": error.action or "进入平台数据中心检查页面结构，不自动重试", "captured_at": utcnow()})
+                try:
+                    exported = self.export_metrics(platform)
+                    if exported:
+                        profile.update(exported)
+                        result["accounts"][platform + "_exports"] = len(exported["export_files"])
+                except Exception as error:
+                    result["accounts"][platform + "_export_error"] = str(error)[:300]
+                    result["errors"].append({"platform": platform, "type": "VALIDATION_FAILED", "message": "官方导出读取失败：" + str(error)[:300],
+                                             "action": "重新下载有效 XLSX 后手动同步，不自动重试", "captured_at": utcnow()})
                 if snapshot_has_data({"profile": profile, "items": items}):
                     self.service.save_snapshot(platform, profile, items)
                     collected.add(platform)
@@ -67,7 +109,7 @@ class AccountExecutors:
             except DomainError as error:
                 result["accounts"][platform + "_error"] = error.message
                 result["errors"].append({"platform": platform, "type": error_type(error.message), "message": error.message, "action": error.action or "按错误类型处理后手动重试", "captured_at": utcnow()})
-        errors = [key for key in result["accounts"] if key.endswith("_error")]
+        errors = [platform + "_error" for platform, _ in sources if platform + "_error" in result["accounts"]]
         if len(errors) == len(sources):
             details = "；".join("{}：{}".format(key, result["accounts"][key]) for key in errors)
             raise DomainError("ACCOUNTS_UNAVAILABLE", details, 409, "browser", "在接入向导分别登录对应平台后重试；已登录平台检查页面结构")

@@ -8,6 +8,9 @@ PLATFORMS = ("douyin", "wechat_channels", "xiaohongshu", "wechat_official_accoun
 RANGES = ("today", "yesterday", "7d", "30d")
 METRICS = ("reach", "likes", "comments", "shares", "favorites", "avgConsumptionSeconds",
            "completionRate", "engagementRate", "profileVisits", "newFollowers")
+ANALYTICS_FIELDS = {"impressions": "曝光", "views": "阅读/播放", "likes": "点赞", "comments": "评论",
+                    "shares": "分享", "favorites": "收藏", "completionRate": "完播率",
+                    "avgConsumptionSeconds": "平均观看时长", "profileVisits": "主页访客", "newFollowers": "净增粉丝"}
 
 
 def parse_time(value):
@@ -242,8 +245,15 @@ class AccountAnalytics:
                  "captured_at": snapshots.get(platform, {}).get("captured_at"),
                  "detail": "累计公开快照，不代表今日新增" if platform in snapshots else "尚无真实账号快照"}
                 for platform in PLATFORMS]
+        coverage = {}
+        for platform in PLATFORMS:
+            snapshot = snapshots.get(platform) or {}
+            profile = snapshot.get("profile") or {}
+            missing = [label for key, label in ANALYTICS_FIELDS.items() if profile.get(key) in (None, "")]
+            coverage[platform] = {"source": profile.get("analytics_source") or "内容列表", "data_period": profile.get("data_period"),
+                                  "missing_fields": missing, "complete": not missing}
         return {"timezone": "Asia/Shanghai", "generated_at": local_now.isoformat(), "platforms": platforms,
-                "totals": totals, "contents": contents,
+                "totals": totals, "contents": contents, "coverage": coverage,
                 "trends": {"publications": {"labels": [day.strftime("%m/%d") for day in labels], "values": trend}},
                 "sync": sync, "competitor_analytics": competitors,
                 "leads": [{key: value for key, value in lead.items() if key not in {"_time", "_deal_time"}} for lead in leads],

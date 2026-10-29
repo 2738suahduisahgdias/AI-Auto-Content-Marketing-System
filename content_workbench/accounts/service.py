@@ -30,6 +30,14 @@ class AccountService:
             conn.execute("INSERT INTO account_daily_snapshots VALUES (?,?,?,?)", (snapshot_id, platform, dumps({"profile": profile, "items": items}), utcnow()))
         return snapshot_id
 
+    def merge_profile(self, platform, metrics):
+        self.ensure_tables()
+        with self.conn(readonly=True) as conn:
+            row = conn.execute("SELECT snapshot_json FROM account_daily_snapshots WHERE platform=? ORDER BY captured_at DESC LIMIT 1", (platform,)).fetchone()
+        current = loads(row[0], {}) if row else {}
+        profile = {**(current.get("profile") or {}), **metrics}
+        return self.save_snapshot(platform, profile, current.get("items") or [])
+
     def bootstrap(self):
         self.ensure_tables()
         with self.conn(readonly=True) as conn:

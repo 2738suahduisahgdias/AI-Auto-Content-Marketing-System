@@ -5,7 +5,7 @@ from unittest import mock
 
 from content_workbench.accounts.collection_knowledge import collection_bootstrap, error_type
 from content_workbench.accounts.collection_ontology import collection_ontology
-from content_workbench.accounts.existing_browser import verified, xhs_card_title
+from content_workbench.accounts.existing_browser import data_period, metric, verified, xhs_card_title
 from content_workbench.accounts.executors import AccountExecutors
 from content_workbench.accounts.platform_worker import fill_channels_titles, labeled_metrics, wait_for_login
 from content_workbench.publishing.webbridge_worker import Bridge
@@ -20,6 +20,7 @@ class AccountCollectionCase(unittest.TestCase):
         self.service.topics.root = Path(self.temp.name)
         self.service.topics.db_path = Path(self.temp.name) / "accounts.db"
         self.executor = AccountExecutors(self.service)
+        self.executor.downloads = Path(self.temp.name) / "empty-downloads"
 
     def tearDown(self):
         self.temp.cleanup()
@@ -117,6 +118,13 @@ class AccountCollectionCase(unittest.TestCase):
         self.assertEqual("(() => true)()", cdp.call_args.args[1]["expression"])
         card = {"title": "", "text": "未通过\n真实笔记标题\n查看修改建议 2026-10-28 00:38\n2\n0"}
         self.assertEqual("真实笔记标题", xhs_card_title(card))
+
+    def test_data_center_metric_and_period_parsing(self):
+        text = "数据总览\n曝光数\n361\n观看总时长\n18.8分钟\n视频完播率\n0.8%\n统计时间 10-22 至 10-28"
+        self.assertEqual(361, metric(text, "曝光数"))
+        self.assertEqual(1128.0, metric(text, "观看总时长"))
+        self.assertEqual(0.8, metric(text, "视频完播率"))
+        self.assertEqual("10-22 至 10-28", data_period(text))
 
     def test_collection_knowledge_is_complete_and_errors_are_typed(self):
         data = collection_bootstrap()
