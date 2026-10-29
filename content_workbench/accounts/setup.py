@@ -4,7 +4,8 @@ import shutil
 import sys
 from pathlib import Path
 
-from content_workbench.storage.db import PROJECT_ROOT, connect
+from content_workbench.accounts.snapshot_rules import snapshot_has_data
+from content_workbench.storage.db import PROJECT_ROOT, connect, loads
 
 
 def chrome_candidates():
@@ -41,7 +42,8 @@ def setup_status(db_path):
         snapshots = set()
         published = set()
         if "account_daily_snapshots" in tables:
-            snapshots = {row[0] for row in conn.execute("SELECT DISTINCT platform FROM account_daily_snapshots")}
+            snapshots = {row["platform"] for row in conn.execute("SELECT platform,snapshot_json FROM account_daily_snapshots")
+                         if snapshot_has_data(loads(row["snapshot_json"], {}))}
         if "publish_targets" in tables:
             published = {row[0] for row in conn.execute("SELECT DISTINCT platform FROM publish_targets WHERE status='published'")}
     platforms = []

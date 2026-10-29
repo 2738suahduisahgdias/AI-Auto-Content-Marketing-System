@@ -1,6 +1,7 @@
 from content_workbench.accounts.analytics import AccountAnalytics
 from content_workbench.accounts.collection_knowledge import collection_bootstrap
 from content_workbench.accounts.leads import LeadService
+from content_workbench.accounts.snapshot_rules import snapshot_has_data
 from content_workbench.publishing.knowledge import publish_knowledge
 from content_workbench.storage.db import connect, dumps, immediate, loads, new_id, utcnow
 
@@ -39,8 +40,10 @@ class AccountService:
         for row in snapshots:
             if row["platform"] in seen:
                 continue
-            seen.add(row["platform"])
             value = loads(row["snapshot_json"], {})
+            if not snapshot_has_data(value):
+                continue
+            seen.add(row["platform"])
             latest.append({"id": row["id"], "platform": row["platform"], "captured_at": row["captured_at"], **value})
         recommendations = []
         for row in candidates:

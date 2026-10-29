@@ -3,6 +3,7 @@ from pathlib import Path
 
 from content_workbench.accounts.collection_knowledge import error_type
 from content_workbench.accounts.existing_browser import run as run_existing_browser
+from content_workbench.accounts.snapshot_rules import snapshot_has_data
 from content_workbench.agents.registry import require_agent_enabled
 from content_workbench.domain.errors import DomainError
 from content_workbench.storage.db import utcnow
@@ -41,6 +42,7 @@ class AccountExecutors:
 
     def sync(self, job, context):
         result = {"accounts": {}, "media_downloaded": 0, "errors": []}
+        collected = set()
         sources = [("xiaohongshu", "xhs_notes"), ("douyin", "douyin_account"),
                    ("wechat_channels", "channels_account"), ("wechat_official_account", "official_account")]
         for platform, action in sources:
@@ -55,7 +57,9 @@ class AccountExecutors:
                         except Exception:
                             pass
                 profile = {**(snapshot.get("profile") or {}), "connection": "ready" if items else "empty"}
-                self.service.save_snapshot(platform, profile, items)
+                if snapshot_has_data({"profile": profile, "items": items}):
+                    self.service.save_snapshot(platform, profile, items)
+                    collected.add(platform)
                 result["accounts"][platform] = len(items)
                 if not items:
                     result["accounts"][platform + "_warning"] = "已打开后台但未读取到内容；账号可能无内容，也可能页面结构已变化，请检查后台列表"
@@ -67,6 +71,10 @@ class AccountExecutors:
         if len(errors) == len(sources):
             details = "；".join("{}：{}".format(key, result["accounts"][key]) for key in errors)
             raise DomainError("ACCOUNTS_UNAVAILABLE", details, 409, "browser", "在接入向导分别登录对应平台后重试；已登录平台检查页面结构")
+        if not collected:
+            details = "；".join(str(value) for value in result["accounts"].values())
+            raise DomainError("ACCOUNTS_EMPTY", "四个平台均未采集到有效账号数据：" + details, 409, "browser",
+                              "检查登录和后台页面结构；空结果不会覆盖最近有效快照")
         return result
 
     def recommend(self, job, context):

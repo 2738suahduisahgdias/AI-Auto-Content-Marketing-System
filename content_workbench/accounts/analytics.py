@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from content_workbench.accounts.snapshot_rules import snapshot_has_data
 from content_workbench.storage.db import connect, loads
 
 PLATFORMS = ("douyin", "wechat_channels", "xiaohongshu", "wechat_official_account")
@@ -110,10 +111,12 @@ class AccountAnalytics:
         result = {}
         previous = {}
         for row in rows:
+            value = loads(row["snapshot_json"], {})
+            if not snapshot_has_data(value):
+                continue
             platform = row["platform"]
             if platform in result:
                 if platform not in previous:
-                    value = loads(row["snapshot_json"], {})
                     previous_totals = {}
                     for key in METRICS[:5]:
                         values = [item_metric(item, key) for item in value.get("items") or []]
@@ -125,7 +128,6 @@ class AccountAnalytics:
                         for key in METRICS[:5]}
                     result[platform]["baseline_available"] = True
                 continue
-            value = loads(row["snapshot_json"], {})
             items = value.get("items") or []
             totals = {}
             for key in METRICS[:5]:

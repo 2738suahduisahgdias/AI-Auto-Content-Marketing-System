@@ -36,6 +36,8 @@ class Bridge:
         return self.call("cdp", {"method": method, "params": params or {}})
 
     def evaluate(self, expression):
+        if re.match(r"^\s*\(\s*\)\s*=>", expression):
+            expression = "({})()".format(expression)
         result = self.cdp("Runtime.evaluate", {"expression": expression, "returnByValue": True})
         if "exceptionDetails" in result:
             raise RuntimeError(result["exceptionDetails"].get("text", "页面脚本执行失败"))

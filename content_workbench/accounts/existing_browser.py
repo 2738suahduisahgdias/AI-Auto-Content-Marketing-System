@@ -33,9 +33,22 @@ def verified(snapshot, action):
 
 def body(bridge):
     return bridge.evaluate("""() => {
-      const bodies=Array.from(document.querySelectorAll('body')).map(e=>e.innerText||'');
-      return bodies.sort((a,b)=>b.length-a.length)[0]||'';
+      const texts=[];function walk(root){
+        if(root.body)texts.push(root.body.innerText||'');
+        for(const element of root.querySelectorAll('*'))if(element.shadowRoot)walk(element.shadowRoot);
+      }walk(document);return texts.sort((a,b)=>b.length-a.length)[0]||'';
     }""") or ""
+
+
+def xhs_card_title(card):
+    if card.get("title"):
+        return card["title"]
+    ignored = {"未通过", "已发布", "审核中", "仅自己可见", "查看修改建议"}
+    lines = [line.strip() for line in card.get("text", "").split("\n") if line.strip()]
+    candidates = [line for line in lines if line not in ignored and not re.fullmatch(r"[\d.,]+[万wW]?", line)
+                  and not re.fullmatch(r"\d{2}:\d{2}", line) and not line.startswith("查看修改建议")
+                  and not re.search(r"20\d{2}-\d{2}-\d{2}", line)]
+    return max(candidates, key=len, default="")
 
 
 def xhs_notes(bridge):
@@ -43,28 +56,29 @@ def xhs_notes(bridge):
     time.sleep(5)
     if "login" in bridge.snapshot().get("url", ""):
         return {"status": "login_required"}
-    cards = bridge.evaluate("""() => Array.from(document.querySelectorAll('.note-card')).map(card => ({
+    cards = bridge.evaluate("""() => Array.from(document.querySelectorAll('[data-impression]')).map(card => ({
       title: card.querySelector('.note-card__title')?.innerText.trim() || '',
       text: card.innerText,
       impression: card.getAttribute('data-impression') || '',
-      cover: card.querySelector('.note-card__media')?.style.backgroundImage || ''
-    }))""")
+      cover: card.querySelector('.note-card__media')?.style.backgroundImage || card.querySelector('img')?.src || ''
+    }))""") or []
     items = []
     for card in cards:
-        if not card.get("title"):
-            continue
         try:
             impression = json.loads(card["impression"])
             note_id = impression.get("noteTarget", {}).get("value", {}).get("noteId", "")
         except (TypeError, json.JSONDecodeError):
             note_id = ""
+        title = xhs_card_title(card)
+        if not note_id or not title:
+            continue
         published_at = re.search(r"20\d{2}-\d{2}-\d{2}(?:\s+\d{2}:\d{2})?", card["text"])
-        items.append({"title": card["title"], "canonical_url": "https://www.xiaohongshu.com/explore/" + note_id if note_id else "https://creator.xiaohongshu.com/new/note-manager",
-                      "platform_item_id": note_id or None,
-                      "metadata": {"title": card["title"], "cover_url": card["cover"], "visible_text": card["text"][:2000],
+        items.append({"title": title, "canonical_url": "https://www.xiaohongshu.com/explore/" + note_id,
+                      "platform_item_id": note_id,
+                      "metadata": {"title": title, "cover_url": card["cover"], "visible_text": card["text"][:2000],
                                    "visible_metrics": re.findall(r"\d+(?:\.\d+)?[万wW]?", card["text"]),
                                    "published_at": published_at.group(0) if published_at else None}})
-    return {"status": "ok", "profile": {}, "items": items}
+    return {"status": "ok", "profile": {"published_notes_count": len(items)}, "items": items}
 
 
 def douyin_account(bridge):
@@ -105,21 +119,28 @@ def channels_account(bridge):
     current = body(bridge)
     if "login" in bridge.snapshot().get("url", "") or "登录视频号助手" in current:
         return {"status": "login_required"}
-    cards = bridge.evaluate("""() => Array.from(document.querySelectorAll('.post-feed-item')).map(card => ({
-      text: card.innerText,
-      cover: card.querySelector('img')?.src || '',
-      counts: Array.from(card.querySelectorAll('.post-data .data-item .count')).map(e=>e.innerText)
-    }))""")
+    cards = bridge.evaluate("""() => {
+      const cards=[];function walk(root){
+        for(const card of root.querySelectorAll('.post-feed-item'))cards.push({
+          text:card.innerText,title:card.querySelector('.post-title')?.innerText.trim()||'',
+          cover:card.querySelector('img')?.src||'',
+          counts:Array.from(card.querySelectorAll('.post-data .data-item .count')).map(e=>e.innerText)
+        });
+        for(const element of root.querySelectorAll('*'))if(element.shadowRoot)walk(element.shadowRoot);
+      }walk(document);return cards;
+    }""") or []
     items = []
     for card in cards:
         lines = [line.strip() for line in card["text"].split("\n") if line.strip()]
         values = card.get("counts") or []
         keys = ["views", "likes", "comments", "shares", "favorites"]
-        items.append({"title": "未读取标题", "canonical_url": "https://channels.weixin.qq.com/platform/post/list",
-                      "metadata": {"title": "未读取标题", "visible_text": card["text"][:2000], "cover_url": card["cover"],
+        title = card.get("title") or "未读取标题"
+        items.append({"title": title, "canonical_url": "https://channels.weixin.qq.com/platform/post/list",
+                      "metadata": {"title": title, "visible_text": card["text"][:2000], "cover_url": card["cover"],
                                    "published_at": next((line for line in lines if re.match(r"20\d{2}年", line)), None)},
                       "metrics": {key: values[index] if index < len(values) else None for index, key in enumerate(keys)}})
-    return {"status": "ok", "profile": labeled_metrics(current, "wechat_channels"), "items": fill_channels_titles(items, current)}
+    return {"status": "ok", "profile": {**labeled_metrics(current, "wechat_channels"), "videos_count": len(items)},
+            "items": fill_channels_titles(items, current)}
 
 
 def official_account(bridge):

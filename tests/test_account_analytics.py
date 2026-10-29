@@ -62,6 +62,16 @@ class AccountAnalyticsCase(unittest.TestCase):
         self.assertEqual(126, data["competitor_analytics"]["items"][0]["likes"])
         self.assertIsNone(data["competitor_analytics"]["items"][0]["comments"])
 
+    def test_empty_latest_snapshot_does_not_hide_last_valid_data(self):
+        self.accounts.save_snapshot("douyin", {"account_name": "真实账号"}, [{"title": "有效作品", "metadata": {"like_count": 15}}])
+        self.accounts.save_snapshot("douyin", {"connection": "empty"}, [])
+        data = AccountAnalytics(self.db).bootstrap(datetime(2026, 10, 28, 12, tzinfo=ZoneInfo("Asia/Shanghai")))
+        self.assertEqual(1, len(data["platforms"]["douyin"]["snapshot"]["items"]))
+        self.assertEqual(15, data["platforms"]["douyin"]["snapshot"]["totals"]["likes"])
+        accounts = self.accounts.bootstrap()["accounts"]
+        self.assertEqual(1, len(accounts))
+        self.assertEqual("有效作品", accounts[0]["items"][0]["title"])
+
     def test_empty_database_and_public_number(self):
         data = AccountAnalytics(self.db).bootstrap(datetime(2026, 10, 28, 12, tzinfo=ZoneInfo("Asia/Shanghai")))
         self.assertEqual(0, data["totals"]["today"]["publications"])

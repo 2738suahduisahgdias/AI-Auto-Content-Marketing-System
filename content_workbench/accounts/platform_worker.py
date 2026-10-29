@@ -20,35 +20,45 @@ def xhs_logged_in(context):
     return bool(names & {"web_session", "webId", "a1", "web_sessionid"})
 
 
+def xhs_card_title(card):
+    if card.get("title"):
+        return card["title"]
+    ignored = {"未通过", "已发布", "审核中", "仅自己可见", "查看修改建议"}
+    lines = [line.strip() for line in card.get("text", "").split("\n") if line.strip()]
+    candidates = [line for line in lines if line not in ignored and not re.fullmatch(r"[\d.,]+[万wW]?", line)
+                  and not re.fullmatch(r"\d{2}:\d{2}", line) and not line.startswith("查看修改建议")
+                  and not re.search(r"20\d{2}-\d{2}-\d{2}", line)]
+    return max(candidates, key=len, default="")
+
+
 def xhs_notes(page):
     page.goto("https://creator.xiaohongshu.com/new/note-manager", wait_until="domcontentloaded", timeout=60000)
     page.wait_for_timeout(5000)
     if "login" in page.url:
         return {"status": "login_required"}
-    cards = page.evaluate("""() => Array.from(document.querySelectorAll('.note-card')).map(card => ({
+    cards = page.evaluate("""() => Array.from(document.querySelectorAll('[data-impression]')).map(card => ({
       title: card.querySelector('.note-card__title')?.innerText.trim() || '',
       text: card.innerText,
       impression: card.getAttribute('data-impression') || '',
-      cover: card.querySelector('.note-card__media')?.style.backgroundImage || ''
+      cover: card.querySelector('.note-card__media')?.style.backgroundImage || card.querySelector('img')?.src || ''
     }))""")
     items = []
     for card in cards:
-        if not card["title"]:
-            continue
-        note_id = ""
         try:
             impression = json.loads(card["impression"])
             note_id = impression.get("noteTarget", {}).get("value", {}).get("noteId", "")
         except (TypeError, json.JSONDecodeError):
-            pass
-        text = card["text"]
-        published_at = re.search(r"20\d{2}-\d{2}-\d{2}(?:\s+\d{2}:\d{2})?", text)
-        items.append({"title": card["title"], "canonical_url": "https://www.xiaohongshu.com/explore/" + note_id if note_id else "https://creator.xiaohongshu.com/new/note-manager",
-                      "platform_item_id": note_id or None,
-                      "metadata": {"title": card["title"], "cover_url": card["cover"], "visible_text": text[:2000],
-                                   "visible_metrics": re.findall(r"\d+(?:\.\d+)?[万wW]?", text),
+            note_id = ""
+        title = xhs_card_title(card)
+        if not note_id or not title:
+            continue
+        published_at = re.search(r"20\d{2}-\d{2}-\d{2}(?:\s+\d{2}:\d{2})?", card["text"])
+        items.append({"title": title, "canonical_url": "https://www.xiaohongshu.com/explore/" + note_id,
+                      "platform_item_id": note_id,
+                      "metadata": {"title": title, "cover_url": card["cover"], "visible_text": card["text"][:2000],
+                                   "visible_metrics": re.findall(r"\d+(?:\.\d+)?[万wW]?", card["text"]),
                                    "published_at": published_at.group(0) if published_at else None}})
-    return {"status": "ok", "items": items}
+    return {"status": "ok", "profile": {"published_notes_count": len(items)}, "items": items}
 
 
 def douyin_account(page):

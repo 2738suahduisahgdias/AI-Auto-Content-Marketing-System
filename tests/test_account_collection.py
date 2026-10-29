@@ -5,9 +5,10 @@ from unittest import mock
 
 from content_workbench.accounts.collection_knowledge import collection_bootstrap, error_type
 from content_workbench.accounts.collection_ontology import collection_ontology
-from content_workbench.accounts.existing_browser import verified
+from content_workbench.accounts.existing_browser import verified, xhs_card_title
 from content_workbench.accounts.executors import AccountExecutors
 from content_workbench.accounts.platform_worker import fill_channels_titles, labeled_metrics, wait_for_login
+from content_workbench.publishing.webbridge_worker import Bridge
 from content_workbench.topics.browser_worker import open_context
 from content_workbench.domain.errors import DomainError
 
@@ -58,6 +59,14 @@ class AccountCollectionCase(unittest.TestCase):
             self.assertIn(platform, caught.exception.message)
         self.service.save_snapshot.assert_not_called()
 
+    def test_all_empty_results_fail_without_overwriting_valid_snapshots(self):
+        with mock.patch.object(self.executor, "platform", return_value={"status": "ok", "profile": {}, "items": []}):
+            with self.assertRaises(DomainError) as caught:
+                self.executor.sync({}, mock.Mock())
+        self.assertEqual("ACCOUNTS_EMPTY", caught.exception.code)
+        self.assertIn("不会覆盖最近有效快照", caught.exception.action)
+        self.service.save_snapshot.assert_not_called()
+
     def test_all_login_actions_use_the_same_collection_profile(self):
         with mock.patch.object(self.executor, "platform", return_value={"status": "browser_closed"}) as open_browser:
             for platform in ("xiaohongshu", "douyin_publish", "wechat_channels", "wechat_official_account"):
@@ -100,6 +109,14 @@ class AccountCollectionCase(unittest.TestCase):
         snapshot = {"url": "https://channels.weixin.qq.com/platform/post/list", "tree": ["视频管理"]}
         self.assertTrue(verified(snapshot, "channels_login"))
         self.assertFalse(verified({"url": "https://channels.weixin.qq.com/login.html", "tree": ["登录视频号助手"]}, "channels_login"))
+
+    def test_browser_evaluates_arrow_functions_and_xhs_current_card_text(self):
+        bridge = Bridge()
+        with mock.patch.object(bridge, "cdp", return_value={"result": {"value": "ok"}}) as cdp:
+            self.assertEqual("ok", bridge.evaluate("() => true"))
+        self.assertEqual("(() => true)()", cdp.call_args.args[1]["expression"])
+        card = {"title": "", "text": "未通过\n真实笔记标题\n查看修改建议 2026-10-28 00:38\n2\n0"}
+        self.assertEqual("真实笔记标题", xhs_card_title(card))
 
     def test_collection_knowledge_is_complete_and_errors_are_typed(self):
         data = collection_bootstrap()
