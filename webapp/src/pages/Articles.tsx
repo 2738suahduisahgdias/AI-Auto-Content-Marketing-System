@@ -1,5 +1,6 @@
+import ArticleCreativePlan, {defaultCreativePlan, type CreativePlan} from "@/components/ArticleCreativePlan";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Check, Download, FilePlus2, FileText, Plus, Send, Sparkles } from "lucide-react";
+import { Check, Download, FilePlus2, Plus, Send, Sparkles } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useApp } from "@/AppContext";
 import { Badge, Button, Card, Empty, ErrorBox, Field, Modal, PageHeader, Progress, Textarea } from "@/components/ui";
@@ -30,14 +31,15 @@ export default function Articles() {
   const { id } = useParams();
   const navigate = useNavigate();
   const items = useMemo(() => resources?.articles.items || [], [resources?.articles.items]);
-  const selected = items.find(item => item.id === id) || (!id ? items[0] : undefined);
-  const [pagination, setPagination] = useState({ key: "", page: 1 });
-  const selectionKey = id || "";
-  const selectedIndex = Math.max(0, items.findIndex(item => item.id === selected?.id));
-  const pageCount = Math.max(1, Math.ceil(items.length / 10));
-  const currentPage = Math.min(pagination.key === selectionKey ? pagination.page : Math.floor(selectedIndex / 10) + 1, pageCount);
-  const goToPage = (page: number) => setPagination({ key: selectionKey, page });
-  const pageItems = items.slice((currentPage - 1) * 10, currentPage * 10);
+  const selected = items.find(item => item.id === id);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("all");
+  const [switchOpen, setSwitchOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const filtered = items.filter(item => String(item.campaign.title).toLowerCase().includes(search.toLowerCase()) && (status === "all" || (status === "draft" ? ["brief_ready","outline_draft","draft","needs_review"].includes(item.state) : status === "delivered" ? ["exported","published"].includes(item.state) : item.state === status))).sort((a,b)=>String((b as any).updated_at || '').localeCompare(String((a as any).updated_at || '')));
+  const pageCount = Math.max(1, Math.ceil(filtered.length / 10));
+  const currentPage = Math.min(page,pageCount);
+  const pageItems = filtered.slice((currentPage-1)*10,currentPage*10);
   const outline = activeRevision(selected, "outline");
   const draft = activeRevision(selected, "draft");
   const exported = activeRevision(selected, "export");
@@ -46,7 +48,9 @@ export default function Articles() {
   const [brief, setBrief] = useState(String(selected?.campaign.brief?.text || ""));
   const [outlineText, setOutlineText] = useState(String(outline?.payload.text || ""));
   const [draftText, setDraftText] = useState(String(draft?.payload.text || ""));
+  const [creativePlan,setCreativePlan]=useState<CreativePlan>(draft?.payload.creative_plan || outline?.payload.creative_plan || defaultCreativePlan());
   const [busy, setBusy] = useState("");
+  const [workspace, setWorkspace] = useState<"write" | "images" | "delivery">("write");
   const [createOpen, setCreateOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newBrief, setNewBrief] = useState("");
@@ -56,6 +60,9 @@ export default function Articles() {
     setBrief(String(selected?.campaign.brief?.text || ""));
     setOutlineText(String(outline?.payload.text || ""));
     setDraftText(String(draft?.payload.text || ""));
+    if (loadedRevision.split(":")[0] !== (selected?.id || "none") || loadedRevision.split(":")[2] !== (draft?.id || "none")) {
+      setCreativePlan(draft?.payload.creative_plan || outline?.payload.creative_plan || defaultCreativePlan());
+    }
   }
 
   const jobs = useMemo(() => (resources?.articles.jobs || []).filter(job => (job as Job & { aggregate_id?: string }).aggregate_id === selected?.id).slice(0, 5), [resources?.articles.jobs, selected?.id]);
@@ -88,22 +95,16 @@ export default function Articles() {
     }
   };
 
-  const createSample = async () => {
-    setBusy("sample");
-    const created = await run<Article>(() => api("/api/articles", jsonOptions("POST", { sample: true })), "写作规范样例已创建；它只是本地草稿，不会公开发布");
-    setBusy("");
-    if (created) navigate(`/articles/${created.id}`);
-  };
-
   const saveRevision = (kind: "outline" | "draft") => execute(`save:${kind}`, () => api(`/api/articles/${selected?.id}/revisions`, jsonOptions("POST", {
     kind,
-    payload: { text: kind === "outline" ? outlineText : draftText, format: "markdown" },
+    payload: { text: kind === "outline" ? outlineText : draftText, format: "markdown", creative_plan:creativePlan },
     expected_version: selected?.version,
   })), `${kind === "outline" ? "大纲" : "正文"}已保存为新版本；下游审批会按版本失效`);
 
   const generate = (operation: "article.outline" | "article.draft") => execute(operation, () => api(`/api/articles/${selected?.id}/generate`, jsonOptions("POST", {
     operation,
     prompt: brief,
+    creative_plan: creativePlan,
     expected_version: selected?.version,
   })), "文章Agent已加入后台；生成期间可离开，完成后会出现新版本");
 
@@ -119,20 +120,29 @@ export default function Articles() {
   const currentStep = exported ? 5 : selected?.state === "approved" ? 5 : draft ? 4 : outline ? 3 : 2;
   const exportPayload = exported?.payload || {};
   const canEdit = Boolean(selected) && !hasActiveJob;
+  const dirty = Boolean(selected) && (JSON.stringify(creativePlan)!==JSON.stringify(draft?.payload.creative_plan || outline?.payload.creative_plan || defaultCreativePlan()) || outlineText !== String(outline?.payload.text || '') || draftText !== String(draft?.payload.text || '') || brief !== String(selected?.campaign.brief?.text || ''));
+  const leave = (path:string) => { if(dirty && !window.confirm('有未保存的文案或写作要求。取消可返回编辑器保存；确定将放弃这些修改并离开。')) return; setSwitchOpen(false); navigate(path); };
+  useEffect(()=>{
+    if(!dirty)return;
+    const unload=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue='';};
+    const click=(event:MouseEvent)=>{const link=(event.target as Element)?.closest('a'); if(!link || event.defaultPrevented || link.target==='_blank' || link.hasAttribute('download'))return; const url=new URL(link.href,location.href); if(url.origin===location.origin && url.pathname!==location.pathname && !window.confirm('有未保存的文案或写作要求。取消可返回保存；确定将放弃修改并离开。')){event.preventDefault();event.stopPropagation();}};
+    window.addEventListener('beforeunload',unload);document.addEventListener('click',click,true);
+    return()=>{window.removeEventListener('beforeunload',unload);document.removeEventListener('click',click,true);};
+  },[dirty]);
+  const articleList = <><div className="article-search-tools"><input className="input" aria-label="搜索文章" placeholder="搜索文章标题" value={search} onChange={e=>{setSearch(e.target.value);setPage(1)}}/><select aria-label="文章状态" value={status} onChange={e=>{setStatus(e.target.value);setPage(1)}}><option value="all">全部状态</option><option value="draft">草稿</option><option value="in_review">待审核</option><option value="approved">已批准</option><option value="delivered">已交付</option></select></div>{pageItems.map(item=><button className="article-picker-row" key={item.id} onClick={()=>leave('/articles/'+item.id)}><span><strong>{String(item.campaign.title)}</strong><small>{(item as any).updated_at ? '更新于 '+new Date((item as any).updated_at).toLocaleString() : '暂无更新时间'} · {(item as any).platform === 'xiaohongshu' ? '小红书' : (item as any).platform === 'wechat_official_account' ? '公众号' : '平台未标注'} · {/选题ID[:：]/.test(String(item.campaign.brief?.text || '')) ? '来源：关联选题（详见写作要求）' : '来源：未记录'}</small></span><Badge>{articleStateNames[item.state] || item.state}</Badge><span>打开 →</span></button>)}{!filtered.length&&<Empty title={items.length?'没有符合条件的文章':'还没有文章'} description="可以调整搜索与筛选，或新建文章。"/>}<nav className="article-pagination" aria-label="文章分页"><Button disabled={currentPage===1} onClick={()=>setPage(currentPage-1)}>上一页</Button><span>{currentPage} / {pageCount} 页</span><Button disabled={currentPage===pageCount} onClick={()=>setPage(currentPage+1)}>下一页</Button></nav></>;
+
 
   return <div className="articles-page">
-    <PageHeader eyebrow="EDITORIAL WORKFLOW" title="文章任务" description="真实需求、论证大纲、完整正文与人工审批。文章独立生产，不依赖音频、字幕或视频渲染。" actions={<><Button disabled={!selected||!draft||Boolean(busy)||draftText!==String(draft?.payload.text||'')} onClick={()=>{if(!selected||!draft)return;void run<any>(()=>api('/api/tasks',jsonOptions('POST',{title:selected.campaign.title,article_id:selected.id,article_revision_id:draft.id,source_type:'article',pillar:'enterprise_ai',audience:'business_owners'})),'已从保存的文章版本创建视频任务').then(task=>{if(task)void refresh().then(()=>navigate('/tasks/'+task.content_id))})}}>从已保存正文制作视频</Button><Button onClick={() => void createSample()} disabled={Boolean(busy)}><FileText size={15} />创建规范样例</Button><Button variant="primary" onClick={() => setCreateOpen(true)} disabled={Boolean(busy)}><Plus size={16} />新建文章</Button></>} />
-    <div className="article-workspace">
-      <Card className="article-sidebar">
-        <div className="article-sidebar-head"><strong>全部文章</strong><span>{items.length} 篇</span></div>
-        {pageItems.map(item => <Link to={`/articles/${item.id}`} key={item.id} className={`article-list-item${item.id === selected?.id ? " active" : ""}`}><strong>{String(item.campaign.title)}</strong><small>{articleStateNames[item.state] || item.state} · v{item.version}<br />{item.id}</small></Link>)}
-        {!items.length && <Empty title="还没有文章" description="新建真实主题，或创建本地写作规范样例。" />}
-        {items.length > 10 && <nav className="article-pagination" aria-label="文章分页"><Button size="small" disabled={currentPage === 1} onClick={() => goToPage(currentPage - 1)}>上一页</Button><span>{currentPage} / {pageCount} 页</span><Button size="small" disabled={currentPage === pageCount} onClick={() => goToPage(currentPage + 1)}>下一页</Button></nav>}
-      </Card>
+    <PageHeader eyebrow="EDITORIAL WORKFLOW" title="文案与图文创作" description="从已选主题开始，或自由写作。文案 Agent 协助写稿、规划配图，再按公众号或小红书整理交付。" actions={<><Button variant="primary" onClick={() => setCreateOpen(true)} disabled={Boolean(busy)}><Plus size={16} />新建文章</Button></>} />
+    {id && <div className="article-editor-navigation"><Button onClick={()=>leave("/articles")}>← 返回文章列表</Button><Button onClick={()=>{setSearch("");setStatus("all");setPage(1);setSwitchOpen(true)}}>{selected?.campaign.title || "选择文章"} ▾</Button>{dirty && <span>有未保存修改</span>}</div>}
+    {id && <nav className="article-work-tabs" aria-label="图文工作区">{([['write','写文案'],['images','配图片'],['delivery','排版交付']] as const).map(([key,label])=><button key={key} aria-pressed={workspace===key} onClick={()=>setWorkspace(key)}>{label}</button>)}</nav>}
+    {!id && <Card className="article-library"><div className="article-sidebar-head"><h2>全部文章</h2><span>{filtered.length} 篇 · 按最近更新排序</span></div>{articleList}</Card>}
+    {id && <div className="article-workspace article-editor-full">
       <main className="article-main">
-        {!selected ? <Empty title={id ? "没有找到这篇文章" : "开始第一条独立文章任务"} description={id ? "它可能已被移除，或链接不完整。请从左侧选择真实文章。" : "创建后，大纲和正文都会保存为可追溯版本。"} action={<Button variant="primary" onClick={() => setCreateOpen(true)}><FilePlus2 size={15} />新建文章</Button>} /> : <>
-          <div className="article-title-block"><div><p className="eyebrow">公众号文章 · {selected.id}</p><h2>{String(selected.campaign.title)}</h2><p>当前版本 v{selected.version} · 每次保存生成新版本</p></div><Badge tone={["approved", "exported", "published"].includes(selected.state) ? "green" : selected.state === "in_review" ? "orange" : "neutral"}>{articleStateNames[selected.state] || selected.state}</Badge></div>
-          <div className="article-steps" aria-label="文章生产步骤">{["真实需求", "论证大纲", "完整正文", "人工终审", "交付文档"].map((name, index) => <span key={name} aria-current={index + 1 === currentStep ? "step" : undefined} className={`article-step${index + 1 < currentStep ? " done" : index + 1 === currentStep ? " current" : ""}`}>{index + 1} {name}</span>)}</div>
+        {!selected ? <Empty title={id ? "没有找到这篇文章" : "开始第一条独立文章任务"} description={id ? "它可能已被移除，或链接不完整。请返回文章列表选择已有文章。" : "创建后，大纲和正文都会保存为可追溯版本。"} action={<Button variant="primary" onClick={() => setCreateOpen(true)}><FilePlus2 size={15} />新建文章</Button>} /> : <>
+          <div className="article-title-block"><div><p className="eyebrow">文案项目</p><h2>{String(selected.campaign.title)}</h2><details><summary>版本与文章信息</summary><p>文章 ID：{selected.id} · 当前版本 v{selected.version}</p></details></div><Badge tone={["approved", "exported", "published"].includes(selected.state) ? "green" : selected.state === "in_review" ? "orange" : "neutral"}>{articleStateNames[selected.state] || selected.state}</Badge></div>
+          <ArticleCreativePlan key={selected.id} stage={workspace} plan={creativePlan} onChange={setCreativePlan} onSave={()=>void saveRevision("draft")} disabled={Boolean(busy) || hasActiveJob} onApply={text=>setBrief(previous=>previous+"\n\n"+text)} />
+          <div hidden={workspace!=="write"}><div className="article-entry-row"><Link className="button" to="/topics/douyin">从选题中心选择主题</Link><Button onClick={()=>setCreateOpen(true)}>自由写作 / 粘贴已有稿</Button><p>已有文案直接编辑并保存；大纲仅为 AI 写作辅助，不是手写稿的必经步骤。</p></div><div className="article-steps" aria-label="文章生产步骤">{["真实需求", "论证大纲", "完整正文", "人工终审", "交付文档"].map((name, index) => <span key={name} aria-current={index + 1 === currentStep ? "step" : undefined} className={`article-step${index + 1 < currentStep ? " done" : index + 1 === currentStep ? " current" : ""}`}>{index + 1} {name}</span>)}</div>
           {hasActiveJob && <div className="article-review-note">后台任务正在运行。当前编辑内容会保留；生成完成后仅在新版本出现时更新编辑器。</div>}
           <Card className="article-card">
             <div className="article-card-head"><div><h3>文章要求</h3><p>生成时作为本次输入，不覆盖其他 Agent，也不会自动保存为正文。</p></div></div>
@@ -147,7 +157,7 @@ export default function Articles() {
           <Card className="article-card">
             <div className="article-card-head"><div><h3>二、完整正文</h3><p>生成后必须人工核查事实、案例、数字、来源和过度承诺。</p></div><Button size="small" disabled={Boolean(busy) || !outline || hasActiveJob} title={!outline ? "先保存或生成大纲" : hasActiveJob ? "已有文章后台任务运行中" : undefined} onClick={() => void generate("article.draft")}><Sparkles size={14} />{busy === "article.draft" ? "正在提交…" : "文章Agent生成正文"}</Button></div>
             <p className="article-version-note">{draft ? `当前正文 ${draft.id}` : "尚无正文；生成或编辑后保存为新版本。"}</p>
-            <Textarea className="article-draft-editor" value={draftText} onChange={event => setDraftText(event.target.value)} disabled={!canEdit} placeholder="先保存大纲，再生成或编辑完整 Markdown 正文" />
+            <Textarea className="article-draft-editor" value={draftText} onChange={event => setDraftText(event.target.value)} disabled={!canEdit} placeholder="可以直接手写或粘贴已有文案并保存；使用 AI 生成时先准备大纲" />
             <div className="button-row">
               <Button size="small" disabled={Boolean(busy) || !canEdit} onClick={() => void saveRevision("draft")}>保存正文</Button>
               {draft && !["approved", "exported", "published", "in_review"].includes(selected.state) && <Button size="small" disabled={Boolean(busy)} onClick={() => void execute("review", () => api(`/api/articles/${selected.id}/actions`, jsonOptions("POST", { action: "submit_review", expected_version: selected.version })), "已提交人工审核")}>提交人工审核</Button>}
@@ -156,14 +166,18 @@ export default function Articles() {
               {draft && ["approved", "exported"].includes(selected.state) && <Button size="small" variant="primary" disabled={Boolean(busy) || hasActiveJob} onClick={() => void execute("export", () => api(`/api/articles/${selected.id}/export`, jsonOptions("POST", { revision_id: draft.id, expected_version: selected.version })), "文章导出已加入后台；完成后可下载真实文件")}><Download size={14} />导出当前正文</Button>}
             </div>
           </Card>
+          </div>
           {!!jobs.length && <div className="article-jobs">{jobs.map(job => <ArticleJob job={job} key={job.id} />)}</div>}
-          {["approved", "exported", "published"].includes(selected.state) && <Card className="article-card article-delivery">
+          {workspace === "delivery" && <div className="button-row"><Button disabled={!selected||!draft||Boolean(busy)||draftText!==String(draft?.payload.text||'')} onClick={()=>{if(!selected||!draft)return;void run<any>(()=>api('/api/tasks',jsonOptions('POST',{title:selected.campaign.title,article_id:selected.id,article_revision_id:draft.id,source_type:'article',pillar:'enterprise_ai',audience:'business_owners'})),'已从保存的文章版本创建视频任务').then(task=>{if(task)void refresh().then(()=>navigate('/tasks/'+task.content_id))})}}>从已保存正文制作视频</Button></div>}
+          {workspace === "delivery" && !["approved", "exported", "published"].includes(selected.state) && <p className="article-review-note">当前正文尚未批准。请在“写文案”中保存并审核正文，再导出或交给发布 Agent。</p>}
+          {workspace === "delivery" && ["approved", "exported", "published"].includes(selected.state) && <Card className="article-card article-delivery">
             <div className="article-card-head"><div><h3>交付文档</h3><p>这里只提供实际生成的文档；平台预览与公开发布统一在发布中心完成。</p></div><Link className="button button-small" to={`/publish?kind=article&id=${encodeURIComponent(selected.id)}`}>前往发布中心</Link></div>
             {exported ? <div className="article-export"><div><strong>Markdown + 安全 HTML</strong><p>{exported.id} · 文件由后端真实生成</p></div><div className="button-row">{exportPayload.markdown_asset_id ? <a className="button button-small" href={`/api/v2/assets/${exportPayload.markdown_asset_id}/content?download=1`}><Download size={13} />下载 Markdown</a> : <Button size="small" disabled title="导出修订缺少 Markdown 资产，请重新导出">Markdown 不可用</Button>}{exportPayload.html_asset_id ? <a className="button button-small" href={`/api/v2/assets/${exportPayload.html_asset_id}/content?download=1`}><Download size={13} />下载 HTML</a> : <Button size="small" disabled title="导出修订缺少 HTML 资产，请重新导出">HTML 不可用</Button>}</div></div> : <Empty title="尚未导出交付文档" description="导出当前已批准正文后，这里会显示真实 Markdown 和 HTML 下载文件。" />}
           </Card>}
         </>}
       </main>
-    </div>
+    </div>}
+    <Modal open={switchOpen} onOpenChange={setSwitchOpen} title="切换文章" description="按最近更新排序，支持搜索和状态筛选。">{articleList}</Modal>
     <Modal open={createOpen} onOpenChange={setCreateOpen} title="新建文章任务" description="只创建本地编辑任务，不会自动生成或公开发布。">
       <form className="article-create-form" onSubmit={createArticle}><Field label="文章主题"><input className="input" autoFocus required maxLength={200} value={newTitle} onChange={event => setNewTitle(event.target.value)} placeholder="要为目标用户解决什么具体问题？" /></Field><Field label="初始写作要求（可选）"><Textarea value={newBrief} onChange={event => setNewBrief(event.target.value)} placeholder="目标读者、真实场景、事实证据、边界与禁止承诺" /></Field><div className="button-row article-create-actions"><Button type="button" onClick={() => setCreateOpen(false)}>取消</Button><Button variant="primary" type="submit" disabled={busy === "create"}><Send size={14} />{busy === "create" ? "正在创建…" : "创建本地文章"}</Button></div></form>
     </Modal>

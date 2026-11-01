@@ -1,3 +1,9 @@
 .activation-page{max-width:1100px;margin:auto}.activation-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}.activation-grid .card,.welcome-card{padding:26px}.activation-page h2{font-size:20px;margin:0 0 16px}.activation-page p{line-height:1.8;color:var(--muted-foreground,#786c5d)}.activation-page label{display:block;margin:16px 0 8px}.activation-page textarea{display:block;width:100%;min-height:110px;resize:both;max-width:100%;border:1px solid #dacdbb;padding:12px;border-radius:10px;box-sizing:border-box;font:inherit;background:#fffdf9}.activation-qr{display:block;max-width:190px;max-height:240px;object-fit:contain;margin:0 auto}.license-note{padding:14px;background:#fff1db;border-radius:10px}.guide-steps{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}.guide-steps button{padding:10px 16px;border:1px solid #e0d4c2;background:#fff;border-radius:30px;cursor:pointer}.guide-steps button[aria-current=step]{background:#b65d14;color:white}.welcome-card{margin:16px 0}.guide-dependency{display:flex;justify-content:space-between;gap:20px;padding:12px 0;border-bottom:1px solid #eee3d5}.guide-dependency small{max-width:60%}.activation-page code{overflow-wrap:anywhere}.guide-actions{display:flex;gap:12px;flex-wrap:wrap;margin:20px 0}@media(max-width:850px){.activation-grid{grid-template-columns:1fr}}
 
 .welcome-card ol{list-style:decimal;padding-left:24px;line-height:1.9;margin:16px 0}.welcome-card .button{margin:8px 0}.activation-grid .button{margin:10px 8px 4px 0}
+
+.activation-page .button{min-height:46px;padding:11px 20px;font-size:14px}
+.guide-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.guide-steps button{min-height:56px;padding:14px 18px;font-size:15px;font-weight:600;border-radius:12px;text-align:left}
+.guide-steps button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+@media(max-width:850px){.guide-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}

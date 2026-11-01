@@ -89,7 +89,7 @@ class SocialCase(unittest.TestCase):
             self.service.create_run("douyin:video/search", {})
         with self.assertRaises(DomainError):
             self.service.create_run("douyin:video/detail", {})
-        with self.assertRaises(DomainError):
+        with mock.patch("content_workbench.providers.text.shutil.which", return_value=None), self.assertRaises(DomainError):
             self.service.create_run("douyin:video/detail", {"url": "https://www.douyin.com/video/1"}, "codex_cli")
 
     def test_douyin_hot_uses_existing_browser_and_saves_research_items(self):
@@ -147,7 +147,8 @@ class TextProviderCase(unittest.TestCase):
         with self.assertRaises(DomainError):
             json_object("[]")
 
-    def test_codex_is_reserved_without_unverified_command(self):
+    @mock.patch("content_workbench.providers.text.shutil.which", return_value=None)
+    def test_codex_missing_binary_is_unavailable(self, _which):
         registry = TextProviderRegistry(".", providers={"codex_cli": CodexCLIProvider()})
         self.assertFalse(registry.status()["items"][0]["available"])
         with self.assertRaises(DomainError) as caught:

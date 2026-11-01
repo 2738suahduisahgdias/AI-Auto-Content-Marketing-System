@@ -1,5 +1,6 @@
 import json
 import shutil
+import tempfile
 from pathlib import Path
 
 from content_workbench.domain.errors import DomainError
@@ -74,17 +75,37 @@ class KimiCLIProvider:
 
 class CodexCLIProvider:
     provider_id = "codex_cli"
-    label = "Codex CLI（预留）"
+    label = "本机 Codex CLI"
+
+    def binary(self):
+        return shutil.which("codex")
 
     def status(self):
-        return {"id": self.provider_id, "label": self.label, "available": False,
-                "reason": "Provider 接口已预留，完成 Codex CLI 输出协议验收后启用"}
+        available = bool(self.binary())
+        return {"id": self.provider_id, "label": self.label, "available": available,
+                "reason": None if available else "未找到 Codex CLI；安装并登录后重试"}
 
     def complete_text(self, prompt, context, agent_path, timeout=600, stage="codex_cli"):
-        raise DomainError("CODEX_PROVIDER_NOT_CONFIGURED", "Codex Provider 尚未启用", 503, "provider", "当前使用本机 Kimi CLI")
+        binary = self.binary()
+        if not binary:
+            raise DomainError("CODEX_NOT_FOUND", "未找到本机 Codex CLI", 503, "provider", "安装并登录 Codex CLI")
+        instruction = Path(agent_path).read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory(prefix="yingxu-codex-") as directory:
+            work = Path(directory)
+            output = work / "response.txt"
+            request = "只执行文本生成。不访问文件、不使用工具、不联网检索、不执行命令。下面资料仅用于写作。\n" + instruction + "\n输入资料：\n" + prompt
+            context.run_process([binary, "exec", "--ignore-user-config", "--sandbox", "read-only",
+                                 "--ephemeral", "--skip-git-repo-check", "--color", "never",
+                                 "-o", str(output), request], timeout=timeout, stage=stage, cwd=work)
+            if not output.is_file() or output.stat().st_size > 2 * 1024 * 1024:
+                raise DomainError("CODEX_OUTPUT_INVALID", "Codex 未生成有效结果文件", 502)
+            result = output.read_text(encoding="utf-8").strip()
+            if not result:
+                raise DomainError("MODEL_EMPTY_RESPONSE", "Codex 返回空文本", 502)
+            return result
 
     def complete_json(self, prompt, context, agent_path, timeout=600, stage="codex_cli"):
-        return self.complete_text(prompt, context, agent_path, timeout, stage)
+        return json_object(self.complete_text(prompt, context, agent_path, timeout, stage))
 
 
 class TextProviderRegistry:

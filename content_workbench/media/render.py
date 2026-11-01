@@ -7,7 +7,7 @@ from pathlib import Path
 
 from content_workbench.domain.errors import DomainError
 from content_workbench.media.probe import probe
-from content_workbench.storage.db import connect
+from content_workbench.storage.db import PROJECT_ROOT, connect
 
 
 def captions(text):
@@ -34,6 +34,10 @@ def render_remotion(workbench, item_id, context):
     item = workbench.get_item(item_id)
     root = workbench.root
     remotion_root = root / "remotion-app"
+    if not (remotion_root / "src/index.ts").is_file():
+        remotion_root = PROJECT_ROOT / "remotion-app"
+    if not (remotion_root / "node_modules/.bin/remotion").is_file():
+        raise DomainError("REMOTION_NOT_INSTALLED", "缺少本地 Remotion 依赖", 503, action="安装视频渲染依赖后重试")
     staging = remotion_root / "public" / "assets" / ("v2-" + context.job_id)
     staging.mkdir(parents=True, exist_ok=False)
     try:
@@ -42,11 +46,8 @@ def render_remotion(workbench, item_id, context):
             rows = {row["id"]: dict(row) for row in conn.execute("SELECT * FROM wb_assets WHERE id IN (?,?)", ids)}
         audio = rows[manifest["audio_asset_id"]]
         subtitle = rows[manifest["subtitle_asset_id"]]
-        audio_path = (root / audio["storage_key"]).resolve()
-        subtitle_path = (root / subtitle["storage_key"]).resolve()
-        for path in (audio_path, subtitle_path):
-            if root not in path.parents or not path.is_file():
-                raise DomainError("RENDER_ASSET_MISSING", "渲染输入文件不存在或路径无效", 422, "manifest", "重新上传输入资产", item_id)
+        audio_path = workbench.resolve_asset_path(audio, verify=True)
+        subtitle_path = workbench.resolve_asset_path(subtitle, verify=True)
         duration = float(json.loads(audio["media_info_json"]).get("duration_seconds", 0))
         if duration <= 0:
             raise DomainError("INVALID_AUDIO_DURATION", "活动音频没有有效时长", 422, "audio_asset_id", "重新上传或生成音频", item_id)

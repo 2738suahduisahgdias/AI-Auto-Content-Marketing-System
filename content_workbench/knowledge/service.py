@@ -46,7 +46,10 @@ class KnowledgeService:
         return relation_id
 
     def backfill(self):
-        seed = __import__("json").loads((PROJECT_ROOT / "data/seed.json").read_text())
+        seed_path = PROJECT_ROOT / "data/seed.json"
+        if not seed_path.is_file():
+            seed_path = PROJECT_ROOT / "data/seed.example.json"
+        seed = __import__("json").loads(seed_path.read_text(encoding="utf-8"))
         strategy = seed["strategy"]
         brand = strategy["brand"]
         account = self.entity("Account", brand["name"], brand["positioning"], {"goal": brand["primary_goal"]})

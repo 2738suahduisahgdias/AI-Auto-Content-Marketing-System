@@ -1,8 +1,10 @@
-import { useId, useState, type ReactNode } from "react";
+import { settingPages } from "@/lib/settingsPages";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Bot, CalendarDays, ChevronDown, FileText, Home, Library, Menu, PenTool, Settings, Share2, ShieldCheck, TrendingUp, Video, X } from "lucide-react";
+import { KeyRound, Rocket, ArrowUpRight, Bot, CalendarDays, ChevronDown, FileText, Home, Library, Menu, PenTool, Settings, Share2, ShieldCheck, TrendingUp, Video, X } from "lucide-react";
+import { api } from "@/lib/api";
 import { useApp } from "@/AppContext";
 
 import { Busy, ErrorBox } from "@/components/ui";
@@ -49,24 +51,39 @@ const accountSources = [
 function NavDropdown({ label, path, icon: Icon, items, onNavigate }: { label: string; path: string; icon: LucideIcon; items: { to: string; label: string; end?: boolean }[]; onNavigate?: () => void }) {
   const location = useLocation();
   const menuId = useId();
-  const active = location.pathname.startsWith(path);
+  const active = location.pathname.startsWith(path) || items.some(item => item.to === location.pathname);
   const [open, setOpen] = useState(active);
+  useEffect(() => { if (active) setOpen(true); }, [active, location.pathname]);
   return <div className="nav-dropdown"><button type="button" className={cn("nav-link nav-dropdown-toggle", active && "active")} aria-expanded={open} aria-controls={menuId} onClick={() => setOpen(value => !value)}><Icon size={16} /><span>{label}</span><ChevronDown className={cn("nav-dropdown-chevron", open && "open")} size={14} /></button>{open && <div className="nav-dropdown-menu" id={menuId}>{items.map(item => <NavLink key={item.to} to={item.to} end={item.end} onClick={onNavigate} className={({ isActive }) => cn("nav-link nav-sublink", isActive && "active")}><span>{item.label}</span></NavLink>)}</div>}</div>;
 }
 
-function Navigation({ onNavigate }: { onNavigate?: () => void }) {
-  return <nav className="main-nav" aria-label="主导航">{groups.map(group => <div className="nav-group" key={group.label}><p>{group.label}</p>{group.label === "选题" ? <NavDropdown label="选题中心" path="/topics/" icon={TrendingUp} items={topicSources} onNavigate={onNavigate} /> : group.label === "数据" ? <><NavDropdown label="账号日报" path="/accounts" icon={CalendarDays} items={accountSources} onNavigate={onNavigate} />{group.items.filter(item => item.to !== "/accounts").map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} onClick={onNavigate} className={({ isActive }) => cn("nav-link", isActive && "active")}><Icon size={16} /><span>{label}</span></NavLink>)}</> : group.items.map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} onClick={onNavigate} className={({ isActive }) => cn("nav-link", isActive && "active")}><Icon size={16} /><span>{label}</span></NavLink>)}</div>)}</nav>;
+function GettingStarted({ onNavigate }: { onNavigate?: () => void }) {
+  return <nav className="getting-started" aria-label="授权与入门"><NavLink to="/welcome" onClick={onNavigate} className="getting-started-link"><Rocket size={20}/><span><strong>新手引导</strong><small>开始制作第一条视频</small></span><ArrowUpRight size={16}/></NavLink><NavLink to="/activation" onClick={onNavigate} className="getting-started-link"><KeyRound size={20}/><span><strong>离线授权</strong><small>激活软件 · 联系刘洋</small></span><ArrowUpRight size={16}/></NavLink></nav>;
+}
+
+function Navigation({ onNavigate, compactOnboarding = false }: { onNavigate?: () => void; compactOnboarding?: boolean }) {
+  const settingsItems = Object.entries(settingPages).map(([key, item]) => ({to: '/settings/' + key, label: item.title}));
+  if (compactOnboarding) settingsItems.push({to:'/activation',label:'离线授权'},{to:'/welcome',label:'新手引导'});
+  return <nav className="main-nav" aria-label="主导航">{groups.map(group => <div className="nav-group" key={group.label}><p>{group.label}</p>{group.label === "选题" ? <NavDropdown label="选题中心" path="/topics/" icon={TrendingUp} items={topicSources} onNavigate={onNavigate}/> : group.label === "数据" ? <NavDropdown label="账号日报" path="/accounts" icon={CalendarDays} items={accountSources} onNavigate={onNavigate}/> : group.items.map(({to,label,icon:Icon,end}) => to === '/settings' ? <NavDropdown key={to} label="设置" path="/settings" icon={Settings} items={settingsItems} onNavigate={onNavigate}/> : <NavLink key={to} to={to} end={end} onClick={onNavigate} className={({isActive})=>cn('nav-link',isActive&&'active')}><Icon size={16}/><span>{label}</span></NavLink>)}</div>)}</nav>;
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { resources, loading, loadError, notice } = useApp();
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
+  const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(null);
+  useEffect(() => {
+    let active = true;
+    api<{onboarding:{completed:boolean}}>('/api/v2/license')
+      .then(data => { if (active) setOnboardingCompleted(data.onboarding.completed); })
+      .catch(() => { /* Keep accessible compact links if the local service is unavailable. */ });
+    return () => { active = false; };
+  }, [location.pathname]);
   const basePath = "/" + location.pathname.split("/")[1];
   const title = ({"/activation":"离线授权","/welcome":"新手引导"} as Record<string,string>)[location.pathname] || titles[location.pathname] || titles[basePath] || "内容工作台";
   return <div className="app-shell">
-    <aside className="sidebar"><NavLink to="/" className="brand"><span className="brand-symbol">L</span><span><strong>刘量</strong><small>内容增长工作台</small></span></NavLink><div className="workspace-label"><Bot size={16} /><span>多 Agent 本地工作区<small>真实数据 · 人工终审</small></span></div><Navigation /><div className="sidebar-foot"><span className="live-dot" />本地数据由你掌控<NavLink to="/activation">离线授权</NavLink><NavLink to="/welcome">新手引导</NavLink><NavLink to="/legacy">打开旧版 ↗</NavLink></div></aside>
-    <div className="main-shell"><header className="topbar"><Dialog.Root open={menuOpen} onOpenChange={setMenuOpen}><Dialog.Trigger className="icon-button mobile-menu" aria-label="打开导航"><Menu size={20} /></Dialog.Trigger><Dialog.Portal><Dialog.Overlay className="modal-overlay" /><Dialog.Content className="mobile-drawer"><div className="drawer-head"><strong>内容增长工作台</strong><Dialog.Close className="icon-button" aria-label="关闭"><X size={18} /></Dialog.Close></div><Navigation onNavigate={() => setMenuOpen(false)} /><NavLink to="/legacy" className="legacy-link">打开旧版 ↗</NavLink></Dialog.Content></Dialog.Portal></Dialog.Root><div><p className="topbar-date">{new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "long" }).format(new Date())}</p><h2>{title}</h2></div><div className="topbar-meta"><PenTool size={15} /><span>Agent 生产，你来判断</span></div></header>
+    <aside className="sidebar"><NavLink to="/" className="brand"><span className="brand-symbol">L</span><span><strong>刘量</strong><small>内容增长工作台</small></span></NavLink><div className="workspace-label"><Bot size={16} /><span>多 Agent 本地工作区<small>真实数据 · 人工终审</small></span></div>{onboardingCompleted === false && <GettingStarted />}<Navigation compactOnboarding={onboardingCompleted !== false} /><div className="sidebar-foot"><span className="live-dot" />本地数据由你掌控<NavLink to="/legacy">打开旧版 ↗</NavLink></div></aside>
+    <div className="main-shell"><header className="topbar"><Dialog.Root open={menuOpen} onOpenChange={setMenuOpen}><Dialog.Trigger className="icon-button mobile-menu" aria-label="打开导航"><Menu size={20} /></Dialog.Trigger><Dialog.Portal><Dialog.Overlay className="modal-overlay" /><Dialog.Content className="mobile-drawer"><div className="drawer-head"><strong>内容增长工作台</strong><Dialog.Close className="icon-button" aria-label="关闭"><X size={18} /></Dialog.Close></div>{onboardingCompleted === false && <GettingStarted onNavigate={() => setMenuOpen(false)} />}<Navigation compactOnboarding={onboardingCompleted !== false} onNavigate={() => setMenuOpen(false)} /><NavLink to="/legacy" className="legacy-link">打开旧版 ↗</NavLink></Dialog.Content></Dialog.Portal></Dialog.Root><div><p className="topbar-date">{new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "long" }).format(new Date())}</p><h2>{title}</h2></div><div className="topbar-meta"><PenTool size={15} /><span>Agent 生产，你来判断</span></div></header>
       <main className="page-container">{["/activation","/welcome"].includes(location.pathname) ? children : loading ? <Busy /> : loadError && !resources ? <ErrorBox>{loadError}</ErrorBox> : children}</main>
     </div>
     <nav className="mobile-bottom" aria-label="高频导航">{[{ to: "/", label: "今天", icon: Home, end: true }, { to: "/topics/douyin", label: "选题", icon: TrendingUp }, { to: "/tasks", label: "制作", icon: Video }, { to: "/publish", label: "发布", icon: Share2 }].map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} className={({ isActive }) => cn(isActive && "active")}><Icon size={18} /><span>{label}</span></NavLink>)}</nav>

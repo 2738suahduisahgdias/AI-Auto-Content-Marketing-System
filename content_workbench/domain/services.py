@@ -277,11 +277,15 @@ class Workbench:
             temporary = target.with_name("." + uuid.uuid4().hex + ".pending")
             shutil.copyfile(path, temporary)
             os.replace(temporary, target)
-        if move:
+        if move and path != target:
             path.unlink(missing_ok=True)
         with self.conn() as conn, immediate(conn):
-            row = conn.execute("SELECT id FROM wb_assets WHERE sha256=? AND byte_size=?", (digest, size)).fetchone()
+            row = conn.execute("SELECT id,source_json FROM wb_assets WHERE sha256=? AND byte_size=?", (digest, size)).fetchone()
             if row:
+                # A requested managed copy upgrades a previous external reference.
+                if loads(row["source_json"], {}).get("kind") == "local_reference":
+                    conn.execute("UPDATE wb_assets SET storage_key=?,source_json=? WHERE id=?",
+                                 (storage_key, dumps(source or {}), row[0]))
                 return row[0]
             asset_id = new_id("asset")
             conn.execute("""INSERT INTO wb_assets
@@ -289,6 +293,60 @@ class Workbench:
                 VALUES (?,?,?,?,?,?,?,?,?,'referenced',?)""",
                 (asset_id, digest, size, storage_key, media["mime_type"], dumps(media), dumps(source or {}), privacy_class, rights_status, utcnow()))
             return asset_id
+
+    def import_local_asset(self, source_path, copy=False, rights_status="research_only"):
+        path = Path(str(source_path)).expanduser().resolve()
+        if path.suffix.lower() not in {".mp4", ".mov", ".mkv", ".webm", ".mp3", ".wav", ".m4a", ".aac", ".flac", ".png", ".jpg", ".jpeg", ".webp", ".srt"}:
+            raise DomainError("UNSUPPORTED_LOCAL_ASSET", "请选择视频、音频、图片或 SRT 字幕", 422)
+        if not path.is_file():
+            raise DomainError("ASSET_FILE_MISSING", "文件不存在，请连接硬盘或重新定位", 404)
+        if copy:
+            return self.register_asset(path, {"kind": "local_copy", "original_name": path.name}, rights_status)
+        media = probe(path)
+        before = path.stat()
+        digest = file_hash(path)
+        after = path.stat()
+        if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
+            raise DomainError("ASSET_CHANGED", "读取期间文件发生变化，请重试", 409)
+        source = {"kind": "local_reference", "path": str(path), "mtime_ns": after.st_mtime_ns}
+        with self.conn() as conn, immediate(conn):
+            row = conn.execute("SELECT id FROM wb_assets WHERE sha256=? AND byte_size=?", (digest, after.st_size)).fetchone()
+            if row:
+                return row[0]
+            asset_id = new_id("asset")
+            conn.execute("""INSERT INTO wb_assets
+                (id,sha256,byte_size,storage_key,mime_type,media_info_json,source_json,privacy_class,rights_status,retention_class,created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,'referenced',?)""",
+                (asset_id, digest, after.st_size, "local-reference/" + asset_id, media["mime_type"], dumps(media), dumps(source), "local_only", rights_status, utcnow()))
+        return asset_id
+
+    def resolve_asset_path(self, asset, verify=False):
+        if not asset:
+            raise DomainError("ASSET_NOT_FOUND", "素材不存在", 404)
+        source = loads(asset["source_json"], {})
+        referenced = source.get("kind") == "local_reference"
+        path = Path(source["path"]).resolve() if referenced else (self.root / asset["storage_key"]).resolve()
+        if (not referenced and self.root not in path.parents) or not path.is_file():
+            raise DomainError("ASSET_FILE_MISSING", "素材已移动或硬盘未连接，请重新定位", 404)
+        stat = path.stat()
+        if stat.st_size != asset["byte_size"] or ((verify or (referenced and stat.st_mtime_ns != source.get("mtime_ns"))) and file_hash(path) != asset["sha256"]):
+            raise DomainError("ASSET_CHANGED", "原素材内容已改变，请作为新素材导入", 409)
+        return path
+
+    def relink_asset(self, asset_id, source_path):
+        path = Path(str(source_path)).expanduser().resolve()
+        with self.conn() as conn, immediate(conn):
+            asset = conn.execute("SELECT * FROM wb_assets WHERE id=?", (asset_id,)).fetchone()
+            if not asset:
+                raise DomainError("ASSET_NOT_FOUND", "素材不存在", 404)
+            source = loads(asset["source_json"], {})
+            if source.get("kind") != "local_reference":
+                raise DomainError("ASSET_NOT_REFERENCE", "仅原文件引用需要重新定位", 409)
+            if not path.is_file() or path.stat().st_size != asset["byte_size"] or file_hash(path) != asset["sha256"]:
+                raise DomainError("ASSET_RELINK_MISMATCH", "文件内容与原素材不一致，请选择原文件", 409)
+            source.update(path=str(path), mtime_ns=path.stat().st_mtime_ns)
+            conn.execute("UPDATE wb_assets SET source_json=? WHERE id=?", (dumps(source), asset_id))
+        return asset_id
 
     def add_asset_revision(self, item_id, kind, asset_id, expected_version, source_audio_asset_id=None, metadata=None):
         if kind not in ("audio", "subtitle", "render"):

@@ -52,3 +52,7 @@ remotion-app/public-static/yingxu-assets/
 license/
 *.encrypted.pem
 customers.sqlite3*
+
+# Local dependency environments may be symlinks on external disks.
+/.venv-topics
+/.venv-faster-whisper

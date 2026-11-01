@@ -4,7 +4,7 @@ from pathlib import Path
 
 from content_workbench.agents.registry import require_agent_enabled
 from content_workbench.domain.errors import DomainError
-from content_workbench.storage.db import utcnow
+from content_workbench.storage.db import PROJECT_ROOT, utcnow
 from .media_review import review_media
 
 
@@ -78,7 +78,7 @@ class ReviewExecutors:
             raise DomainError("REVIEW_REQUIRED", "没有可供风险分析的机器预审报告", 409, "batch_id", "先完成机器预审")
         prompt = json.dumps({"operation": "短视频风险证据分析，逐条返回结果，不得声称看到了未提供的画面或事实",
                              "items": items, "agent_supplement": config["prompt"]}, ensure_ascii=False)
-        agent = self.root / "agents/video-review-agent.md"
+        agent = PROJECT_ROOT / "agents/video-review-agent.md"
         stdout, _ = context.run_process([binary, "--agent-file", str(agent), "-p", prompt, "--output-format", "stream-json"],
                                         timeout=config["timeout_seconds"], stage="video_review_agent", cwd=self.root)
         contents = []

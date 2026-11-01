@@ -81,8 +81,10 @@ class WechatInboxCase(unittest.TestCase):
         handler.path = "/api/topics/wechat/messages"
         handler.headers = {"Host": "127.0.0.1:8765", "X-Wechat-Ingest-Token": "secret"}
         app = V2Application.__new__(V2Application)
+        app.license = mock.Mock()
         with mock.patch.dict("os.environ", {"CONTENT_AGENT_WECHAT_TOKEN": "secret"}):
             self.assertEqual("wechat_ingest", app.authenticate(handler, write=True))
+            app.license.require_active.assert_called_once()
         with mock.patch.dict("os.environ", {"CONTENT_AGENT_WECHAT_TOKEN": "different"}):
             with self.assertRaises(DomainError) as caught:
                 app.authenticate(handler, write=True)

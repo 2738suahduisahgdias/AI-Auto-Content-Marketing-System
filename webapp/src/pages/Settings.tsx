@@ -1,3 +1,6 @@
+import LocalAssets from "@/components/LocalAssets";
+import RuntimeReadiness from "@/components/RuntimeReadiness";
+import { settingPages } from "@/lib/settingsPages";
 import { useEffect, useState, type ReactNode } from "react";
 import { Bot, Film, LoaderCircle, Mic2, RefreshCw, RotateCcw, Save, Settings2, Subtitles, Volume2, WandSparkles } from "lucide-react";
 import { Navigate, NavLink, useParams } from "react-router-dom";
@@ -234,13 +237,7 @@ function TemplateLibrary() {
   </section>;
 }
 
-const settingPages = {
-  agents: { title: "Agent 配置", description: "管理各 Agent 的引擎、模型、提示词、Skills 和执行参数。" },
-  models: { title: "模型连接", description: "查看并测试脚本模型与素材规划能力。测试可能调用已配置的云端模型。" },
-  media: { title: "本地媒体", description: "管理 Remotion、系统语音、字幕转写与音色克隆的本地运行能力。" },
-  templates: { title: "视频模板", description: "查看真实模板预览，管理模板版本与启用状态。" },
-  data: { title: "数据与自动化", description: "查看本地数据存储、模型输入范围与人工审核边界。" },
-};
+
 
 export default function Settings() {
   const { section } = useParams();
@@ -364,8 +361,10 @@ export default function Settings() {
 
   return <div className="settings-page">
     <PageHeader eyebrow="LOCAL SYSTEM / CONTROL ROOM" title={settingPages[page].title} description={settingPages[page].description} actions={<div className="settings-page-actions"><Badge tone="blue">{entries.length} 个独立 Agent · {enabledCount} 个已启用</Badge><Button size="small" onClick={() => { void reload(); }} disabled={refreshing}><RefreshCw className={refreshing ? "spin" : ""} size={14} />{refreshing ? "正在刷新" : "刷新真实状态"}</Button></div>} />
-    <nav className="settings-subpages" aria-label="设置子页面">{Object.entries(settingPages).map(([key,item])=><NavLink key={key} to={'/settings/'+key} className={page===key?'active':''} aria-current={page===key?'page':undefined}>{item.title}</NavLink>)}</nav>
+    {page === 'agents' && <RuntimeReadiness />}
+    {page === 'agents' && <details className="article-skills"><summary>文案 Agent：图文创作技能接入计划</summary><p>写作统筹复用原文章 Agent；选题与记忆读取、公众号／小红书表达适配、图片搜索、本地图片引用、AI 生图、平台排版与分页长图、图文质检分别作为技能接入。配图搜索需搜索服务，生图需独立图像模型，长图在本地渲染。</p><p>当前已有大纲、正文、版本保存与 Markdown / HTML 导出；图片与平台排版能力待接入。母稿和各平台版本分开保存，正文、图片、模板版本一起交付审核，修改后旧审批失效。</p></details>}
     {dirty.size>0 && <p className="settings-draft-note">{dirty.size} 个 Agent 有未保存修改，切换设置子页会保留草稿。<NavLink to="/settings/agents">返回配置保存</NavLink></p>}
+    {page === "media" && <LocalAssets />}
     {activeTest && !['models','media'].includes(page) && <p role="status" className="settings-test-progress">{tests[activeTest].progress} 切换子页不会中断测试。</p>}
     {loadError && <ErrorBox>{resources ? `刷新失败：${loadError}\n当前仍显示上一次成功读取的数据。` : loadError}</ErrorBox>}
     {!resources ? (loading ? <Busy label="正在读取 Agent 配置与本地能力状态…" /> : <Empty title="设置数据尚未读取" description="请检查本地服务后点击“刷新真实状态”。" />) : <>

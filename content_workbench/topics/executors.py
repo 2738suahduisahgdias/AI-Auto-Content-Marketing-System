@@ -2,6 +2,7 @@ import json
 import shutil
 import tempfile
 from pathlib import Path
+from content_workbench.storage.db import PROJECT_ROOT
 
 from content_workbench.accounts.existing_browser import run as run_existing_browser
 from content_workbench.agents.registry import require_agent_enabled
@@ -28,7 +29,7 @@ class TopicExecutors:
 
     def browser(self, context, action, stage, collection=None, url=None, cover_url=None, output=None, wait_seconds=30):
         config = require_agent_enabled(self.service.db_path, "hotspot_agent")
-        arguments = [str(self.root / ".venv-topics/bin/python"), str(self.root / "content_workbench/topics/browser_worker.py"),
+        arguments = [str(self.root / ".venv-topics/bin/python"), str(PROJECT_ROOT / "content_workbench/topics/browser_worker.py"),
                      "--action", action, "--profile", str(self.root / "data/topic-browser-profile"),
                      "--wait-seconds", str(wait_seconds)]
         if collection:
@@ -175,7 +176,7 @@ class TopicExecutors:
         binary = shutil.which("kimi") or str(Path.home() / ".kimi-code/bin/kimi")
         if not Path(binary).is_file():
             raise DomainError("KIMI_NOT_FOUND", "未找到 Kimi CLI", 503, "provider", "先安装并登录 Kimi CLI")
-        agent = self.root / "agents" / (agent_name + ".md")
+        agent = PROJECT_ROOT / "agents" / (agent_name + ".md")
         stdout, _ = context.run_process([binary, "--agent-file", str(agent), "-p", prompt, "--output-format", "stream-json"],
                                         timeout=timeout, stage=agent_name, cwd=self.root)
         contents = []

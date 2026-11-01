@@ -2,6 +2,7 @@ import json
 import sys
 import tempfile
 from pathlib import Path
+from content_workbench.storage.db import PROJECT_ROOT
 
 from content_workbench.agents.registry import require_agent_enabled
 from content_workbench.domain.errors import DomainError
@@ -104,7 +105,7 @@ class PublishingExecutors:
                              "platforms": platforms, "contracts": contracts, "instructions": data.get("prompt", ""),
                              "agent_supplement": config["prompt"]}, ensure_ascii=False)
         context.progress("model_generate", 0.15)
-        agent = self.root / "agents" / "publish-fields-agent.md"
+        agent = PROJECT_ROOT / "agents" / "publish-fields-agent.md"
         stdout, _ = context.run_process([LocalExecutors(self.service.workbench).kimi(), "--agent-file", str(agent), "-p", prompt,
                                          "--output-format", "stream-json"], timeout=config["timeout_seconds"], stage="kimi_cli", cwd=self.root)
         fields = self.validate_generated_fields(kind, platforms, self.model_payload(stdout))
@@ -121,7 +122,7 @@ class PublishingExecutors:
             use_bridge = platform in ("wechat_channels", "wechat_official_account") and action in ("prepare", "execute")
             worker = "webbridge_worker.py" if use_bridge else "browser_worker.py"
             python = sys.executable if use_bridge else browser_python(self.root)
-            arguments = [python, str(self.root / "content_workbench/publishing" / worker),
+            arguments = [python, str(PROJECT_ROOT / "content_workbench/publishing" / worker),
                          "--action", action, "--platform", platform]
             if not use_bridge:
                 arguments += ["--profile", str(self.profile(platform))]

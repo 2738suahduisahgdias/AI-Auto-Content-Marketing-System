@@ -8,7 +8,7 @@ from content_workbench.domain.errors import DomainError
 from content_workbench.domain.services import Workbench
 from content_workbench.media.probe import probe
 from content_workbench.media.render import render_remotion
-from content_workbench.storage.db import dumps, immediate, new_id, utcnow
+from content_workbench.storage.db import PROJECT_ROOT, dumps, immediate, new_id, utcnow
 
 
 class LocalExecutors:
@@ -35,7 +35,7 @@ class LocalExecutors:
             raise DomainError("KIMI_NOT_FOUND", "未找到本机 Kimi CLI", 503, "provider", "先安装并登录 Kimi CLI")
         return str(path)
 
-    def save_text_result(self, job, text):
+    def save_text_result(self, job, text, provider="kimi_cli", generation=None):
         if not text.strip():
             raise DomainError("EMPTY_GENERATION", "模型返回空文本", 502, "provider", "重试或改为人工编辑")
         item_id = job["aggregate_id"]
@@ -43,19 +43,36 @@ class LocalExecutors:
         item = self.workbench.get_item(item_id)
         expected = job["input"].get("expected_version")
         active = expected is None or item["version"] == expected
-        revision_id = self.workbench.save_revision(item_id, kind, {"text": text.strip(), "format": "markdown" if kind != "script" else "plain"},
-                                                   expected if active else None, activate=active, created_by="kimi_cli")
-        return {"revision_id": revision_id, "active": active, "model": "unpinned", "provider": "kimi_cli"}
+        payload = {"text": text.strip(), "format": "markdown" if kind != "script" else "plain", "generation": generation or {}}
+        if kind in ("draft", "outline"):
+            previous = next((revision["payload"] for revision in item["revisions"] if revision["id"] == item["active_revisions"].get("draft")), {})
+            plan = job["input"].get("creative_plan", previous.get("creative_plan"))
+            if isinstance(plan, dict):
+                payload["creative_plan"] = plan
+        revision_id = self.workbench.save_revision(item_id, kind, payload,
+                                                   expected if active else None, activate=active, created_by=provider)
+        return {"revision_id": revision_id, "active": active, "model": "unpinned", "provider": provider}
 
     def generate_text(self, job, context):
         agent_id = {"article.outline": "article_agent", "article.draft": "article_agent", "video.script": "script_agent"}[job["kind"]]
         config = require_agent_enabled(self.workbench.db_path, agent_id)
         item = self.workbench.get_item(job["aggregate_id"])
         context.progress("model_generate", 0.15)
+        from content_workbench.agents.writing import writing_context
+        try:
+            skills_prompt, generation = writing_context(config, PROJECT_ROOT)
+        except ValueError as error:
+            raise DomainError("WRITING_SKILL_INVALID", str(error), 422)
         prompt = json.dumps({"operation": job["kind"], "campaign": item["campaign"],
                              "brief": item["campaign"]["brief"], "input": job["input"].get("prompt", ""),
-                             "agent_supplement": config["prompt"]}, ensure_ascii=False)
-        agent = self.root / "agents" / "content-item-agent.md"
+                             "creative_plan": job["input"].get("creative_plan", {}), "writing_skills": skills_prompt, "agent_supplement": config["prompt"], "active_outline": next((r["payload"].get("text", "") for r in item["revisions"] if r["id"] == item["active_revisions"].get("outline")), "")}, ensure_ascii=False)
+        agent = PROJECT_ROOT / "agents" / "content-item-agent.md"
+        if config["engine"] == "codex_cli":
+            from content_workbench.providers.text import CodexCLIProvider
+            payload = CodexCLIProvider().complete_json(prompt, context, agent, timeout=config["timeout_seconds"])
+            if not isinstance(payload.get("text"), str):
+                raise DomainError("MODEL_SCHEMA_INVALID", "Codex 必须返回 text 字符串", 502)
+            return self.save_text_result(job, payload["text"], provider="codex_cli", generation=generation)
         stdout, _ = context.run_process([self.kimi(), "--agent-file", str(agent), "-p", prompt,
                                          "--output-format", "stream-json"], timeout=config["timeout_seconds"], stage="kimi_cli", cwd=self.root)
         contents = []
@@ -80,7 +97,7 @@ class LocalExecutors:
             text = payload["text"]
         except (json.JSONDecodeError, KeyError, TypeError):
             raise DomainError("MODEL_SCHEMA_INVALID", "模型未返回指定的 text JSON", 502, "provider", "重试一次；仍失败时人工编辑")
-        return self.save_text_result(job, text)
+        return self.save_text_result(job, text, generation=generation)
 
     def save_asset_result(self, job, asset_id, kind, source_audio=None, metadata=None):
         item_id = job["aggregate_id"]
@@ -136,7 +153,7 @@ class LocalExecutors:
             raise DomainError("VOICE_SAMPLE_MISSING", "本人音色样本不存在", 404, "voice_id", "重新保存本人样本")
         with tempfile.TemporaryDirectory(prefix="v2-clone-") as directory:
             work = Path(directory)
-            context.run_process([str(self.root / "vendor/openvoice-venv/bin/python"), str(self.root / "workers/openvoice_worker.py"),
+            context.run_process([str(self.root / "vendor/openvoice-venv/bin/python"), str(PROJECT_ROOT / "workers/openvoice_worker.py"),
                                  "--openvoice-root", str(self.root / "vendor/OpenVoice"), "--ref", str(sample), "--text", text,
                                  "--output", str(work / "clone.wav"), "--work-dir", str(work / "work"), "--speaker", "zh"],
                                 timeout=3600, stage="openvoice_clone")
@@ -150,13 +167,13 @@ class LocalExecutors:
             raise DomainError("AUDIO_NOT_ACTIVE", "只能转写当前活动音频", 409, "audio_asset_id", "先选择要转写的活动音频")
         with self.workbench.conn(readonly=True) as conn:
             asset = conn.execute("SELECT * FROM wb_assets WHERE id=?", (asset_id,)).fetchone()
-        path = (self.root / asset["storage_key"]).resolve()
+        path = self.workbench.resolve_asset_path(asset, verify=True)
         model = job["input"].get("model", "small")
         if model not in ("small", "base"):
             raise DomainError("INVALID_ASR_MODEL", "本地转写仅支持 small/base", 422, "model", "选择 small 或 base")
         with tempfile.TemporaryDirectory(prefix="v2-asr-") as directory:
             output = Path(directory) / "subtitle.srt"
-            context.run_process([str(self.root / ".venv-faster-whisper/bin/python"), str(self.root / "workers/whisperx_worker.py"),
+            context.run_process([str(self.root / ".venv-faster-whisper/bin/python"), str(PROJECT_ROOT / "workers/whisperx_worker.py"),
                                  "--audio", str(path), "--model", model, "--language", "zh", "--output", str(output)],
                                 timeout=3600, stage="faster_whisper")
             subtitle = self.workbench.register_asset(output, {"kind": "faster_whisper", "model": model, "source_audio_asset_id": asset_id}, "owned")

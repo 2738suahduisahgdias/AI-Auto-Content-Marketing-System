@@ -11,11 +11,14 @@ if app.ROOT.resolve() not in app.DB_PATH.resolve().parents:
 from content_workbench.api.v2 import V2Application
 app.init_db()
 app.V2=V2Application(app.DB_PATH,app.ROOT,app.create_task,{"video.produce":app.produce_video_task,"video.preview":app.produce_visual_preview})
-# Only local technical review runs in the isolated demo. Publishing and model jobs stay disabled.
+# Original article jobs and local review run here. Publishing executors remain disabled until platform validation.
 from content_workbench.jobs.worker import Worker
 from content_workbench.review.executors import ReviewExecutors
 app.V2.review.local_only=True
-review_worker=Worker(app.DB_PATH,ReviewExecutors(app.V2.review).mapping(),app.ROOT,allowed_kinds=["review.scan","review.repair"])
+local_executors=ReviewExecutors(app.V2.review).mapping()
+for kind in ("article.outline","article.draft","article.export"):
+    local_executors[kind]=app.V2.worker.executors[kind]
+review_worker=Worker(app.DB_PATH,local_executors,app.ROOT,allowed_kinds=["review.scan","review.repair","article.export","article.outline","article.draft"])
 review_worker.before_execute=app.V2.license.require_active
 review_worker.start()
 app.V2.overview_worker=review_worker

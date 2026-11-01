@@ -83,9 +83,7 @@ class PublishingService:
                 asset = conn.execute("SELECT * FROM wb_assets WHERE id=?", (asset_id,)).fetchone()
             if not asset or not str(asset["mime_type"]).startswith("image/"):
                 raise DomainError("PUBLISH_COVER_INVALID", definition["label"] + "不是有效图片资产", 422, name, "上传 PNG、JPG 或 WebP 图片")
-            path = (self.root / asset["storage_key"]).resolve()
-            if self.root not in path.parents or not path.is_file():
-                raise DomainError("PUBLISH_COVER_MISSING", definition["label"] + "文件不存在", 409, name, "重新上传图片")
+            path = self.workbench.resolve_asset_path(asset, verify=True)
             if definition.get("min_width") or definition.get("aspect_ratio"):
                 process = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
                                           "-show_entries", "stream=width,height", "-of", "json", str(path)],

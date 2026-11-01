@@ -148,6 +148,9 @@ class V2Application:
             body = handler.read_json() if method in ("POST", "PUT", "PATCH") and path not in ("/api/v2/assets", "/api/review/uploads") else None
             if path.startswith("/api/v2/license") and method == "POST" and not isinstance(body, dict):
                 raise DomainError("LICENSE_INPUT", "授权请求格式无效")
+            if path == "/api/v2/runtime-readiness" and method == "GET":
+                from content_workbench.readiness import runtime_readiness
+                return self.response(handler, runtime_readiness(self))
             if path == "/api/v2/work-overview" and method == "GET":
                 from content_workbench.overview import overview
                 return self.response(handler, overview(self.workbench.db_path, getattr(self, "overview_worker", self.worker)))
@@ -204,6 +207,27 @@ class V2Application:
                                                "voices": voices, "assets": assets, "migration": loads(migration[0], {}) if migration else {},
                                                "csrf_token": self.csrf(session), "capabilities": {"browser_collection": "not_implemented",
                                                "cloud_providers": "not_configured", "render_modes": ["remotion"]}})
+            if method == "GET" and path == "/api/v2/local-assets":
+                with self.workbench.conn(readonly=True) as conn:
+                    assets = [dict(row) for row in conn.execute("SELECT * FROM wb_assets ORDER BY created_at DESC LIMIT 200")]
+                for asset in assets:
+                    asset["source"] = loads(asset["source_json"], {})
+                    try:
+                        self.workbench.resolve_asset_path(asset)
+                        asset["available"] = True
+                    except DomainError as error:
+                        asset["available"] = False
+                        asset["problem"] = str(error)
+                return self.response(handler, {"assets": assets})
+            if method == "POST" and path == "/api/v2/local-assets":
+                if not isinstance(body.get("copy", False), bool):
+                    raise DomainError("INVALID_COPY_MODE", "copy 必须是布尔值", 422)
+                asset_id = self.workbench.import_local_asset(body.get("path", ""), copy=body.get("copy", False))
+                return self.response(handler, {"asset_id": asset_id}, 201)
+            match = re.fullmatch(r"/api/v2/local-assets/([^/]+)/relink", path)
+            if method == "POST" and match:
+                asset_id = self.workbench.relink_asset(match.group(1), body.get("path", ""))
+                return self.response(handler, {"asset_id": asset_id})
             if method == "GET" and path == "/api/v2/content-items":
                 kind = query.get("type", [None])[0]
                 return self.response(handler, {"items": self.workbench.list_items(kind)})
@@ -322,9 +346,7 @@ class V2Application:
             row = conn.execute("SELECT * FROM wb_assets WHERE id=?", (asset_id,)).fetchone()
         if not row:
             raise DomainError("ASSET_NOT_FOUND", "资产不存在", 404)
-        path = (self.root / row["storage_key"]).resolve()
-        if self.root not in path.parents or not path.is_file():
-            raise DomainError("ASSET_FILE_MISSING", "资产文件不存在", 404, action="恢复文件或重新上传，不要把缺失当删除")
+        path = self.workbench.resolve_asset_path(row)
         size = path.stat().st_size
         start, end = 0, size - 1
         status = 200
