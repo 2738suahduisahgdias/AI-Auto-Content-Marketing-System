@@ -11,7 +11,7 @@ export type AudioSegment = {
 
 const mediaSource = (src: string) => /^(https?:|data:|blob:)/.test(src) ? src : staticFile(src);
 
-export const Narration: React.FC<{audio?: string; audioSegments?: AudioSegment[]}> = ({audio, audioSegments}) => {
+export const Narration: React.FC<{audio?: string; audioSegments?: AudioSegment[]; volume?: number}> = ({audio, audioSegments, volume = 1}) => {
   const {fps} = useVideoConfig();
   if (audioSegments?.length) {
     return <>
@@ -33,5 +33,5 @@ export const Narration: React.FC<{audio?: string; audioSegments?: AudioSegment[]
       ))}
     </>;
   }
-  return audio ? <Audio src={mediaSource(audio)} premountFor={fps} /> : null;
+  return audio ? <Audio src={mediaSource(audio)} volume={volume} premountFor={fps} /> : null;
 };

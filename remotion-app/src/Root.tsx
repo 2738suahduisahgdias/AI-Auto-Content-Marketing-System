@@ -14,6 +14,8 @@ import {KineticTextComposition} from "./ported/kinetic";
 const calculateMetadata: CalculateMetadataFunction<TalkingHeadProps> = ({ props }) => {
   return {
     durationInFrames: Math.max(1, Math.ceil(props.durationSeconds * 30)),
+    width: props.outputWidth || 1080,
+    height: props.outputHeight || 1920,
   };
 };
 

@@ -697,6 +697,20 @@ def create_task(payload):
                 source = {"type": "douyin_favorite_collection", "name": collection["name"],
                           "usage": collection["usage"], "url": snapshot["source"],
                           "captured_at": snapshot["captured_at"]}
+        if payload.get("article_id"):
+            article = conn.execute("SELECT * FROM wb_content_items WHERE id=? AND content_type='article'", (payload["article_id"],)).fetchone()
+            if not article:
+                raise ApiError(404, "原文章不存在")
+            active = parse_json(article["active_revisions_json"], {})
+            if active.get("draft") != payload.get("article_revision_id"):
+                raise ApiError(409, "文章版本已变化，请刷新后选择已保存正文")
+            revision_row = conn.execute("SELECT * FROM wb_revisions WHERE id=? AND item_id=?", (active.get("draft"), article["id"])).fetchone()
+            if not revision_row:
+                raise ApiError(409, "文章没有可用正文版本")
+            manual_content = parse_json(revision_row["payload_json"], {}).get("text", "")
+            if not manual_content.strip():
+                raise ApiError(409, "文章正文为空")
+            source.update({"type":"article_revision", "article_id":article["id"], "article_revision_id":revision_row["id"]})
         if not title or len(title) > 200:
             raise ApiError(400, "请输入 1～200 字的选题标题")
         if pillar not in ("enterprise_ai", "ai_learning", "ai_marketing", "personal_thinking"):
@@ -728,6 +742,205 @@ def create_task(payload):
         task = get_task(conn, content_id)
         record_stage_revision(conn, task, "content")
         return task
+
+
+def yingxu_content_signature(snapshot):
+    manuscript = snapshot.get('manuscript', {})
+    keys = ('title', 'text', 'desc', 'duration', 'source', 'fileId', 'referenceFileId')
+    return payload_hash({
+        'manuscript': {key: manuscript.get(key, '') for key in ('title', 'text')},
+        'shots': [{key: shot.get(key) for key in keys} for shot in snapshot.get('shots', [])],
+        'format': snapshot.get('format') or '1080 × 1920 · 竖屏',
+        'rhythm': snapshot.get('rhythm') or '音乐驱动 · 无旁白',
+        'voiceFileId': snapshot.get('voiceFileId'), 'bgmFileId': snapshot.get('bgmFileId'),
+    })
+
+
+def save_yingxu(task, payload):
+    """Persist the migrated editor on its existing task; preserve all other source fields."""
+    snapshot = payload.get("snapshot")
+    if not isinstance(snapshot, dict) or not isinstance(snapshot.get("shots", []), list):
+        raise ApiError(400, "视频编辑快照格式无效")
+    manuscript = snapshot.get("manuscript", {})
+    if not isinstance(manuscript, dict) or not isinstance(manuscript.get("text", ""), str):
+        raise ApiError(400, "文案格式无效")
+    if len(manuscript.get("text", "")) > 200000:
+        raise ApiError(400, "文案超过 20 万字符")
+    if len(json.dumps(snapshot, ensure_ascii=False)) > 1000000:
+        raise ApiError(413, "编辑快照过大；媒体必须通过文件接口保存")
+    for shot in snapshot.get("shots", []):
+        if not isinstance(shot, dict):
+            raise ApiError(400, "分镜格式无效")
+    with DB_LOCK, connect() as conn:
+        current = get_task(conn, task["content_id"])
+        source = current.get("source", {})
+        previous = source.get("yingxu", {})
+        if payload.get("revision") != previous.get("revision", 0):
+            raise ApiError(409, "另一个窗口已更新此任务，请重新读取后合并", "revision")
+        # Validate persisted media references against the original task's file records.
+        owned = {file["id"] for file in current["files"]}
+        for shot in snapshot.get("shots", []):
+            for key in ("fileId", "referenceFileId"):
+                if shot.get(key) is not None and shot[key] not in owned:
+                    raise ApiError(400, "素材不属于当前任务", key)
+        for key in ("voiceFileId", "bgmFileId"):
+            if snapshot.get(key) is not None and snapshot[key] not in owned:
+                raise ApiError(400, "音频不属于当前任务", key)
+        scripts, metadata = merge_manual_scripts(current.get("scripts", {}), current.get("script_meta", {}), {"master": manuscript.get("text", "")})
+        revision = previous.get("revision", 0) + 1
+        source["yingxu"] = {"revision": revision, "snapshot": snapshot}
+        if source.get("yingxu_handoff") and yingxu_content_signature(previous.get("snapshot", {})) != yingxu_content_signature(snapshot):
+            source["yingxu_handoff"]["stale"] = True
+        title = str(manuscript.get("title") or current["title"]).strip()[:200]
+        changed = {"source_json": json.dumps(source, ensure_ascii=False), "title": title,
+                   "scripts_json": json.dumps(scripts, ensure_ascii=False), "script_meta_json": json.dumps(metadata, ensure_ascii=False)}
+        if current["state"] in ("topic_approved", "script_drafted") and manuscript.get("text", "").strip():
+            changed["state"] = "script_drafted"
+        update_task(conn, task["content_id"], **changed)
+        revision_id = "stage_" + uuid.uuid4().hex
+        conn.execute("UPDATE stage_revisions SET status='superseded' WHERE content_id=? AND stage='yingxu' AND status='active'", (task["content_id"],))
+        conn.execute("INSERT INTO stage_revisions(id,content_id,stage,revision_no,payload_json,payload_hash,status,created_at) VALUES (?,?,?,?,?,?,?,?)",
+                     (revision_id, task["content_id"], "yingxu", revision, json.dumps(snapshot, ensure_ascii=False), payload_hash(snapshot), "active", now()))
+        add_event(conn, task["content_id"], "保存映序制作版本", "版本 {}".format(revision))
+        return get_task(conn, task["content_id"])
+
+
+def yingxu_script_candidate(task, payload):
+    """Reuse the original script agent and settings without replacing the saved manuscript."""
+    version = task.get('source', {}).get('yingxu', {}).get('revision', 0)
+    if payload.get('revision') != version:
+        raise ApiError(409, "文案版本已变化，请先保存")
+    if not get_ai_status().get('ready'):
+        raise ApiError(409, "请在原设置页完成脚本 Agent 的真实连接测试")
+    config = agent_runtime('script_agent')
+    try:
+        skill_prompt, _ = writing_context(config, PROJECT_ROOT)
+    except ValueError as error:
+        raise ApiError(409, str(error))
+    snapshot = task['source']['yingxu']['snapshot']
+    prompt = config['prompt'] + "\n" + build_script_prompt(task, ['master'], skill_prompt)
+    prompt += "\n本次写作要求：" + str(snapshot.get('manuscript', {}).get('prompt', ''))[:10000]
+    generated = validate_generated_scripts(run_kimi_agent_json(SCRIPT_AGENT_PATH, prompt, config['timeout_seconds'], detect_kimi()), ['master'])
+    return {'candidate': generated['master'], 'revision': version}
+
+
+def yingxu_render_props(task, preview=False):
+    snapshot = task.get("source", {}).get("yingxu", {}).get("snapshot", {})
+    shots = snapshot.get("shots", [])
+    if not shots:
+        raise ApiError(400, "请先保存至少一个分镜")
+    files = {f["id"]: f for f in task["files"]}
+    def media(file_id, extensions):
+        file = files.get(file_id)
+        if not file:
+            raise ApiError(400, "素材不属于当前任务，请重新上传并保存")
+        source = (ROOT / file["relative_path"]).resolve()
+        if ROOT.resolve() not in source.parents or not source.is_file() or source.suffix.lower() not in extensions:
+            raise ApiError(400, "素材丢失或格式不支持，请重新定位素材")
+        name = hashlib.sha256(source.read_bytes()).hexdigest() + source.suffix.lower()
+        directory = REMOTION_APP / "public-static" / "yingxu-assets"
+        directory.mkdir(parents=True, exist_ok=True)
+        target = directory / name
+        if not target.exists():
+            shutil.copyfile(source, target)
+        return "yingxu-assets/" + name, file
+    scenes, captions, elapsed = [], [], 0.0
+    for index, shot in enumerate(shots):
+        try:
+            duration = float(shot.get("duration", 0))
+        except (ValueError, TypeError):
+            raise ApiError(400, "分镜时长必须为有效秒数")
+        asset = None
+        if shot.get("fileId"):
+            src, file = media(shot["fileId"], {".mp4", ".mov", ".png", ".jpg", ".jpeg", ".webp"})
+            video = Path(file["relative_path"]).suffix.lower() in (".mp4", ".mov")
+            if video:
+                duration = float(file["media_info"].get("duration_seconds", 0))
+            asset = {"kind": "video" if video else "image", "src": src}
+        elif shot.get("source") != "Remotion 代码":
+            raise ApiError(400, "第 {} 镜需要先上传真实素材；AI 视频模型尚未接入，不能用示例图充当成片".format(index + 1))
+        if not 0 < duration <= 3600:
+            raise ApiError(400, "分镜时长须大于 0 且不超过 3600 秒")
+        end = elapsed + duration
+        scenes.append({"id": str(index), "name": shot.get("title", "分镜"), "headline": shot.get("title", ""),
+                       "start_seconds": elapsed, "end_seconds": end, "asset_type": "own",
+                       "description": shot.get("desc", ""), "narration": shot.get("text", ""), "media": asset})
+        captions.append({"text": shot.get("text", ""), "startMs": round(elapsed * 1000), "endMs": round(end * 1000), "timestampMs": None, "confidence": None})
+        elapsed = end
+    if elapsed > 3600:
+        raise ApiError(400, "当前本地渲染单次支持一小时以内视频")
+    props = {"title": snapshot.get("manuscript", {}).get("title", task["title"]), "scenes": scenes,
+             "captions": captions, "durationSeconds": min(10, elapsed) if preview else elapsed,
+             "outputWidth": 1920 if str(snapshot.get("format", "")).startswith("1920") else 1080,
+             "outputHeight": 1080 if str(snapshot.get("format", "")).startswith("1920") else 1920,
+             "appearance": {"background": "#faf8f4", "sceneBackground": "#fffaf2", "textColor": "#29231c", "accentColor": "#c26918", "titleBackground": "#fffdf8", "sceneLabelBackground": "#fff1df", "captionBackground": "#392b20", "captionColor": "#ffffff", "variant": "enterprise"}}
+    for key, field in (("voiceFileId", "audio"), ("bgmFileId", "backgroundMusic")):
+        if snapshot.get(key) and (key != "voiceFileId" or snapshot.get("rhythm") == "旁白驱动"):
+            props[field], _ = media(snapshot[key], {".mp3", ".wav", ".m4a"})
+    return props
+
+
+YINGXU_RENDER_LOCK = threading.Lock()
+
+
+def render_yingxu(task, payload):
+    if not YINGXU_RENDER_LOCK.acquire(blocking=False):
+        raise ApiError(409, "已有本地渲染正在运行，请完成后重试")
+    try:
+        version = task.get("source", {}).get("yingxu", {}).get("revision", 0)
+        if payload.get("revision") != version:
+            raise ApiError(409, "制作版本已变化，请刷新并保存后重试")
+        preview = payload.get("preview") is True
+        props = yingxu_render_props(task, preview)
+        if shutil.disk_usage(ROOT).free < 1024 ** 3:
+            raise ApiError(409, "剩余磁盘空间不足 1 GB，请清理缓存后重试")
+        directory = ROOT / "renders" / task["content_id"]
+        directory.mkdir(parents=True, exist_ok=True)
+        output = directory / ("yingxu-" + uuid.uuid4().hex + ".mp4")
+        try:
+            run_remotion_render(props, output, scale=0.5 if preview else 1)
+            probe_media(output, "video")
+            with DB_LOCK, connect() as conn:
+                current = get_task(conn, task["content_id"])
+                if current.get("source", {}).get("yingxu", {}).get("revision") != version:
+                    raise ApiError(409, "渲染期间制作版本变化，请按最新版本重试")
+                result = upload_file(current, "asset" if preview else "video", "yingxu-{}-v{}.mp4".format("preview" if preview else "final", version), output.read_bytes(), studio=True)
+            with DB_LOCK, connect() as conn:
+                result['media_info'].update({'yingxu_revision': version, 'yingxu_render_hash': payload_hash(props), 'yingxu_preview': preview})
+                conn.execute("UPDATE files SET media_info_json=? WHERE id=?", (json.dumps(result['media_info']), result['id']))
+                add_event(conn, task["content_id"], "映序本地渲染完成", "制作版本 {} · 文件 #{} · {}".format(version, result["id"], "样片" if preview else "成片"))
+            return result
+        finally:
+            output.unlink(missing_ok=True)
+    finally:
+        YINGXU_RENDER_LOCK.release()
+
+
+def handoff_yingxu(task, payload):
+    with DB_LOCK, connect() as conn:
+        current = get_task(conn, task["content_id"])
+        file_id = payload.get("file_id")
+        file = next((f for f in current["files"] if f["id"] == file_id and f["kind"] == "video"), None)
+        if not file:
+            raise ApiError(400, "请选择本任务的真实成片文件", "file_id")
+        path = (ROOT / file["relative_path"]).resolve()
+        if ROOT not in path.parents or not path.is_file():
+            raise ApiError(409, "成片文件缺失，请重新定位或上传")
+        source = current.get("source", {})
+        revision = source.get("yingxu", {}).get("revision", 0)
+        if payload.get("revision") != revision:
+            raise ApiError(409, "制作版本已变化，请刷新后提交")
+        rendered_hash = file.get('media_info', {}).get('yingxu_render_hash')
+        if rendered_hash and rendered_hash != payload_hash(yingxu_render_props(current)):
+            raise ApiError(409, "当前文案、素材或声音已与成片不同，请重新渲染后交付")
+        handoff = {"content_id": task["content_id"], "file_id": file_id, "file_sha256": file_sha256(path),
+                   "revision": revision, "status": "requires_review", "stale": False}
+        if all(source.get("yingxu_handoff", {}).get(k) == v for k, v in handoff.items()):
+            return current
+        source["yingxu_handoff"] = {**handoff, "created_at": now()}
+        update_task(conn, task["content_id"], source_json=json.dumps(source, ensure_ascii=False))
+        add_event(conn, task["content_id"], "交付发布工作区", "文件 {} · 制作版本 {} · 等待人工审核，不执行发布".format(file_id, revision))
+        return get_task(conn, task["content_id"])
 
 
 def save_scripts(task, payload):
@@ -1593,12 +1806,12 @@ def save_voice_sample(name, filename, authorized, body):
     return result
 
 
-def upload_file(task, kind, filename, body):
+def upload_file(task, kind, filename, body, studio=False):
     if kind not in UPLOADS:
         raise ApiError(400, "上传类型无效", "file", "从当前页面的上传按钮重新选择文件，不要调用其他类型的上传接口。")
     states = {"audio": ("script_approved", "waiting_audio"), "srt": ("script_approved", "waiting_audio"),
               "asset": ("transcribed", "assets_planned"), "video": ("assets_approved", "rendered")}
-    if kind != "cover":
+    if kind != "cover" and not studio:
         require_state(task, *states[kind])
     if not body:
         raise ApiError(400, "不能上传空文件", "file", "重新选择非空且可读取的文件后上传。")
@@ -1616,7 +1829,13 @@ def upload_file(task, kind, filename, body):
     temporary = path.with_suffix(path.suffix + ".uploading")
     try:
         temporary.write_bytes(body)
-        info = probe_media(temporary, kind)
+        probe_kind = kind
+        if studio and kind == "asset":
+            if Path(filename).suffix in (".mp4", ".mov"):
+                probe_kind = "video"
+            elif Path(filename).suffix in (".mp3", ".wav", ".m4a"):
+                probe_kind = "audio"
+        info = probe_media(temporary, probe_kind)
         temporary.replace(path)
     except Exception:
         temporary.unlink(missing_ok=True)
@@ -1635,7 +1854,7 @@ def upload_file(task, kind, filename, body):
         add_event(conn, task["content_id"], "上传文件", "{} · {}".format(kind, filename))
         row = conn.execute("SELECT * FROM files WHERE id=?", (file_id,)).fetchone()
         result = file_dict(row)
-    if kind == "audio":
+    if kind == "audio" and not studio:
         auto_transcribe_async(task["content_id"], file_id)
     return result
 
@@ -2834,6 +3053,37 @@ class Handler(BaseHTTPRequestHandler):
                     task = get_task(conn, render_match.group(1))
                 self.json_response(render_task(task, self.read_json()))
                 return
+            yingxu_candidate = re.fullmatch(r"/api/tasks/(\d{8}-\d{3})/yingxu-script-candidate", path)
+            if yingxu_candidate:
+                with connect() as conn:
+                    task = get_task(conn, yingxu_candidate.group(1))
+                self.json_response(yingxu_script_candidate(task, self.read_json()))
+                return
+            yingxu_render = re.fullmatch(r"/api/tasks/(\d{8}-\d{3})/yingxu-render", path)
+            if yingxu_render:
+                with connect() as conn:
+                    task = get_task(conn, yingxu_render.group(1))
+                self.json_response(render_yingxu(task, self.read_json()))
+                return
+            studio_upload = re.fullmatch(r"/api/tasks/(\d{8}-\d{3})/yingxu-files", path)
+            if studio_upload:
+                query = parse_qs(urlsplit(self.path).query)
+                length = int(self.headers.get("Content-Length", "0"))
+                if length <= 0 or length > MAX_UPLOAD:
+                    raise ApiError(413, "文件为空或超过当前接口 500MB 上限")
+                with connect() as conn:
+                    task = get_task(conn, studio_upload.group(1))
+                body = self.rfile.read(length)
+                if len(body) != length:
+                    raise ApiError(400, "文件上传不完整")
+                self.json_response(upload_file(task, query.get("kind", ["asset"])[0], query.get("filename", [""])[0], body, studio=True), 201)
+                return
+            handoff = re.fullmatch(r"/api/tasks/(\d{8}-\d{3})/yingxu-handoff", path)
+            if handoff:
+                with connect() as conn:
+                    task = get_task(conn, handoff.group(1))
+                self.json_response(handoff_yingxu(task, self.read_json()))
+                return
             if path == "/api/tasks":
                 self.json_response(create_task(self.read_json()), 201)
                 return
@@ -2881,6 +3131,12 @@ class Handler(BaseHTTPRequestHandler):
             self.authenticate_legacy(path)
             if V2 and V2.matches(path):
                 return V2.handle(self, "PUT", path, parse_qs(urlsplit(self.path).query))
+            studio = re.fullmatch(r"/api/tasks/(\d{8}-\d{3})/yingxu", path)
+            if studio:
+                with connect() as conn:
+                    task = get_task(conn, studio.group(1))
+                self.json_response(save_yingxu(task, self.read_json()))
+                return
             match = re.fullmatch(r"/api/tasks/(\d{8}-\d{3})/(scripts|assets|quality|publications|metrics|subtitles)", path)
             if not match:
                 raise ApiError(404, "接口不存在")

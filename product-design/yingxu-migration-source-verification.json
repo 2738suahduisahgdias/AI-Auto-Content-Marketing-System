@@ -1,0 +1,30 @@
+{
+  "baseline": "fd724d7992a322bb08fe091386627746e382e02b",
+  "unchanged_count": 160,
+  "changed_original_files": [
+    "app.py",
+    "remotion-app/scripts/render.mjs",
+    "remotion-app/src/Root.tsx",
+    "remotion-app/src/VideoComposition.tsx",
+    "remotion-app/src/narration.tsx",
+    "webapp/src/pages/Articles.tsx",
+    "webapp/src/pages/Publish.tsx"
+  ],
+  "yingxu_original_archive_verified": true,
+  "active_entry": "main.tsx -> original AppProvider/AppShell/App -> YingxuVideoWorkspace -> BoundYingxu (whole video route; no legacy Tasks UI)",
+  "standalone_demo": "archived, unreachable",
+  "production_database": "untouched; preview uses isolated copy on port 8876",
+  "scope": "原 pages/components/content_workbench/app.py/remotion-app/src 及 render.mjs 共167个文件",
+  "template_preview_hashes": {
+    "founder-ip-1.0.0.png": "fee897add2a9eda9e1bc8be95a53c641275b6e30669cdc970c7b7257dac55a74",
+    "tech-showcase-1.0.0.png": "f727af74fd40507441cc0a756daf3c4639bcb5b25122faec2f7ec59d659cfd86",
+    "warm-story-0.1.0.png": "569ab446f0c093edbdd661e0f03e872ff56a06684b5db65b09ef8ccc7aae6050",
+    "kinetic-text-1.0.0.png": "6037ce8aa5197dae6bbc30cab2474db7c6f7b2f8ca242b3de8400026301fefef",
+    "data-story-1.0.0.png": "8fde408e3df5b29d279399459adaa587c2512aa764b0f2313eb5748584de544a",
+    "karaoke-caption-1.0.0.png": "2ce14af56a9de556c0fb561939ecffb843c730f9d4fb804efdf09977953f9d35",
+    "map-story-1.0.0.png": "ea0e6253055b5ecb833d553375fedec43bf75e88798775571d6b8aaa9d27ba25",
+    "audiogram-1.0.0.png": "192cb330425bee1807209bce3277960670c2f23a7455514f732d7e5bf459e41e",
+    "promo-1.0.0.png": "86b3b7145998753d36de0dd8188871461bf586a476857706c637faaab8f4fa46",
+    "enterprise-explainer-1.0.0.png": "44f1bf38cc91797f9c39e59b4f8e892aa67f00f6511ed491819eee7b2cea561b"
+  }
+}

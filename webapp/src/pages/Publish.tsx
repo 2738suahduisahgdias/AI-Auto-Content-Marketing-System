@@ -84,7 +84,10 @@ export default function Publish() {
     await loadQueue();
   };
 
+  const handoffs=(resources?.core.tasks||[]).filter((task:any)=>task.source?.yingxu_handoff);
   return <div className="publish-page">
+    {handoffs.length>0&&<Card><h2>视频制作交付 · 待审核</h2>{handoffs.map((task:any)=>{const h=task.source.yingxu_handoff;return <div className="migration-toolbar" key={task.content_id}><strong>{task.title}</strong><span>{task.content_id} · 文件 #{h.file_id} · 制作版本 {h.revision} · {h.stale?'制作已修改，需重新交付':'等待审核，尚未发布'}</span><a className="button" href={'/api/files/'+h.file_id+'/media'} target="_blank" rel="noreferrer">查看成片</a><Link className="button" to={'/tasks/'+task.content_id}>返回制作</Link><Link className="button" to="/review">进入原审核中心</Link></div>})}</Card>}
+
     <PageHeader eyebrow="HUMAN-CONFIRMED DISTRIBUTION" title="发布中心" description="按“内容版本 × 平台”管理发布目标。队列选择、逐平台编辑、预览和公开确认均保留真实证据。" />
     <div className="publish-kind-tabs" role="tablist" aria-label="发布内容类型"><button role="tab" aria-selected={kind === "article"} className={`publish-kind-tab${kind === "article" ? " active" : ""}`} onClick={() => chooseKind("article")}><FileText size={14} /> 文章发布</button><button role="tab" aria-selected={kind === "video"} className={`publish-kind-tab${kind === "video" ? " active" : ""}`} onClick={() => chooseKind("video")}><Film size={14} /> 视频发布</button></div>
     {kind === "video" && <section className="publish-queue-layout">

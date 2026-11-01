@@ -1,0 +1,47 @@
+/* Presentation only: original Topics handlers, fields and services are unchanged. */
+.yd-original-topics{--paper:var(--surface,#fff);--blue:var(--accent,#b85b0b);--muted:var(--secondary,#62605c);--red:#b42318;min-width:0}
+.yd-original-topics .page-header{padding:24px 0;gap:20px;align-items:flex-start;border:0;flex-wrap:wrap}
+.yd-original-topics .page-header h1{font-family:inherit;font-size:28px;letter-spacing:-.03em}
+.yd-original-topics .eyebrow{font-size:10px;letter-spacing:.12em;color:var(--accent)}
+.yd-original-topics .page-description{max-width:640px;font-size:13px;line-height:1.7}
+.yd-original-topics .page-actions{display:flex;gap:8px;flex-wrap:wrap}
+.yd-original-topics .card{background:var(--surface,#fff);border:1px solid var(--line);border-radius:12px;box-shadow:0 2px 10px #30201005;padding:20px}
+.yd-original-topics .button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;border:1px solid var(--line);border-radius:8px;background:var(--surface,#fff);color:var(--ink);padding:8px 12px;font:500 12px inherit;cursor:pointer;transition:background .15s,box-shadow .15s}
+.yd-original-topics .button:hover:not(:disabled){background:var(--tint);border-color:var(--accent)}
+.yd-original-topics .button-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.yd-original-topics .button-primary:hover:not(:disabled){background:var(--accent-strong)}
+.yd-original-topics .button:disabled{opacity:.5;cursor:wait}
+.yd-original-topics .button-danger{color:var(--red)}
+.yd-original-topics .topic-layout{grid-template-columns:minmax(0,1fr) 300px;gap:24px}
+.yd-original-topics .topic-side{top:88px;max-height:calc(100vh - 112px);overflow:auto;padding:2px 4px 12px}
+.yd-original-topics .topic-intro{padding:16px 0;margin-bottom:20px}
+.yd-original-topics :is(.topic-intro h2,.topic-recommendation h3){font-family:inherit;font-size:18px}
+.yd-original-topics .topic-subtabs{padding:4px;background:var(--soft);border:1px solid var(--line);border-radius:10px;gap:4px}
+.yd-original-topics .topic-filter{border:0;border-radius:7px;padding:9px 13px;font-size:12px}
+.yd-original-topics .topic-filter.active{background:var(--tint);color:var(--accent);box-shadow:0 1px 3px #00000009}
+.yd-original-topics .topic-filter:hover{background:var(--tint)}
+.yd-original-topics :is(.topic-sync-summary,.topic-evidence,.topic-detail-report){background:var(--soft);border:1px solid var(--line);color:var(--secondary);border-radius:8px;padding:14px;font-size:12px;line-height:1.7}
+.yd-original-topics .topic-evidence{border-left:3px solid var(--gold,#b59a60)}
+.yd-original-topics .topic-job{background:var(--surface);border-radius:10px;padding:16px}
+.yd-original-topics :is(.topic-hot-list,.wechat-message-card){border-radius:12px;background:var(--surface)}
+.yd-original-topics .topic-hot-item{padding:16px;border-radius:0;box-shadow:none}
+.yd-original-topics .topic-research-card{padding:0}
+.yd-original-topics .topic-video-grid-compact{grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px}
+.yd-original-topics .topic-video-grid-compact .topic-research-body{padding:16px}
+.yd-original-topics .topic-video-grid-compact .topic-research-body>h3{font-size:14px;line-height:1.55;min-height:44px}
+.yd-original-topics :is(.topic-captured,.topic-time,.topic-hot-copy small){font-size:11px}
+.yd-original-topics :is(.topic-author>span,.wechat-snapshot-source>span){background:var(--tint);color:var(--accent)}
+.yd-original-topics .field{margin-bottom:16px}
+.yd-original-topics .field-label{font-size:12px;color:var(--secondary);margin-bottom:7px}
+.yd-original-topics :is(.input,.textarea,select){width:100%;min-height:38px;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font:inherit;background:var(--surface)}
+.yd-original-topics .badge{border-radius:6px;padding:4px 7px;font-size:10px}
+.yd-original-topics :is(.badge-blue,.badge-orange){background:var(--tint);color:var(--accent)}
+.yd-original-topics .empty{border:1px dashed var(--line);border-radius:12px;background:var(--soft);padding:40px 20px}
+.yd-original-topics .error-box{border-radius:10px;padding:16px;background:#fff3ed;color:#9f3414}
+/* Radix portals live outside the workbench. Scope only while original Topics is mounted. */
+body:has(.yd-original-topics) .modal{background:#fffdfa;color:#1a1a1a;border:1px solid #e7e5e4;border-radius:16px;box-shadow:0 24px 80px #30201029;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;--accent:#b85b0b;--line:#e7e5e4;--paper:#fffdfa;--ink:#1a1a1a;--muted:#62605c}
+body:has(.yd-original-topics) .modal :is(input,textarea,select,.button){border-radius:8px}
+body:has(.yd-original-topics) .modal .button-primary{background:#b85b0b;border-color:#b85b0b;color:#fff}
+body:has(.yd-original-topics) .modal :is(button,input,textarea,select):focus-visible{outline:2px solid #b85b0b;outline-offset:3px}
+@media(max-width:1100px){.yd-original-topics .topic-layout{grid-template-columns:1fr}.yd-original-topics .topic-side{position:static;max-height:none}.yd-original-topics .topic-hot-item{grid-template-columns:30px minmax(0,1fr)}.yd-original-topics .topic-hot-item .topic-card-actions{grid-column:2;flex-wrap:wrap}}
+@media(max-width:720px){.yd-original-topics :is(.topic-recommendations,.wechat-inbox-grid,.wechat-columns){grid-template-columns:1fr}.yd-original-topics .page-actions{width:100%}}

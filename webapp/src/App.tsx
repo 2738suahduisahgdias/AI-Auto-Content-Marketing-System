@@ -10,6 +10,7 @@ const Competitors = lazy(() => import("@/pages/Competitors"));
 const SocialData = lazy(() => import("@/pages/SocialData"));
 const Retrospective = lazy(() => import("@/pages/Retrospective"));
 const Articles = lazy(() => import("@/pages/Articles"));
+const YingxuVideoWorkspace = lazy(() => import("./migration/YingxuVideoWorkspace"));
 const Tasks = lazy(() => import("@/pages/Tasks"));
 const Review = lazy(() => import("@/pages/Review"));
 const Publish = lazy(() => import("@/pages/Publish"));
@@ -19,7 +20,7 @@ const PublishKnowledge = lazy(() => import("@/pages/PublishKnowledge"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const Setup = lazy(() => import("@/pages/Setup"));
 
-export default function App() {
+export default function App({migratedVideo=false}:{migratedVideo?:boolean}) {
   return <AppShell><Suspense fallback={<Busy />}><Routes>
     <Route path="/" element={<Today />} />
     <Route path="/topics/:source" element={<Topics />} />
@@ -28,7 +29,7 @@ export default function App() {
     <Route path="/social" element={<SocialData />} />
     <Route path="/retrospective" element={<Retrospective />} />
     <Route path="/articles/:id?" element={<Articles />} />
-    <Route path="/tasks/:id?" element={<Tasks />} />
+    <Route path="/tasks/:id?" element={migratedVideo ? <YingxuVideoWorkspace /> : <Tasks />} />
     <Route path="/review" element={<Review />} />
     <Route path="/publish" element={<Publish />} />
     <Route path="/knowledge" element={<Knowledge />} />

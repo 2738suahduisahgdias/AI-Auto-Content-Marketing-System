@@ -42,6 +42,9 @@ export type TalkingHeadProps = {
   title: string;
   scenes: TalkingHeadScene[];
   audio?: string;
+  backgroundMusic?: string;
+  outputWidth?: number;
+  outputHeight?: number;
   audioSegments?: AudioSegment[];
   captions: Caption[];
   durationSeconds: number;
@@ -72,6 +75,7 @@ export const VideoComposition: React.FC<TalkingHeadProps> = ({
   scenes,
   audio,
   audioSegments,
+  backgroundMusic,
   captions,
   appearance,
 }) => {
@@ -80,6 +84,7 @@ export const VideoComposition: React.FC<TalkingHeadProps> = ({
   return (
     <div style={{position: "absolute", inset: 0, background: theme.background}}>
       <Narration audio={audio} audioSegments={audioSegments} />
+      <Narration audio={backgroundMusic} volume={0.18} />
       {scenes.map((scene) => (
         <Sequence
           key={scene.id}

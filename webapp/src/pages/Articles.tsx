@@ -121,7 +121,7 @@ export default function Articles() {
   const canEdit = Boolean(selected) && !hasActiveJob;
 
   return <div className="articles-page">
-    <PageHeader eyebrow="EDITORIAL WORKFLOW" title="文章任务" description="真实需求、论证大纲、完整正文与人工审批。文章独立生产，不依赖音频、字幕或视频渲染。" actions={<><Button onClick={() => void createSample()} disabled={Boolean(busy)}><FileText size={15} />创建规范样例</Button><Button variant="primary" onClick={() => setCreateOpen(true)} disabled={Boolean(busy)}><Plus size={16} />新建文章</Button></>} />
+    <PageHeader eyebrow="EDITORIAL WORKFLOW" title="文章任务" description="真实需求、论证大纲、完整正文与人工审批。文章独立生产，不依赖音频、字幕或视频渲染。" actions={<><Button disabled={!selected||!draft||Boolean(busy)||draftText!==String(draft?.payload.text||'')} onClick={()=>{if(!selected||!draft)return;void run<any>(()=>api('/api/tasks',jsonOptions('POST',{title:selected.campaign.title,article_id:selected.id,article_revision_id:draft.id,source_type:'article',pillar:'enterprise_ai',audience:'business_owners'})),'已从保存的文章版本创建视频任务').then(task=>{if(task)void refresh().then(()=>navigate('/tasks/'+task.content_id))})}}>从已保存正文制作视频</Button><Button onClick={() => void createSample()} disabled={Boolean(busy)}><FileText size={15} />创建规范样例</Button><Button variant="primary" onClick={() => setCreateOpen(true)} disabled={Boolean(busy)}><Plus size={16} />新建文章</Button></>} />
     <div className="article-workspace">
       <Card className="article-sidebar">
         <div className="article-sidebar-head"><strong>全部文章</strong><span>{items.length} 篇</span></div>

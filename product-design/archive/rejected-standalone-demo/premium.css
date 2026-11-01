@@ -92,3 +92,22 @@
 .yd-root[data-design="bone"] .yd-track:last-child{background:var(--gold-soft);color:#806638}
 .yd-root[data-design="bone"] .yd-onboard button.active{background:var(--tint);border-color:#d8a671;color:var(--accent)}
 .yd-root[data-design="bone"] .yd-project-cover.cover1{background:#ece7de;color:#73614b}
+
+/* Complete the shared palette, including inherited original-system widgets. */
+.yd-root[data-design="bone"]{--panel:#fff;--paper:#f9f8f6;--blue:#b85b0b;--blue-soft:#fff1df;--accent-dark:#974709;--yellow:#f3ead8}
+.yd-root[data-design="bone"] .yd-muted{color:#68615a!important}
+.yd-root[data-design="bone"] .yd-tabs{background:#efece6}
+.yd-root[data-design="bone"] .yd-original-topics{--muted:#68615a;--panel:#fff;--paper:#fff;--blue:#b85b0b;--blue-soft:#fff1df;--accent-dark:#974709}
+.yd-root[data-design="bone"] .yd-original-topics :is(.topic-sync-summary,.topic-evidence,.topic-detail-report,.topic-job){background:#fcfaf6;border-color:#e7e5e4;color:#68615a}
+.yd-root[data-design="bone"] .yd-original-topics :is(.topic-research-cover-native,.wechat-snapshot-cover){background:#f0ebe3}
+.yd-root[data-design="bone"] .yd-original-topics :is(.topic-author>span,.wechat-snapshot-source>span,.topic-guide code){background:#f3ead8;color:#80652f}
+.yd-root[data-design="bone"] .yd-original-topics :is(.badge-green,.badge-blue,.badge-orange){background:#fff1df;color:#974709;border-color:#edcfaa}
+.yd-root[data-design="bone"] .yd-original-topics .progress{background:#efece6}
+.yd-root[data-design="bone"] .yd-original-topics .progress>span{background:#b85b0b}
+.yd-root[data-design="bone"] .yd-original-topics :is(.topic-analysis-mark,.wechat-snapshot-mark){background:#45382be8;color:#fff}
+.yd-root[data-design="bone"] .yd-original-topics .topic-filter.active{background:#fff1df;color:#974709}
+.yd-root[data-design="bone"] .yd-original-topics .button-primary{background:#b85b0b;color:#fff;border-color:#b85b0b}
+.yd-root[data-design="bone"] .yd-original-topics .button-primary:hover:not(:disabled){background:#974709;color:#fff}
+body:has(.yd-root[data-design="bone"] .yd-original-topics) .modal{--blue:#b85b0b;--blue-soft:#fff1df;--panel:#fff;--accent-dark:#974709}
+body:has(.yd-root[data-design="bone"] .yd-original-topics) .modal :is(.topic-detail-report,.topic-evidence){background:#fcfaf6;color:#68615a;border-color:#e7e5e4}
+body:has(.yd-root[data-design="bone"] .yd-original-topics) .modal :is(.badge-green,.badge-blue){background:#fff1df;color:#974709}

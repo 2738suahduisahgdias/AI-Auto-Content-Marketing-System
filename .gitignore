@@ -41,3 +41,9 @@ webapp/tsconfig.tsbuildinfo
 
 # Local-only migration preview build; production bundle remains untouched.
 web/demo-dist/
+
+# Local migration verification bundle
+webapp/dist/
+
+# Content-addressed render copies; original media remains in local task storage
+remotion-app/public-static/yingxu-assets/

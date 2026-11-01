@@ -2,7 +2,7 @@ import {bundle} from '@remotion/bundler';
 import {renderMedia, renderStill, selectComposition} from '@remotion/renderer';
 import {createHash} from 'node:crypto';
 import {existsSync} from 'node:fs';
-import {mkdir, readFile, readdir} from 'node:fs/promises';
+import {cp, mkdir, readFile, readdir} from 'node:fs/promises';
 import path from 'node:path';
 
 const root = process.cwd();
@@ -40,6 +40,10 @@ const serveUrl = bundleExists ? bundleDir : await bundle({
   enableCaching: true,
   onProgress: progress => console.log(JSON.stringify({stage: 'bundle', progress})),
 });
+
+// Migrated task media can be added after a compiled bundle is cached.
+const yingxuAssets = path.join(root, 'public-static', 'yingxu-assets');
+if (existsSync(yingxuAssets)) await cp(yingxuAssets, path.join(bundleDir, 'public', 'yingxu-assets'), {recursive: true});
 
 const props = JSON.parse(await readFile(propsPath, 'utf8'));
 const composition = await selectComposition({serveUrl, id: compositionId, inputProps: props});

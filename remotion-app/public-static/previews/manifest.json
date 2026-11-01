@@ -1,0 +1,12 @@
+{
+  "founder-ip@1.0.0": "/api/video-templates/founder-ip@1.0.0/preview",
+  "enterprise-explainer@1.0.0": "/api/video-templates/enterprise-explainer@1.0.0/preview",
+  "warm-story@0.1.0": "/api/video-templates/warm-story@0.1.0/preview",
+  "promo@1.0.0": "/api/video-templates/promo@1.0.0/preview",
+  "tech-showcase@1.0.0": "/api/video-templates/tech-showcase@1.0.0/preview",
+  "data-story@1.0.0": "/api/video-templates/data-story@1.0.0/preview",
+  "audiogram@1.0.0": "/api/video-templates/audiogram@1.0.0/preview",
+  "map-story@1.0.0": "/api/video-templates/map-story@1.0.0/preview",
+  "karaoke-caption@1.0.0": "/api/video-templates/karaoke-caption@1.0.0/preview",
+  "kinetic-text@1.0.0": "/api/video-templates/kinetic-text@1.0.0/preview"
+}
