@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -65,6 +65,7 @@ const generatedJob = {
 
 describe("PublishingPanel", () => {
   beforeEach(() => {
+    cleanup();
     apiMock.mockReset();
     notifyMock.mockReset();
     let generated = false;
@@ -122,4 +123,11 @@ describe("PublishingPanel", () => {
     expect(screen.queryByText(/最多 300 字/)).not.toBeInTheDocument();
     expect(screen.queryByText(/最多 5000 字/)).not.toBeInTheDocument();
   });
+  it("blocks public confirmation when the runtime executor is disabled", async () => {
+    apiMock.mockResolvedValue({execution_enabled:false,field_jobs:[],batch:{id:"batch",source_hash:"hash",targets:[{id:"target",platform:"xiaohongshu",status:"ready",payload:{title:"验收",body:"正文"}}]}});
+    render(<MemoryRouter><PublishingPanel kind="article" source={{id:"article-1",title:"验收",body:"正文"}} /></MemoryRouter>);
+    await waitFor(()=>expect(screen.getByRole("button",{name:/确认公开发布/})).toHaveAttribute("title","当前环境未启用自动公开发布，请在平台后台人工确认"));
+    expect(screen.getByRole("button",{name:/确认公开发布/})).toBeDisabled();
+  });
+
 });

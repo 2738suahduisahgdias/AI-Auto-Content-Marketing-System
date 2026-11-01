@@ -106,10 +106,17 @@ class PublishingExecutors:
                              "agent_supplement": config["prompt"]}, ensure_ascii=False)
         context.progress("model_generate", 0.15)
         agent = PROJECT_ROOT / "agents" / "publish-fields-agent.md"
-        stdout, _ = context.run_process([LocalExecutors(self.service.workbench).kimi(), "--agent-file", str(agent), "-p", prompt,
-                                         "--output-format", "stream-json"], timeout=config["timeout_seconds"], stage="kimi_cli", cwd=self.root)
-        fields = self.validate_generated_fields(kind, platforms, self.model_payload(stdout))
-        return {"platforms": fields, "provider": "kimi_cli", "model": "unpinned", "auto_saved": False, "auto_published": False}
+        if config["engine"] == "codex_cli":
+            from content_workbench.providers.text import CodexCLIProvider
+            payload = CodexCLIProvider().complete_json(prompt, context, agent, timeout=config["timeout_seconds"])
+            provider = "codex_cli"
+        else:
+            stdout, _ = context.run_process([LocalExecutors(self.service.workbench).kimi(), "--agent-file", str(agent), "-p", prompt,
+                                             "--output-format", "stream-json"], timeout=config["timeout_seconds"], stage="kimi_cli", cwd=self.root)
+            payload = self.model_payload(stdout)
+            provider = "kimi_cli"
+        fields = self.validate_generated_fields(kind, platforms, payload)
+        return {"platforms": fields, "provider": provider, "model": "unpinned", "auto_saved": False, "auto_published": False}
 
     def profile(self, platform):
         if platform in ("douyin", "xiaohongshu"):

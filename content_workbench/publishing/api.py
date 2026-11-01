@@ -24,6 +24,7 @@ class PublishingAPI:
             return self.app.response(handler, self.service.publication_queue())
         if method == "GET" and path == "/api/publishing/bootstrap":
             data = self.service.bootstrap(query.get("kind", [None])[0], query.get("source_id", [None])[0], query.get("source_file_id", [None])[0])
+            data["execution_enabled"] = getattr(self.app, "publishing_execution_enabled", True)
             data["csrf_token"] = self.app.csrf(self.app.cookie(handler))
             return self.app.response(handler, data)
         if method == "GET" and path == "/api/publishing/retrospective":
@@ -40,6 +41,8 @@ class PublishingAPI:
             return self.app.response(handler, {"jobs": jobs}, 202)
         match = re.fullmatch(r"/api/publishing/batches/([^/]+)/confirm", path)
         if method == "POST" and match:
+            if not getattr(self.app, "publishing_execution_enabled", True):
+                raise DomainError("PUBLISH_EXECUTOR_DISABLED", "当前环境未启用公开发布执行器，请在平台后台人工审核并发布", 409)
             jobs = self.service.confirm(match.group(1), body.get("source_hash"), body.get("platforms"), "local_user",
                                         handler.headers.get("Idempotency-Key"))
             return self.app.response(handler, {"jobs": jobs, "final_confirmation": "recorded"}, 202)

@@ -85,6 +85,7 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState("");
+  const [executionEnabled,setExecutionEnabled]=useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [dirtyPlatforms, setDirtyPlatforms] = useState<Set<string>>(new Set());
   const dirty = useRef(new Set<string>());
@@ -98,8 +99,9 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
     if (!sourceId) return;
     if (!silent) setLoading(true);
     try {
-      const data = await api<{ batch: PublishBatch | null; field_jobs: Job[] }>(`/api/publishing/bootstrap?kind=${kind}&source_id=${encodeURIComponent(sourceId)}${sourceFileId ? `&source_file_id=${sourceFileId}` : ""}`);
+      const data = await api<{ batch: PublishBatch | null; field_jobs: Job[]; execution_enabled?: boolean }>(`/api/publishing/bootstrap?kind=${kind}&source_id=${encodeURIComponent(sourceId)}${sourceFileId ? `&source_file_id=${sourceFileId}` : ""}`);
       setBatch(data.batch);
+      setExecutionEnabled(data.execution_enabled !== false);
       setFieldJobs(data.field_jobs || []);
       const currentSource = { id: sourceId, title: sourceTitle, body: sourceBody };
       setForms(current => Object.fromEntries(platforms.map(platform => {
@@ -290,13 +292,13 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
       <div className="button-row">
         <Button disabled={Boolean(busy)} onClick={() => void saveBatch()}><Save size={15} />{busy === "save" ? "正在保存…" : `保存${kind === "article" ? "文章" : "视频"}批次`}</Button>
         <Button disabled={Boolean(busy) || !batch || !selectedPreparable.length || hasDirtySelection} title={!batch ? "先保存发布批次" : hasDirtySelection ? "先保存当前修改" : !selectedPreparable.length ? "选中的平台没有待预览或失败目标" : undefined} onClick={() => void execute("prepare", () => api(`/api/publishing/batches/${batch?.id}/prepare`, jsonOptions("POST", { platforms: selectedPreparable.map(target => target.platform) })), "平台预览已加入后台队列，不会公开发布")}>{busy === "prepare" ? "正在提交…" : "打开后台并预填选中平台"}</Button>
-        <Button variant="primary" disabled={Boolean(busy) || !selectedReady.length || hasDirtySelection} title={hasDirtySelection ? "先保存修改并重新生成受影响平台预览" : !selectedReady.length ? "至少一个选中平台必须已完成真实预览" : "对所有选中的就绪平台进行一次公开确认"} onClick={() => setConfirmOpen(true)}><Send size={15} />确认公开发布{selectedReady.length ? `（${selectedReady.length}）` : ""}</Button>
+        <Button variant="primary" disabled={!executionEnabled || Boolean(busy) || !selectedReady.length || hasDirtySelection} title={!executionEnabled ? "当前环境未启用自动公开发布，请在平台后台人工确认" : hasDirtySelection ? "先保存修改并重新生成受影响平台预览" : !selectedReady.length ? "至少一个选中平台必须已完成真实预览" : "对所有选中的就绪平台进行一次公开确认"} onClick={() => setConfirmOpen(true)}><Send size={15} />确认公开发布{selectedReady.length ? `（${selectedReady.length}）` : ""}</Button>
       </div>
     </div>
     <Modal open={confirmOpen} onOpenChange={setConfirmOpen} title="一次人工确认：即将公开发布" description="这不是预览。请确认你已在各平台窗口检查账号、正文、封面、上传进度和平台提示。">
       <div className="publishing-confirm-list">{selectedReady.map(target => <div key={target.id}><Badge tone="orange">{platformNames[target.platform]}</Badge><span>{forms[target.platform]?.values.title || forms[target.platform]?.values.short_title}</span></div>)}</div>
       <ErrorBox>发布后平台结果可能失败或无法确认。无法确认时必须先去平台后台核对，不能直接重试。</ErrorBox>
-      <div className="button-row publishing-modal-actions"><Button onClick={() => setConfirmOpen(false)}>返回检查</Button><Button variant="primary" disabled={Boolean(busy)} onClick={() => { setConfirmOpen(false); void execute("confirm", () => api(`/api/publishing/batches/${batch?.id}/confirm`, jsonOptions("POST", { source_hash: batch?.source_hash, platforms: selectedReady.map(target => target.platform) })), "公开发布已确认，正在逐平台执行"); }}>我已完成预览检查，确认公开</Button></div>
+      <div className="button-row publishing-modal-actions"><Button onClick={() => setConfirmOpen(false)}>返回检查</Button><Button variant="primary" disabled={!executionEnabled || Boolean(busy)} onClick={() => { setConfirmOpen(false); void execute("confirm", () => api(`/api/publishing/batches/${batch?.id}/confirm`, jsonOptions("POST", { source_hash: batch?.source_hash, platforms: selectedReady.map(target => target.platform) })), "公开发布已确认，正在逐平台执行"); }}>我已完成预览检查，确认公开</Button></div>
     </Modal>
   </section>;
 }

@@ -25,3 +25,10 @@
 - 小红书当前账号本次验证上传 3 张；适配器上限按观察到的编辑器 18 张限制。平台改版仍可能需要维护。
 - 图片数量与文本自动回读不代替人工核对账号、图片内容与授权。公开发布仍需人工。
 - 搜图来源当前仅 Wikimedia Commons；Codex 是否可生图取决于本机登录、工具可用性和账户额度。
+
+## 发布字段与执行能力补充验收
+
+- 发布 Agent 支持并默认选择 Codex CLI，保留原 Kimi 配置兼容；当前隔离 demo 已切换 Codex 并启用 publish.fields worker。
+- 真正执行 job_eb2e71e9ac0f46bf8c64：Codex 返回小红书标题、正文、描述、话题，任务 succeeded，auto_saved=false、auto_published=false；未调用公众号。
+- bootstrap 返回 execution_enabled；隔离环境为 false。前端禁用公开发布按钮，后端 confirm 在变更批次或入队前返回 PUBLISH_EXECUTOR_DISABLED，避免永远排队。
+- 本轮相关后端 29 项通过；前端全量 33 文件、58 项通过；TypeScript 检查通过。

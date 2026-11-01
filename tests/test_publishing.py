@@ -213,7 +213,7 @@ class PublishingCase(unittest.TestCase):
         stdout = json.dumps({"type": "assistant", "content": json.dumps({"platforms": {"wechat_official_account": model_fields}}, ensure_ascii=False)})
         context = mock.Mock()
         context.run_process.return_value = (stdout, "")
-        config = {"prompt": "保留事实", "timeout_seconds": 600}
+        config = {"engine":"kimi_cli", "prompt": "保留事实", "timeout_seconds": 600}
         with mock.patch("content_workbench.publishing.executors.require_agent_enabled", return_value=config), \
                 mock.patch("content_workbench.providers.local.LocalExecutors.kimi", return_value="/fake/kimi"):
             result = PublishingExecutors(self.service).generate_fields(job, context)
