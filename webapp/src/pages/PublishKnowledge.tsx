@@ -17,7 +17,7 @@ export default function PublishKnowledge() {
 
   return <div className="collection-knowledge-page">
     <PageHeader eyebrow="PUBLISH CONTRACTS" title="发布知识库" description="发布 Agent 按各平台独立字段与限制生成内容；仅保存字段未实际写入时，不能通过发布预览。" actions={<Link className="button" to="/knowledge/collection"><Braces size={15} />采集 Ontology</Link>} />
-    <nav className="knowledge-tabs" aria-label="知识库视图"><Link to="/knowledge">账号 Ontology</Link><Link to="/knowledge/collection">采集知识库</Link><Link className="active" to="/knowledge/publishing">发布知识库</Link></nav>
+    <nav className="knowledge-tabs" aria-label="知识库视图"><Link to="/knowledge">增长记忆</Link><Link to="/knowledge/collection">采集知识库</Link><Link className="active" to="/knowledge/publishing">发布知识库</Link></nav>
     <div className="collection-boundary"><Send size={17} /><p>{data.boundary}</p></div>
     <div className="collection-toolbar"><label>平台<select value={platform} onChange={event => {
       const nextPlatform = event.target.value;

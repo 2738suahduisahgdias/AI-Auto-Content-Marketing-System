@@ -39,3 +39,13 @@
 .app-shell .yx-native .project-head{gap:20px;flex-wrap:wrap;margin-bottom:20px}
 .app-shell .yx-native :is(.row,.cards,.production-grid){gap:20px}
 @media(max-width:800px){.app-shell .yx-native .pad{padding:16px}.app-shell .yx-native .step:after{display:none}.app-shell .yx-native .bottom-bar{flex-wrap:wrap;gap:12px}}
+/* Form sizing: text fields fill their panel; compact controls keep readable content. */
+.app-shell .yx-native textarea{display:block;width:100%;max-width:100%;min-height:84px;resize:both;overflow:auto;line-height:1.7}
+.app-shell .yx-native .script-block textarea{resize:both;min-height:84px;padding:10px 12px}
+.app-shell .yx-native .duration{flex:none;gap:4px;padding:2px 6px}
+.app-shell .yx-native .duration input{width:64px;min-width:64px;padding:6px 4px;border:0;background:transparent;border-radius:0;font-size:13px}
+.app-shell .yx-native .shot-controls{flex-wrap:wrap}
+.app-shell .yx-native .shot-controls select{width:auto;max-width:none;min-width:145px;padding:8px;font-size:12px}
+.app-shell .yx-native input:is([type=checkbox],[type=radio]){width:16px;height:16px;padding:0;flex:none;accent-color:var(--accent)}
+.app-shell .yx-native input[type=range]{padding:0;border:0}
+.app-shell .yx-native .row>div,.app-shell .yx-native .shot-details{min-width:0;flex:1}

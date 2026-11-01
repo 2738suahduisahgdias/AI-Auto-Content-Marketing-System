@@ -41,13 +41,13 @@ describe("AppShell topic navigation", () => {
 });
 
 describe("AppShell analytics navigation", () => {
-  it("expands account platforms and links to independent competitor analysis", async () => {
+  it("keeps account platforms without retired modules", async () => {
     const user = userEvent.setup();
     renderShell("/accounts/douyin");
     expect(screen.getByRole("button", { name: "账号日报" })).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByRole("link", { name: "日报总览" })).toHaveAttribute("href", "/accounts");
     expect(screen.getByRole("link", { name: "公众号" })).toHaveAttribute("href", "/accounts/wechat_official_account");
-    expect(screen.getByRole("link", { name: "竞对分析" })).toHaveAttribute("href", "/competitors");
+    for (const name of ["竞对分析", "社媒能力", "内容复盘"]) expect(screen.queryByRole("link", { name })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "账号日报" }));
     expect(screen.queryByRole("link", { name: "日报总览" })).not.toBeInTheDocument();

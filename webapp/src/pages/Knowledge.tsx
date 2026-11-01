@@ -6,6 +6,7 @@ import { Badge, Button, Card, Empty, ErrorBox, Input, PageHeader } from "@/compo
 import { api, errorText, jsonOptions } from "@/lib/api";
 import type { Json } from "@/lib/types";
 import "./Knowledge.css";
+import GrowthMemory from "@/components/GrowthMemory";
 
 function evidenceUrl(relation: Json, entities: Json[]) {
   const direct = relation.evidence?.url;
@@ -63,10 +64,12 @@ export default function Knowledge() {
   }
 
   return <>
-    <PageHeader eyebrow="ACCOUNT ONTOLOGY" title="把碎片信息连成知识网络" description="定位、受众、痛点、证据与内容任务保存在本地 SQLite；每条自动关系保留来源，研究证据可以回跳原链接。" actions={<Button variant="primary" disabled={!!busy} onClick={() => void backfill()}><RefreshCw size={14} />{busy === "backfill" ? "正在回填…" : "同步现有数据到知识库"}</Button>} />
-    <nav className="knowledge-tabs" aria-label="知识库视图"><Link className="active" to="/knowledge">账号 Ontology</Link><Link to="/knowledge/collection">采集知识库</Link><Link to="/knowledge/publishing">发布知识库</Link></nav>
+    <PageHeader eyebrow="GROWTH MEMORY" title="增长工作台的记忆大脑" description="记住有效内容、适用场景与失败经验，为选题 Agent 提供可追溯的推荐依据。原有知识关系、采集经验和发布规则继续保留。" actions={<Button variant="primary" disabled={!!busy} onClick={() => void backfill()}><RefreshCw size={14} />{busy === "backfill" ? "正在回填…" : "同步现有数据到知识库"}</Button>} />
+    <nav className="knowledge-tabs" aria-label="知识库视图"><Link className="active" to="/knowledge">增长记忆</Link><Link to="/knowledge/collection">采集知识库</Link><Link to="/knowledge/publishing">发布知识库</Link></nav>
     {loadError && <ErrorBox>{loadError}<br /><Button size="small" onClick={() => void refresh()}>重新读取</Button></ErrorBox>}
     {actionError && <ErrorBox>{actionError}<br /><Button size="small" onClick={() => setActionError("")}>关闭错误详情</Button></ErrorBox>}
+    <GrowthMemory />
+    <details className="memory-graph"><summary>原有知识网络 · 定位、受众、内容与来源关系</summary>
     <form className="knowledge-toolbar" onSubmit={submitSearch}><Input aria-label="搜索实体或摘要" value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索实体名称或摘要" /><select aria-label="实体类型" value={type} onChange={event => setType(event.target.value)}><option value="">全部类型</option>{allTypes.map(value => <option key={value} value={value}>{value}</option>)}</select><Button type="submit" disabled={!!busy}><Search size={14} />{busy === "search" ? "搜索中…" : "搜索"}</Button><div className="knowledge-count"><Badge>{entities.length} 实体 · {relations.length} 关系</Badge></div></form>
     {(applied.query || applied.type) && <p className="knowledge-filter-note">当前筛选：{applied.query ? `“${applied.query}”` : "全部关键词"} · {applied.type || "全部类型"} <button className="button button-small" onClick={clearFilters} disabled={!!busy}>清空筛选</button></p>}
 
@@ -76,5 +79,6 @@ export default function Knowledge() {
       const url = evidenceUrl(relation, entities) || evidenceUrl(relation, resources?.knowledge.entities || []);
       return <article className="knowledge-relation" key={relation.id}><div className="knowledge-relation-flow"><strong>{entityName(relation.source_type, relation.source_id)}</strong><b>→ {relation.predicate} →</b><strong>{entityName(relation.target_type, relation.target_id)}</strong></div><pre>{JSON.stringify(relation.evidence || {}, null, 2)}</pre>{url && <a className="knowledge-evidence-link" href={url} target="_blank" rel="noreferrer">打开来源证据 <ExternalLink size={12} /></a>}</article>;
     }) : <p className="knowledge-detail-summary">该实体尚无关系。回填只会创建有真实来源支撑的关系。</p>}</Card> : <Card className="knowledge-help"><h2>查看实体详情</h2><p>选择左侧实体，查看它与受众、痛点、平台、证据及内容任务的关系。</p><p>自动回填使用稳定 ID，同一数据重复同步不会重复创建实体或相同证据关系。</p></Card>}</aside></div>
+    </details>
   </>;
 }

@@ -1,4 +1,5 @@
 import hashlib
+from content_workbench.domain.errors import DomainError
 
 from content_workbench.agents.registry import AGENTS
 from content_workbench.storage.db import PROJECT_ROOT, connect, dumps, immediate, loads, new_id, utcnow
@@ -22,6 +23,8 @@ class KnowledgeService:
     def ensure_schema(self):
         with self.conn() as conn:
             conn.executescript((PROJECT_ROOT / "migrations/002_knowledge.sql").read_text())
+            conn.execute("""CREATE TABLE IF NOT EXISTS growth_memories (
+                id TEXT PRIMARY KEY, payload_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)""")
 
     def entity(self, entity_type, name, summary="", properties=None):
         entity_id = stable("kb", entity_type + ":" + name)
@@ -124,3 +127,31 @@ class KnowledgeService:
                 if not conn.execute("SELECT 1 FROM kb_entities WHERE type=? AND id=?", (entity_type, entity_id)).fetchone():
                     raise ValueError("实体不存在：" + entity_type + "/" + entity_id)
         return self.relate(source_type, source_id, predicate, target_type, target_id, evidence or {"source": "manual"})
+
+    def memories(self, platform=None):
+        with self.conn(readonly=True) as conn:
+            rows = [dict(row) for row in conn.execute("SELECT * FROM growth_memories ORDER BY updated_at DESC")]
+        items = [{**loads(row["payload_json"], {}), "id": row["id"], "updated_at": row["updated_at"]} for row in rows]
+        if platform:
+            items = [item for item in items if item.get("enabled") and item.get("platform") in ("all", platform)]
+        return items
+
+    def save_memory(self, payload):
+        fields = ("title", "platform", "kind", "outcome", "lesson", "evidence", "metrics")
+        data = {key: str(payload.get(key) or "").strip() for key in fields}
+        if not data["title"] or not data["lesson"]:
+            raise DomainError("MEMORY_REQUIRED", "请填写记忆标题与可复用经验", 422)
+        if any(len(value) > 4000 for value in data.values()):
+            raise DomainError("MEMORY_TOO_LONG", "单个字段最多 4000 字", 422)
+        if data["platform"] not in ("all", "douyin", "xiaohongshu", "wechat", "industry") or data["kind"] not in ("article", "video", "rule") or data["outcome"] not in ("effective", "avoid", "hypothesis"):
+            raise DomainError("MEMORY_INVALID", "记忆分类无效", 422)
+        if data["outcome"] != "hypothesis" and (not data["evidence"] or not data["metrics"]):
+            raise DomainError("MEMORY_EVIDENCE_REQUIRED", "有效经验和避坑记录需要来源及效果依据；没有数据请保存为待验证", 422)
+        data["enabled"] = payload.get("enabled", True) is True
+        memory_id = payload.get("id") or new_id("memory")
+        with self.conn() as conn, immediate(conn):
+            if payload.get("id") and not conn.execute("SELECT 1 FROM growth_memories WHERE id=?", (memory_id,)).fetchone():
+                raise DomainError("MEMORY_NOT_FOUND", "记忆不存在", 404)
+            conn.execute("""INSERT INTO growth_memories VALUES (?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+                payload_json=excluded.payload_json,updated_at=excluded.updated_at""", (memory_id, dumps(data), utcnow(), utcnow()))
+        return {**data, "id": memory_id}

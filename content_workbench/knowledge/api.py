@@ -7,6 +7,10 @@ class KnowledgeAPI:
         self.service = service
 
     def handle(self, handler, method, path, query, body):
+        if method == "GET" and path == "/api/knowledge/memories":
+            return self.app.response(handler, {"items": self.service.memories()})
+        if method == "POST" and path == "/api/knowledge/memories":
+            return self.app.response(handler, self.service.save_memory(body or {}))
         if method == "GET" and path == "/api/knowledge/bootstrap":
             data = self.service.bootstrap(query.get("q", [""])[0], query.get("type", [""])[0])
             data["csrf_token"] = self.app.csrf(self.app.cookie(handler))

@@ -114,7 +114,7 @@ class PublishingService:
         prompt = str(prompt or "").strip()
         if len(prompt) > 2000:
             raise DomainError("PUBLISH_PROMPT_TOO_LONG", "补充要求不能超过 2000 字", 422, "prompt", "精简补充要求后重试")
-        return self.jobs.enqueue("publish.fields", {"content_kind": kind, "source_id": source_id, "platforms": platforms, "prompt": prompt},
+        return self.jobs.enqueue("publish.fields", {"content_kind": kind, "source_id": source_id, "source_file_id": source_file_id, "platforms": platforms, "prompt": prompt},
                                  kind + ":" + source_id, idempotency_key, max_attempts=2, resource_key="cloud_text")
 
     def create_batch(self, kind, source_id, targets, source_file_id=None):
@@ -256,16 +256,23 @@ class PublishingService:
                 })
         return {"items": items}
 
-    def bootstrap(self, kind=None, source_id=None):
+    def bootstrap(self, kind=None, source_id=None, source_file_id=None):
         batch = None
         field_jobs = []
         if kind and source_id:
             with self.conn(readonly=True) as conn:
-                row = conn.execute("SELECT id FROM publish_batches WHERE content_kind=? AND source_id=? ORDER BY created_at DESC LIMIT 1", (kind, source_id)).fetchone()
+                if source_file_id is not None:
+                    try:
+                        source_file_id = int(source_file_id)
+                    except (TypeError, ValueError):
+                        raise DomainError("INVALID_SOURCE_FILE", "成片文件编号无效", 422)
+                    row = conn.execute("SELECT id FROM publish_batches WHERE content_kind=? AND source_id=? AND source_file_id=? ORDER BY created_at DESC LIMIT 1", (kind, source_id, source_file_id)).fetchone()
+                else:
+                    row = conn.execute("SELECT id FROM publish_batches WHERE content_kind=? AND source_id=? ORDER BY created_at DESC LIMIT 1", (kind, source_id)).fetchone()
             if row:
                 batch = self.get_batch(row[0])
             aggregate_id = kind + ":" + source_id
-            field_jobs = [job for job in self.jobs.list(200) if job["kind"] == "publish.fields" and job["aggregate_id"] == aggregate_id][:10]
+            field_jobs = [job for job in self.jobs.list(200) if job["kind"] == "publish.fields" and job["aggregate_id"] == aggregate_id and (source_file_id is None or str(job.get("input", {}).get("source_file_id")) == str(source_file_id))][:10]
         return {"batch": batch, "field_jobs": field_jobs, "article_platforms": ARTICLE_PLATFORMS, "video_platforms": VIDEO_PLATFORMS,
                 "platform_names": PLATFORM_NAMES, "prepare_supported": {name: prepare_supported(name) for name in PLATFORM_NAMES}}
 

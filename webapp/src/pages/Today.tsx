@@ -4,20 +4,20 @@ import { useApp } from "@/AppContext";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { audienceNames, pillarNames, stateNames } from "@/lib/names";
 
-const nextNames: Record<string, string> = { topic_approved: "手填或按需生成口播稿", script_drafted: "确认当前口播稿", script_approved: "上传录音和 SRT 字幕", waiting_audio: "确认录音与字幕", transcribed: "规划素材与授权", assets_planned: "确认素材与授权", assets_approved: "选择模板并生成", rendered: "完成五项质检", quality_checked: "提交人工审核", review_required: "观看成片并最终审核", approved: "选择平台并发布", published: "录入四窗口数据", analyzed: "复盘已完成" };
+const nextNames: Record<string, string> = { topic_approved: "手填或按需生成口播稿", script_drafted: "确认当前口播稿", script_approved: "上传录音和 SRT 字幕", waiting_audio: "确认录音与字幕", transcribed: "规划素材与授权", assets_planned: "确认素材与授权", assets_approved: "选择模板并生成", rendered: "完成五项质检", quality_checked: "提交人工审核", review_required: "观看成片并最终审核", approved: "选择平台并发布", published: "已发布", analyzed: "已归档" };
 export default function Today() {
   const { resources } = useApp();
   const tasks = resources?.core.tasks || [];
-  const active = tasks.filter((task: any) => task.state !== "analyzed");
+  const active = tasks.filter((task: any) => !["published", "analyzed"].includes(task.state));
   const current = active[0];
   const monday = new Date(); const day = monday.getDay() || 7;
   monday.setHours(0, 0, 0, 0); monday.setDate(monday.getDate() - day + 1);
   const published = tasks.filter((task: any) => task.published_at && new Date(task.published_at) >= monday).length;
   const stats = [
     ["本周发布", `${published} / 3–5`, "稳定生产，不用低质量凑更", Send],
-    ["进行中", active.length, "从脚本到复盘的真实任务", Clock3],
+    ["进行中", active.length, "从文案到发布的真实任务", Clock3],
     ["待人工审核", tasks.filter((task: any) => task.state === "review_required").length, "最终审核不能由质检替代", FileWarning],
-    ["待复盘", tasks.filter((task: any) => task.state === "published").length, "回收四窗口真实数据", CheckCircle2],
+    ["已发布", tasks.filter((task: any) => task.state === "published").length, "已完成发布的内容", CheckCircle2],
   ] as const;
   const runningJobs = (resources?.core.video_jobs || []).filter((job: any) => ["queued", "leased", "running", "retry_wait", "cancel_requested"].includes(job.status));
   return <>

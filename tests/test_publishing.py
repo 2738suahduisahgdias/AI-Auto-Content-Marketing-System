@@ -66,6 +66,18 @@ class PublishingCase(unittest.TestCase):
     def video_targets(self):
         return [{"platform": "douyin", "payload": {"title": "视频标题", "description": "视频简介", "tags": "#AI"}}]
 
+    def test_bootstrap_scopes_batch_to_requested_file(self):
+        batch = self.service.create_batch("video", self.video, self.video_targets())
+        file_id = batch["source_file_id"]
+        self.assertEqual(batch["id"], self.service.bootstrap("video", self.video, str(file_id))["batch"]["id"])
+        self.assertIsNone(self.service.bootstrap("video", self.video, str(file_id + 100))["batch"])
+        job = self.service.generate_fields("video", self.video, ["douyin"], source_file_id=file_id)
+        self.assertEqual(file_id, job["input"]["source_file_id"])
+        self.assertEqual(job["id"], self.service.bootstrap("video", self.video, str(file_id))["field_jobs"][0]["id"])
+        self.assertEqual([], self.service.bootstrap("video", self.video, str(file_id + 100))["field_jobs"])
+        with self.assertRaises(DomainError):
+            self.service.bootstrap("video", self.video, "invalid")
+
     def test_article_batch_is_independent_and_validates_fields(self):
         batch = self.service.create_batch("article", self.article["id"], self.article_targets())
         self.assertEqual("draft", batch["status"])

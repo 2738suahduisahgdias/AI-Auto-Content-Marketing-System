@@ -23,7 +23,7 @@ class PublishingAPI:
         if method == "GET" and path == "/api/publishing/queue":
             return self.app.response(handler, self.service.publication_queue())
         if method == "GET" and path == "/api/publishing/bootstrap":
-            data = self.service.bootstrap(query.get("kind", [None])[0], query.get("source_id", [None])[0])
+            data = self.service.bootstrap(query.get("kind", [None])[0], query.get("source_id", [None])[0], query.get("source_file_id", [None])[0])
             data["csrf_token"] = self.app.csrf(self.app.cookie(handler))
             return self.app.response(handler, data)
         if method == "GET" and path == "/api/publishing/retrospective":

@@ -1,4 +1,6 @@
-# 映序完整后台 demo：范围与自检记录
+# 映序完整后台 demo：历史范围与自检记录
+
+> 此文记录已被否决并归档的独立 demo，不能用作当前迁移版本的验收依据。当前版本以 `growth-workbench-review-2026-11-01.md` 和源码迁移对照表为准。
 
 日期：2026-11-01。开发分支：`codex/yingxu-mac-local-workbench`。
 本机入口：http://127.0.0.1:8847/demo/ 。源码：`webapp/src/demo/`，原前端入口仅增加 `/demo/` 分流，原路由和业务服务保持原样。

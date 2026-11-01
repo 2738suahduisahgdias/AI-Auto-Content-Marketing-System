@@ -90,6 +90,7 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
   const dirty = useRef(new Set<string>());
   const appliedJob = useRef("");
   const sourceId = source?.id || "";
+  const sourceFileId = source?.fileId;
   const sourceTitle = source?.title || "";
   const sourceBody = source?.body || "";
 
@@ -97,7 +98,7 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
     if (!sourceId) return;
     if (!silent) setLoading(true);
     try {
-      const data = await api<{ batch: PublishBatch | null; field_jobs: Job[] }>(`/api/publishing/bootstrap?kind=${kind}&source_id=${encodeURIComponent(sourceId)}`);
+      const data = await api<{ batch: PublishBatch | null; field_jobs: Job[] }>(`/api/publishing/bootstrap?kind=${kind}&source_id=${encodeURIComponent(sourceId)}${sourceFileId ? `&source_file_id=${sourceFileId}` : ""}`);
       setBatch(data.batch);
       setFieldJobs(data.field_jobs || []);
       const currentSource = { id: sourceId, title: sourceTitle, body: sourceBody };
@@ -112,7 +113,7 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [fieldsFor, kind, platforms, sourceBody, sourceId, sourceTitle]);
+  }, [fieldsFor, kind, platforms, sourceBody, sourceId, sourceTitle, sourceFileId]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadBatch(), 0);
@@ -277,7 +278,7 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
           {targetError && <ErrorBox><strong>{String(targetError.code || "发布失败")}</strong><br />{String(targetError.message || "平台步骤未完成")}{targetError.action && <><br />怎么改：{String(targetError.action)}</>}</ErrorBox>}
           {status === "unknown_remote" && <><div className="publishing-unknown"><ShieldAlert size={17} /><p><strong>禁止直接重试</strong>平台点击后的结果无法确认。请先在平台后台核实是否已公开，避免重复发布。</p></div><Button size="small" disabled={Boolean(busy)} onClick={() => { const evidence = window.prompt("请填写平台后台的实际发布证据（时间、内容或真实链接）；不要只写已发布"); if (evidence) void execute(`reconcile:${target?.id}`, () => api(`/api/publishing/targets/${target?.id}/reconcile`, jsonOptions("POST", { evidence })), "平台实际发布结果已记录"); }}>已在后台核实为已发布</Button></>}
           {target?.preview?.screenshot && <p className="publishing-evidence">预览证据：{String(target.preview.screenshot)}</p>}
-          {status === "ready" && <p className="publishing-ready">平台报告预览字段已核验；公开前请检查专用窗口中的实际上传与文案。</p>}
+          {status === "ready" && <p className="publishing-ready">后台预填已完成，等待你审核。请检查平台窗口中的账号、实际上传与文案，然后确认发布。</p>}
           {target?.external_url && <a className="button button-small publishing-external" href={target.external_url} target="_blank" rel="noreferrer">查看真实发布链接<ExternalLink size={13} /></a>}
           {status === "failed" && <Button size="small" disabled={Boolean(busy) || dirtyPlatforms.has(platform)} title={dirtyPlatforms.has(platform) ? "先保存本平台的修改，再重试已保存内容" : "重新生成已保存内容的平台预览"} onClick={() => void execute(`retry:${target?.id}`, () => api(`/api/publishing/targets/${target?.id}/retry`, jsonOptions("POST")), "失败目标已重新加入预览队列")}><RotateCcw size={14} />重试失败预览</Button>}
         </Card>;
@@ -288,7 +289,7 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
       <div><strong>{batch ? `批次 ${batch.id}` : "尚未创建发布批次"}</strong><p>{active ? "后台正在执行，离开页面后任务仍会保留。" : "先保存选中平台，再预览；只有预览就绪的平台可以确认公开。"}</p></div>
       <div className="button-row">
         <Button disabled={Boolean(busy)} onClick={() => void saveBatch()}><Save size={15} />{busy === "save" ? "正在保存…" : `保存${kind === "article" ? "文章" : "视频"}批次`}</Button>
-        <Button disabled={Boolean(busy) || !batch || !selectedPreparable.length || hasDirtySelection} title={!batch ? "先保存发布批次" : hasDirtySelection ? "先保存当前修改" : !selectedPreparable.length ? "选中的平台没有待预览或失败目标" : undefined} onClick={() => void execute("prepare", () => api(`/api/publishing/batches/${batch?.id}/prepare`, jsonOptions("POST", { platforms: selectedPreparable.map(target => target.platform) })), "平台预览已加入后台队列，不会公开发布")}>{busy === "prepare" ? "正在提交…" : "生成选中平台预览"}</Button>
+        <Button disabled={Boolean(busy) || !batch || !selectedPreparable.length || hasDirtySelection} title={!batch ? "先保存发布批次" : hasDirtySelection ? "先保存当前修改" : !selectedPreparable.length ? "选中的平台没有待预览或失败目标" : undefined} onClick={() => void execute("prepare", () => api(`/api/publishing/batches/${batch?.id}/prepare`, jsonOptions("POST", { platforms: selectedPreparable.map(target => target.platform) })), "平台预览已加入后台队列，不会公开发布")}>{busy === "prepare" ? "正在提交…" : "打开后台并预填选中平台"}</Button>
         <Button variant="primary" disabled={Boolean(busy) || !selectedReady.length || hasDirtySelection} title={hasDirtySelection ? "先保存修改并重新生成受影响平台预览" : !selectedReady.length ? "至少一个选中平台必须已完成真实预览" : "对所有选中的就绪平台进行一次公开确认"} onClick={() => setConfirmOpen(true)}><Send size={15} />确认公开发布{selectedReady.length ? `（${selectedReady.length}）` : ""}</Button>
       </div>
     </div>

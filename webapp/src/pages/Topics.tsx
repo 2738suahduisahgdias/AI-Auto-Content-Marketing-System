@@ -65,6 +65,7 @@ export function Recommendations({ items, agent, sources, busy, onConvert }: { it
       <h3>{item.title}</h3><p>{item.reason}</p>
       <div className="topic-recommendation-sources"><strong>来源</strong>{sourceNames.length ? sourceNames.map(name => <Badge key={name}>{name}</Badge>) : <Badge>未关联来源快照</Badge>}</div>
       {evidenceSources.length > 0 && <div className="topic-recommendation-links">{evidenceSources.map(source => /^https?:\/\//.test(source.url) ? <a key={source.id} href={source.url} target="_blank" rel="noreferrer" title={source.title}>{source.title || "查看原链接"} <ExternalLink size={11} /></a> : null)}</div>}
+      {(item.memory_evidence || []).length > 0 && <div className="topic-evidence"><strong>引用我们的增长记忆</strong>{item.memory_evidence.map((memory:Json)=><p key={memory.id}>{memory.title} · {memory.outcome==="hypothesis"?"待验证":memory.outcome==="avoid"?"避坑依据":"有效经验"}：{memory.lesson}<small>依据：{memory.metrics || "尚无效果数据"} · 来源：{memory.evidence || "待补充"}</small></p>)}</div>}
       <div className="topic-evidence"><strong>差异化切入</strong><p>{item.angle}</p>{(item.uncertainties || []).map((value: string) => <small key={value}>待核实：{value}</small>)}</div>
       <div className="topic-recommendation-footer"><small className="topic-time">{item.created_at}</small><Button size="small" variant="primary" disabled={busy || (item.status === "converted" && !item.task_id)} onClick={() => onConvert(item)}>{item.status === "converted" ? "打开选题" : "转为选题"}</Button></div>
     </Card>;

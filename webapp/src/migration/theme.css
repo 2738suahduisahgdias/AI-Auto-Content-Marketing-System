@@ -1,3 +1,16 @@
 /* Shared presentation over the original Liu workspace. */
 :root{--paper:#f9f8f6;--panel:#fff;--ink:#1a1a1a;--muted:#68615a;--line:#e7e5e4;--accent:#b85b0b;--accent-dark:#974709;--blue:#b85b0b;--blue-soft:#fff1df;--shadow:0 2px 10px #30201006}
 .sidebar{background:#fff}.topbar{background:#f9f8f6ee}.nav-link.active{background:#fff1df;color:#974709}.card,.button,.input,.textarea,select{border-radius:8px}h1,h2,h3{font-family:inherit}.tasks-workbench .tasks-stage-card{padding:16px}.migration-toolbar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:16px}.migration-error{padding:12px;background:#fff0e8;color:#9f3414;border-radius:8px}
+/* All multiline editors can be resized in both directions within their panel. */
+.app-shell textarea{resize:both!important;overflow:auto;max-width:100%;min-width:120px}
+.app-shell .field>input:not([type=checkbox]):not([type=radio]):not([type=range]){width:100%;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel,#fffefa);color:var(--ink)}
+
+.app-shell textarea{max-width:none;min-width:120px}.app-shell .field,.app-shell .yx-native .script-block,.app-shell .yx-native .shot-details,.app-shell .yx-native .panel,.app-shell .yx-native .dialog{overflow:auto}.app-shell .yx-native .script-block textarea{max-width:none}.app-shell .yx-native .shot-desc{max-width:none}
+/* Analytics joins the warm-white / amber system without changing metrics. */
+.app-shell .analytics-page{--analytics-soft:#f5efe5;--analytics-dark:#4d392b}
+.app-shell .analytics-demo-notice.real{background:#faf3e6;border-color:#e6d6b9;color:#66523a}
+.app-shell .analytics-demo-notice.real span{color:#76634b}
+.app-shell .analytics-account-hero{background:linear-gradient(115deg,#fffefa,#f5eee2)}
+.app-shell .analytics-account-identity>span{background:#69503a}
+.app-shell .analytics-metric.accent>span,.app-shell .analytics-metric.accent>small{color:#e3d4c0}
+.app-shell .analytics-range-tabs,.app-shell .analytics-view-tabs{background:#eee8de}

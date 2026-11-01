@@ -31,12 +31,12 @@ describe("AccountAnalytics demo", () => {
     expect(screen.getByText("评论与需求证据")).toBeInTheDocument();
   });
 
-  it("shows trends, native quality and public competitor boundaries on a platform", () => {
+  it("keeps native quality without removed competitor module", () => {
     renderPage("/accounts/xiaohongshu?demo=1");
     expect(screen.getByRole("heading", { name: "小红书日报", level: 1 })).toBeInTheDocument();
     expect(screen.getByText("封面点击率")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "互动率趋势，模拟趋势图" })).toBeInTheDocument();
-    expect(screen.getByText("我的表现 vs 小红书竞对")).toBeInTheDocument();
-    expect(screen.getByText(/不推测竞对播放或完播/)).toBeInTheDocument();
+    expect(screen.queryByText("我的表现 vs 小红书竞对")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", {name:/竞对/})).not.toBeInTheDocument();
   });
 });

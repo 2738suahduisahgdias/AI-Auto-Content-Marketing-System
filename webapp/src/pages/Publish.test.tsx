@@ -31,7 +31,9 @@ describe("Publication queue", () => {
     expect(screen.getByText("发布目标队列")).toBeInTheDocument();
     expect(screen.getByText("本地发布预览")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "全选当前筛选" }));
-    expect(screen.getByText("发布选中就绪项")).toBeInTheDocument();
+    expect(screen.queryByText("发布选中就绪项")).not.toBeInTheDocument();
+    expect(document.querySelector("video")).toHaveAttribute("src", "/api/files/3/media");
+    expect(screen.getByRole("button", {name: /确认公开发布/})).toBeInTheDocument();
     expect(screen.getByText("#企业AI")).toBeInTheDocument();
   });
 });

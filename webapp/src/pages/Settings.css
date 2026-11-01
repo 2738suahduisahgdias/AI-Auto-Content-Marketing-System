@@ -12,3 +12,5 @@
 .settings-template-meta p{font-size:11px;color:var(--muted);line-height:1.7;margin:8px 0}
 .settings-template-meta .tag-row{display:flex;align-items:center;gap:8px}
 @media(max-width:1100px){.settings-template-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.settings-subpages{display:flex;gap:6px;flex-wrap:wrap;padding:6px;margin:0 0 24px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}.settings-subpages a{padding:11px 18px;border-radius:8px;text-decoration:none;color:var(--muted);font-weight:550;font-size:13px}.settings-subpages a:hover{background:#fff8ed;color:#974709}.settings-subpages a.active{background:#fff0dd;color:#974709}.settings-draft-note{margin:0 0 18px;color:#93601e;font-size:12px}.settings-draft-note a{margin-left:12px;color:inherit;text-decoration:underline}.settings-page .settings-connections{margin-top:0}.settings-page .settings-boundary{margin-top:0}@media(max-width:760px){.settings-subpages a{flex:1 1 40%;padding:10px 12px;text-align:center}}
