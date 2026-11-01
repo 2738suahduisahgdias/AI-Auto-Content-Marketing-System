@@ -1,0 +1,17 @@
+import {useCallback,useEffect,useState} from 'react';
+import {Link} from 'react-router-dom';
+import {api,errorText} from '../lib/api';
+import {Badge,Button,Card,ErrorBox} from './ui';
+import './WorkOverview.css';
+type Work={id:string;title:string;state:string;next:string;href:string;attention:boolean;progress?:number;updated_at:string};
+type Group={key:string;label:string;total:number;items:Work[]};
+type Overview={groups:Group[];generated_at:string;boundary:string;worker:{running:boolean;allowed_kinds:string[]|null}};
+const labels:Record<string,string>={script_drafted:'文案待确认',script_approved:'文案已确认',waiting_audio:'待配置声音',transcribed:'待规划素材',assets_planned:'素材待确认',assets_approved:'待生成成片',quality_checked:'质检完成',review_required:'待人工审核',ready:'待确认',publishing:'发布执行中',awaiting_confirmation:'待人工确认',queued:'排队中',leased:'已分配',running:'运行中',retry_wait:'等待重试',blocked:'已阻塞',failed:'失败',unknown_remote:'结果待核实',cancel_requested:'正在取消',draft:'草稿',brief_ready:'需求已保存',outline_draft:'大纲待确认',in_review:'等待人工审核',needs_review:'待审核',approved:'已批准',exported:'已导出',prepared:'待人工确认',preparing:'正在预填',reviewing:'预审中',pending:'待处理',rejected:'需修改',topic_approved:'选题已确认',rendered:'成片已生成'};
+export default function WorkOverview(){
+ const [data,setData]=useState<Overview|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[selected,setSelected]=useState('topics');
+ const load=useCallback(async()=>{setBusy(true);try{setData(await api<Overview>('/api/v2/work-overview'));setError('')}catch(e){setError(errorText(e))}finally{setBusy(false)}},[]);
+ useEffect(()=>{void load();const timer=window.setInterval(()=>{if(!document.hidden)void load()},30000);return()=>window.clearInterval(timer)},[load]);
+ const current=data?.groups.find(g=>g.key===selected);const blocked=current?.items.filter(r=>r.attention)||[];
+ return <section className="work-overview" aria-label="全部 Agent 工作进度"><div className="section-heading"><div><p className="eyebrow">PROJECT COORDINATION · LOCAL</p><h2>全部 Agent 的工作进度</h2></div><Button size="small" onClick={()=>void load()} disabled={busy}>{busy?'读取本地记录…':'刷新工作进度'}</Button></div>{error&&<ErrorBox>{error}{data&&'（下方保留上次快照）'}</ErrorBox>}
+ {data?<><p className="work-overview-note">{data.worker.running?(data.worker.allowed_kinds?`当前进程仅启用 ${data.worker.allowed_kinds.join('、') || '零个'} 执行器；其他任务不会自动运行。`:'本地执行器在线；模型与账号是否可用仍以各任务检查为准。'):'本地执行器未启动，已排队任务不会自动开始。'} 更新于 {new Date(data.generated_at).toLocaleTimeString()}</p><div className="work-overview-tabs" role="group" aria-label="按 Agent 查看">{data.groups.map(g=><button key={g.key} aria-pressed={selected===g.key} onClick={()=>setSelected(g.key)}>{g.label}<strong>{g.total}</strong></button>)}</div><Card className="work-overview-panel"><div className="section-heading"><h3>{current?.label}</h3><span>{blocked.length?`${blocked.length} 项显示需要处理的提示`:'按原任务状态展示'}</span></div>{current?.items.length?<div className="work-overview-list">{current.items.map(row=><Link className="work-overview-row" key={row.id} to={row.href}><div><strong>{row.title}</strong><p>{row.next}</p><small>{row.id}</small></div><div><Badge tone={row.attention?'orange':'neutral'}>{labels[row.state]||row.state}</Badge>{typeof row.progress==='number'&&<small>任务报告进度 {Math.round(Math.max(0,Math.min(1,row.progress))*100)}%</small>}<span>打开原工作区 →</span></div></Link>)}</div>:<p className="work-overview-note">此 Agent 暂无未完成工作。可从原选题、文章或视频入口开始。</p>}</Card><p className="work-overview-note">{data.boundary}</p></>:!error&&<p>正在汇总本地工作记录…</p>}</section>
+}

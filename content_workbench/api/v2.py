@@ -148,6 +148,9 @@ class V2Application:
             body = handler.read_json() if method in ("POST", "PUT", "PATCH") and path not in ("/api/v2/assets", "/api/review/uploads") else None
             if path.startswith("/api/v2/license") and method == "POST" and not isinstance(body, dict):
                 raise DomainError("LICENSE_INPUT", "授权请求格式无效")
+            if path == "/api/v2/work-overview" and method == "GET":
+                from content_workbench.overview import overview
+                return self.response(handler, overview(self.workbench.db_path, getattr(self, "overview_worker", self.worker)))
             if path == "/api/v2/license" and method == "GET":
                 return self.response(handler, {**self.license.status(), "csrf_token": self.csrf(self.cookie(handler))})
             if path == "/api/v2/license/activate" and method == "POST":
