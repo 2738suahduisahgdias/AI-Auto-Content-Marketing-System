@@ -46,7 +46,7 @@ const yingxuAssets = path.join(root, 'public-static', 'yingxu-assets');
 if (existsSync(yingxuAssets)) await cp(yingxuAssets, path.join(bundleDir, 'public', 'yingxu-assets'), {recursive: true});
 
 const props = JSON.parse(await readFile(propsPath, 'utf8'));
-const composition = await selectComposition({serveUrl, id: compositionId, inputProps: props});
+const composition = await selectComposition({serveUrl, id: compositionId, inputProps: props, timeoutInMilliseconds: 120000});
 await mkdir(path.dirname(output), {recursive: true});
 if (output.endsWith('.png')) {
   await renderStill({composition, serveUrl, output, inputProps: props, frame: Math.min(45, composition.durationInFrames - 1), scale});
@@ -56,6 +56,7 @@ if (output.endsWith('.png')) {
 await renderMedia({
   composition,
   serveUrl,
+  timeoutInMilliseconds: 120000,
   codec: 'h264',
   outputLocation: output,
   inputProps: props,

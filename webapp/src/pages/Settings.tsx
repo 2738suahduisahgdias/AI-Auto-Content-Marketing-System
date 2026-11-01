@@ -1,4 +1,5 @@
 import ImageProviderSettings from "@/components/ImageProviderSettings";
+import WorkspaceTransfer from "@/components/WorkspaceTransfer";
 import RenderCache from "@/components/RenderCache";
 import LocalAssets from "@/components/LocalAssets";
 import RuntimeReadiness from "@/components/RuntimeReadiness";
@@ -366,7 +367,7 @@ export default function Settings() {
     {page === 'agents' && <RuntimeReadiness />}
     {page === 'agents' && <details className="article-skills"><summary>文案 Agent：图文创作技能接入计划</summary><p>写作统筹复用原文章 Agent；选题与记忆读取、公众号／小红书表达适配、图片搜索、本地图片引用、AI 生图、平台排版与分页长图、图文质检分别作为技能接入。配图搜索需搜索服务，生图需独立图像模型，长图在本地渲染。</p><p>当前已有大纲、正文、版本保存、配图搜索与导入、生图入口、平台排版和分页长图导出；生图依赖本机模型连接，平台配图上传须通过对应账号验收。母稿和各平台版本分开保存，正文、图片、模板版本一起交付审核，修改后旧审批失效。</p></details>}
     {dirty.size>0 && <p className="settings-draft-note">{dirty.size} 个 Agent 有未保存修改，切换设置子页会保留草稿。<NavLink to="/settings/agents">返回配置保存</NavLink></p>}
-    {page === "media" && <><LocalAssets /><RenderCache /></>}
+    {page === "media" && <><LocalAssets /><RenderCache /><WorkspaceTransfer /></>}
     {page === "models" && <ImageProviderSettings />}
     {activeTest && !['models','media'].includes(page) && <p role="status" className="settings-test-progress">{tests[activeTest].progress} 切换子页不会中断测试。</p>}
     {loadError && <ErrorBox>{resources ? `刷新失败：${loadError}\n当前仍显示上一次成功读取的数据。` : loadError}</ErrorBox>}

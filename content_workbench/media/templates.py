@@ -1,10 +1,11 @@
 import copy
 import json
+import os
 import re
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TEMPLATE_PATH = PROJECT_ROOT / "config" / "video_templates.json"
+TEMPLATE_PATH = Path(os.environ.get("CONTENT_AGENT_TEMPLATE_PATH", PROJECT_ROOT / "config" / "video_templates.json"))
 STATUSES = {"draft", "stable", "deprecated"}
 
 

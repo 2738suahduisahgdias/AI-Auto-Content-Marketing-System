@@ -635,6 +635,7 @@ def file_dict(row):
     item["media_info"] = parse_json(item.pop("media_info_json"), {})
     item["url"] = "/api/files/{}/media".format(item["id"])
     item["download_url"] = item["url"] + "?download=1"
+    item["preview_url"] = item["url"] + "?proxy=1" if Path(item["relative_path"]).suffix.lower() in (".mp4", ".mov", ".mkv", ".webm") else item["url"]
     if item["media_info"].get("wb_asset_id"):
         try:
             resolved_task_file(item, verify=False)
@@ -916,6 +917,12 @@ def manage_yingxu_cache(payload):
         raise ApiError(error.status,error.message)
 
 
+def task_proxy(source):
+    from content_workbench.media.proxy import prepare
+    info, _ = yingxu_cache_info()
+    return prepare(source, Path(info["path"]), max(0, info["limit_gb"]*1024**3-info["bytes"]))
+
+
 def yingxu_render_props(task, preview=False, shot_index=None):
     snapshot = task.get("source", {}).get("yingxu", {}).get("snapshot", {})
     shots = snapshot.get("shots", [])
@@ -934,6 +941,12 @@ def yingxu_render_props(task, preview=False, shot_index=None):
         expected = file.get("media_info", {}).get("source_sha256")
         if expected and digest != expected:
             raise ApiError(409, "素材内容已改变，请重新导入并审核")
+        if preview and source.suffix.lower() in (".mp4", ".mov", ".mkv", ".webm"):
+            try:
+                proxy = task_proxy(source)
+                return "yingxu-assets/" + proxy.name, file
+            except (DomainError, OSError, subprocess.SubprocessError):
+                pass  # Original source is still verified and used at full quality.
         name = digest + source.suffix.lower()
         directory = REMOTION_APP / "public-static" / "yingxu-assets"
         directory.mkdir(parents=True, exist_ok=True)
@@ -974,7 +987,8 @@ def yingxu_render_props(task, preview=False, shot_index=None):
         end = elapsed + duration
         scenes.append({"id": str(index), "name": shot.get("title", "分镜"), "headline": shot.get("title", ""),
                        "start_seconds": elapsed, "end_seconds": end, "asset_type": "own",
-                       "description": shot.get("desc", ""), "narration": shot.get("text", ""), "media": asset})
+                       "description": shot.get("desc", ""), "narration": shot.get("text", ""), "media": asset,
+                       **({"type": "media"} if asset else {})})
         captions.append({"text": shot.get("text", ""), "startMs": round(elapsed * 1000), "endMs": round(end * 1000), "timestampMs": None, "confidence": None})
         elapsed = end
     if snapshot.get("voiceFileId") and snapshot.get("rhythm") == "旁白驱动":
@@ -2314,9 +2328,11 @@ def caption_overlays(captions, directory):
     captions_path = Path(directory) / "captions.json"
     captions_path.write_text(json.dumps(captions, ensure_ascii=False), encoding="utf-8")
     worker = PROJECT_ROOT / "workers" / "caption_images.py"
-    if not worker.is_file() or not WHISPERX_PYTHON.is_file():
+    import sys
+    caption_python = Path(sys.executable) if getattr(sys, 'frozen', False) else WHISPERX_PYTHON
+    if not worker.is_file() or not caption_python.is_file():
         raise ApiError(503, "字幕图片生成环境不可用", "settings", "安装 Pillow 后重试，或关闭上传模式烧字。")
-    stdout, _ = run_process([str(WHISPERX_PYTHON), str(worker), "--captions", str(captions_path),
+    stdout, _ = run_process([str(caption_python), str(worker), "--captions", str(captions_path),
                              "--output-dir", directory], 120, MAX_CLI_OUTPUT, "字幕图片生成")
     paths = json.loads(stdout)
     filters = []
@@ -2891,7 +2907,7 @@ class Handler(BaseHTTPRequestHandler):
             target = WEB_ROOT / "react-dist" / "demo-wechat.png"
             if not target.is_file():
                 raise ApiError(404, "联系二维码尚未包含在前端构建中")
-        elif path.startswith("/assets/"):
+        elif path.startswith(("/assets/", "/yingxu-original/")):
             target = (WEB_ROOT / "react-dist" / path.lstrip("/")).resolve()
             if (WEB_ROOT / "react-dist") not in target.parents or not target.is_file():
                 raise ApiError(404, "静态资源不存在")
@@ -2903,7 +2919,7 @@ class Handler(BaseHTTPRequestHandler):
         else:
             raise ApiError(404, "页面不存在")
         body = target.read_bytes()
-        content_type = "image/png" if target.suffix == ".png" else "text/html" if target.suffix == ".html" else "text/css" if target.suffix == ".css" else "application/javascript"
+        content_type = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
         session_header = V2.session_header(self) if V2 and (react_route or path in ("/v2", "/legacy")) else None
         self.send_response(200)
         if session_header:
@@ -2963,7 +2979,7 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             shutil.copyfileobj(buffer, self.wfile, 1024 * 1024)
 
-    def serve_media(self, file_id, download=False):
+    def serve_media(self, file_id, download=False, proxy=False):
         with connect() as conn:
             row = conn.execute("SELECT * FROM files WHERE id=?", (file_id,)).fetchone()
         if not row:
@@ -2975,6 +2991,15 @@ class Handler(BaseHTTPRequestHandler):
             expected = expected / "source"
         if (not linked and expected.resolve() not in path.parents) or not path.is_file():
             raise ApiError(404, "文件不存在或路径无效")
+        proxy_state = "original"
+        if proxy and not download and path.suffix.lower() in (".mp4", ".mov", ".mkv", ".webm"):
+            from content_workbench.media.render_cache import lease
+            try:
+                with lease(REMOTION_APP / "public-static" / "yingxu-assets"):
+                    path = task_proxy(path)
+                proxy_state = "ready"
+            except (DomainError, OSError, subprocess.SubprocessError):
+                proxy_state = "fallback-original"
         size = path.stat().st_size
         start, end = 0, size - 1
         range_header = self.headers.get("Range")
@@ -3000,6 +3025,7 @@ class Handler(BaseHTTPRequestHandler):
         content_type = "text/plain; charset=utf-8" if row["kind"] == "srt" else mimetypes.guess_type(path.name)[0] or "application/octet-stream"
         self.send_header("Content-Type", content_type)
         self.send_header("Accept-Ranges", "bytes")
+        self.send_header("X-Yingxu-Preview", proxy_state)
         self.send_header("Content-Length", str(end - start + 1))
         disposition = "attachment; filename*=UTF-8''{}".format(quote(row["original_name"])) if download else "inline"
         self.send_header("Content-Disposition", disposition)
@@ -3096,7 +3122,7 @@ class Handler(BaseHTTPRequestHandler):
             elif re.fullmatch(r"/api/video-templates/[a-z0-9-]+@\d+\.\d+\.\d+/preview", path):
                 self.serve_template_preview(path.split("/")[3])
             elif re.fullmatch(r"/api/files/\d+/media", path):
-                self.serve_media(int(path.split("/")[3]), parse_qs(parsed.query).get("download") == ["1"])
+                self.serve_media(int(path.split("/")[3]), parse_qs(parsed.query).get("download") == ["1"], parse_qs(parsed.query).get("proxy") == ["1"])
             else:
                 self.serve_static(path)
         except ApiError as error:
@@ -3113,6 +3139,15 @@ class Handler(BaseHTTPRequestHandler):
             self.authenticate_legacy(path)
             if V2 and V2.matches(path):
                 return V2.handle(self, "POST", path, parse_qs(urlsplit(self.path).query))
+            if path in ("/api/workspace/export", "/api/workspace/restore"):
+                from content_workbench.storage.portable import export_workspace, restore_workspace
+                body = self.read_json()
+                try:
+                    result = export_workspace(DB_PATH, ROOT, body.get("destination", "")) if path.endswith("/export") else restore_workspace(body.get("package", ""), body.get("destination", ""))
+                except DomainError as error:
+                    raise ApiError(error.status, error.message)
+                self.json_response(result)
+                return
             if path == "/api/yingxu-cache":
                 self.json_response(manage_yingxu_cache(self.read_json()))
                 return
