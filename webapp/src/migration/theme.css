@@ -1,5 +1,5 @@
 /* Shared presentation over the original Liu workspace. */
-:root{--paper:#f9f8f6;--panel:#fff;--ink:#1a1a1a;--muted:#68615a;--line:#e7e5e4;--accent:#b85b0b;--accent-dark:#974709;--blue:#b85b0b;--blue-soft:#fff1df;--shadow:0 2px 10px #30201006}
+
 .sidebar{background:#fff}.topbar{background:#f9f8f6ee}.nav-link.active{background:#fff1df;color:#974709}.card,.button,.input,.textarea,select{border-radius:8px}h1,h2,h3{font-family:inherit}.tasks-workbench .tasks-stage-card{padding:16px}.migration-toolbar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:16px}.migration-error{padding:12px;background:#fff0e8;color:#9f3414;border-radius:8px}
 /* All multiline editors can be resized in both directions within their panel. */
 .app-shell textarea{resize:both!important;overflow:auto;max-width:100%;min-width:120px}
@@ -14,3 +14,77 @@
 .app-shell .analytics-account-identity>span{background:#69503a}
 .app-shell .analytics-metric.accent>span,.app-shell .analytics-metric.accent>small{color:#e3d4c0}
 .app-shell .analytics-range-tabs,.app-shell .analytics-view-tabs{background:#eee8de}
+
+/* Workbench design tokens shared by lazy routes and Radix portal content. */
+
+body {font-family:var(--font-ui);color:var(--ink);background:var(--paper)}
+h1,h2,h3,h4 {font-family:var(--font-ui);letter-spacing:-.025em}
+::selection {background:#f4d5ac;color:var(--ink)}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible {outline:3px solid var(--focus-ring);outline-offset:2px}
+.card {border-color:var(--line);border-radius:var(--radius-card);box-shadow:var(--shadow)}
+.button {background:var(--panel);border-color:var(--line-strong);border-radius:var(--radius-control)}
+.button:hover:not(:disabled) {background:var(--surface-hover);border-color:var(--gold)}
+.button-primary {background:var(--accent);border-color:var(--accent);color:#fff}
+.button-primary:hover:not(:disabled) {background:var(--accent-dark);border-color:var(--accent-dark);color:#fff}
+.button-danger {color:var(--red);background:#fff5f2;border-color:#e8b9ae}
+.input,.textarea,select {background:var(--panel);border-color:var(--line-strong);border-radius:var(--radius-control);color:var(--ink)}
+.input:focus,.textarea:focus,select:focus {border-color:var(--accent);box-shadow:0 0 0 3px var(--focus-ring)}
+.field-label {color:var(--muted)}
+.badge {background:var(--surface-soft);color:var(--muted);border-radius:6px}
+.badge-green {background:var(--gold-soft);color:#71572a}
+.badge-orange {background:var(--accent-soft);color:var(--accent-dark)}
+.badge-red {background:#f9e4df;color:#a33e35}
+.nav-group>p,.nav-link {color:var(--muted)}
+.nav-link:hover,.icon-button:hover {background:var(--surface-soft)}
+.nav-link.active,.nav-sublink.active {background:var(--accent-soft);color:var(--accent-dark)}
+.nav-dropdown-menu {border-left-color:var(--line)}
+.live-dot {background:var(--gold)}
+.metric-label svg {color:var(--gold)}
+.focus-card {background:#342b23;border-color:#342b23;color:#fffaf3}
+.focus-card .eyebrow,.focus-title {color:#dbc6a6}
+.empty {background:var(--surface-soft);border-color:var(--line-strong);border-radius:var(--radius-card)}
+.toast {background:#342b23;box-shadow:0 12px 35px #30201025}
+.toast-error {background:#823c32}
+.modal-overlay {background:#241c145c;backdrop-filter:blur(4px)}
+.modal {background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 80px #30201025}
+.progress {background:var(--surface-soft)}
+.mobile-bottom {background:#342b23;color:#e1d3c2;border-color:#544638}
+.mobile-bottom a.active {background:var(--accent-soft);color:var(--accent-dark)}
+
+/* Shared selection and surface treatment across all original subpages. */
+.app-shell :is(.topic-filter,.settings-subpages a,.account-platform-tab,.knowledge-tabs a,.setup-os-tabs button) {border-radius:var(--radius-control)}
+.app-shell :is(.topic-filter.active,.article-list-item.active,.publish-queue-item.active,.settings-agent-item.active,.account-platform-tab.active) {background:var(--accent-soft);color:var(--accent-dark);border-color:var(--accent)}
+.app-shell :is(.topic-evidence,.topic-detail-report,.wechat-raw-message,.wechat-link-snapshot,.collection-boundary,.collection-info-grid section,.settings-boundary,.settings-no-prompt,.publishing-options,.publishing-media-rules,.platform-source-field,.article-job,.review-metrics span,.review-counts span) {background:var(--surface-soft);border-radius:var(--radius-control)}
+.app-shell :is(.topic-sync-summary,.setup-status.ready,.article-step.done,.task-quality-item:has(input:checked)) {background:var(--gold-soft);color:#71572a;border-color:var(--line-strong)}
+.app-shell :is(.topic-evidence,.wechat-raw-message,.settings-no-prompt,.publishing-target.has-batch,.review-item.approved) {border-color:var(--gold)}
+.app-shell :is(.knowledge-properties,.setup-command-card code) {background:#342b23;color:#f7ead9}
+.app-shell :is(.knowledge-entity-card,.collection-entity-list button,.collection-platform-list button,.publish-queue,.article-list-item,.settings-template-card,.topic-job,.wechat-message-card,.account-platform-tab) {border-radius:var(--radius-control)}
+.app-shell .knowledge-entity-card:hover {border-color:var(--gold)}
+.app-shell :is(.knowledge-entity-card.active,.collection-entity-list button.active,.collection-platform-list button.active) {background:var(--accent-soft);border-color:var(--accent)}
+.app-shell .analytics-insight-panel,.app-shell .acquisition-result-card,.app-shell .lead-funnel-primary {background:#342b23;border-color:#342b23;color:#fffaf3}
+.app-shell :is(.analytics-insight-row p,.analytics-insight-panel>small,.acquisition-result-card>span,.acquisition-result-card>p,.acquisition-result-card>small,.lead-funnel-primary span,.lead-funnel-primary small) {color:#e2d0b7}
+.app-shell .analytics-retention span {background:linear-gradient(var(--accent),#ddc395)}
+.app-shell .acquisition-stage-bar>span {background:linear-gradient(90deg,var(--accent),#ddc395)}
+.app-shell .trend-bar {fill:var(--gold)}
+.app-shell .trend-bar:hover {fill:var(--accent)}
+.app-shell .trend-legend i.bar {background:var(--gold)}
+
+/* Yingxu editing steps, option cards, sheets and dialogs inherit the same tokens. */
+.app-shell .yx-native {--purple:var(--accent);--soft:var(--accent-soft);--green:var(--gold);font-family:var(--font-ui)}
+.app-shell .yx-native :is(.panel,.production-card,.publish-card,.template-card) {border-radius:var(--radius-card)}
+.app-shell .yx-native :is(.script-block.selected,.template-card.selected,.chip.active) {background:var(--accent-soft);border-color:var(--line-strong)}
+.app-shell .yx-native :is(.status,.status.green,.status.amber,.script-label b,.audio-icon,.pending-tag) {background:var(--gold-soft);color:#71572a}
+.app-shell .yx-native :is(.upload-area,.production-placeholder,.setting-row select,.btn.subtle) {background:var(--surface-soft);color:var(--muted);border-color:var(--line-strong)}
+.app-shell .yx-native :is(.field,.dialog textarea,.shot-controls select,.duration) {border-color:var(--line-strong);border-radius:var(--radius-control)}
+.app-shell .yx-native .wave span {background:var(--gold)}
+.app-shell .yx-native .step.done {color:var(--accent-dark)}
+.app-shell .yx-native .dialog {border-radius:16px}
+.app-shell .yx-native .creative-tip b {color:var(--accent-dark)}
+.app-shell .yx-native .analysis-flow {color:var(--accent)}
+.app-shell .yx-native .analysis-flow span {background:var(--line-strong)}
+.app-shell .yx-native .check-row span:last-child {color:#71572a}
+/* Portal forms live outside .app-shell and need the same resize/focus rules. */
+.modal textarea {resize:both;min-width:120px;max-width:none}
+.modal .field {overflow:auto}
+.app-shell .acquisition-result-card>div span {color:#e2d0b7}
+.app-shell .yx-native .overlay {background:#241c145c;backdrop-filter:blur(4px)}
