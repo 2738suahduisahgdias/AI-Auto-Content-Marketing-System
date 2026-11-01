@@ -15,6 +15,6 @@ class ReadinessTest(unittest.TestCase):
             entries={r['name']:r for r in result['capabilities']}
             self.assertEqual(entries['文章文档导出']['status'],'requires_validation')
             self.assertEqual(entries['文案生成']['status'],'blocked')
-            self.assertEqual(entries['图文图片搜索与生成']['status'],'not_implemented')
+            self.assertEqual(entries['图文图片搜索与生成']['status'],'blocked')
             self.assertTrue(all(r['status']=='requires_login_verification' for r in result['platforms']))
             self.assertEqual(list(Path(tmp).iterdir()),[])

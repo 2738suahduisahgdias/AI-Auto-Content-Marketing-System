@@ -824,7 +824,7 @@ def yingxu_script_candidate(task, payload):
     return {'candidate': generated['master'], 'revision': version}
 
 
-def yingxu_render_props(task, preview=False):
+def yingxu_render_props(task, preview=False, shot_index=None):
     snapshot = task.get("source", {}).get("yingxu", {}).get("snapshot", {})
     shots = snapshot.get("shots", [])
     if not shots:
@@ -837,12 +837,26 @@ def yingxu_render_props(task, preview=False):
         source = (ROOT / file["relative_path"]).resolve()
         if ROOT.resolve() not in source.parents or not source.is_file() or source.suffix.lower() not in extensions:
             raise ApiError(400, "素材丢失或格式不支持，请重新定位素材")
-        name = hashlib.sha256(source.read_bytes()).hexdigest() + source.suffix.lower()
+        from content_workbench.storage.db import file_hash
+        digest = file_hash(source)
+        expected = file.get("media_info", {}).get("source_sha256")
+        if expected and digest != expected:
+            raise ApiError(409, "素材内容已改变，请重新导入并审核")
+        name = digest + source.suffix.lower()
         directory = REMOTION_APP / "public-static" / "yingxu-assets"
         directory.mkdir(parents=True, exist_ok=True)
         target = directory / name
-        if not target.exists():
-            shutil.copyfile(source, target)
+        if not target.exists() or file_hash(target) != digest:
+            if shutil.disk_usage(directory).free < source.stat().st_size + 64 * 1024 ** 2:
+                raise ApiError(409, "素材缓存盘空间不足，请清理缓存或更换项目磁盘；原素材保持不变")
+            temporary = target.with_name(target.name + "." + uuid.uuid4().hex + ".staging")
+            try:
+                shutil.copyfile(source, temporary)
+                if file_hash(temporary) != digest:
+                    raise ApiError(409, "准备渲染期间素材发生变化，请重新导入")
+                temporary.replace(target)
+            finally:
+                temporary.unlink(missing_ok=True)
         return "yingxu-assets/" + name, file
     scenes, captions, elapsed = [], [], 0.0
     for index, shot in enumerate(shots):
@@ -867,6 +881,28 @@ def yingxu_render_props(task, preview=False):
                        "description": shot.get("desc", ""), "narration": shot.get("text", ""), "media": asset})
         captions.append({"text": shot.get("text", ""), "startMs": round(elapsed * 1000), "endMs": round(end * 1000), "timestampMs": None, "confidence": None})
         elapsed = end
+    if snapshot.get("voiceFileId") and snapshot.get("rhythm") == "旁白驱动":
+        voice = files.get(snapshot["voiceFileId"])
+        voice_duration = float((voice or {}).get("media_info", {}).get("duration_seconds", 0))
+        if not 0 < voice_duration <= 3600:
+            raise ApiError(400, "录音没有有效时长，请重新导入")
+        fixed = sum(scene["end_seconds"] - scene["start_seconds"] for scene in scenes if (scene.get("media") or {}).get("kind") == "video")
+        adjustable = elapsed - fixed
+        if voice_duration < fixed - 0.05 or (adjustable <= 0 and abs(voice_duration - fixed) > 0.05):
+            raise ApiError(409, "录音时长与完整实拍素材无法对齐；请增加可调整的代码/图片分镜或修改录音，不会裁短实拍素材")
+        if adjustable > 0:
+            remaining = voice_duration - fixed
+            if remaining <= 0:
+                raise ApiError(409, "录音没有为代码或图片分镜留下时长，请延长录音或调整分镜")
+            cursor = 0.0
+            for scene, caption in zip(scenes, captions):
+                length = scene["end_seconds"] - scene["start_seconds"]
+                if (scene.get("media") or {}).get("kind") != "video":
+                    length *= remaining / adjustable
+                scene["start_seconds"], scene["end_seconds"] = cursor, cursor + length
+                caption["startMs"], caption["endMs"] = round(cursor * 1000), round((cursor + length) * 1000)
+                cursor += length
+            elapsed = cursor
     if elapsed > 3600:
         raise ApiError(400, "当前本地渲染单次支持一小时以内视频")
     props = {"title": snapshot.get("manuscript", {}).get("title", task["title"]), "scenes": scenes,
@@ -877,6 +913,20 @@ def yingxu_render_props(task, preview=False):
     for key, field in (("voiceFileId", "audio"), ("bgmFileId", "backgroundMusic")):
         if snapshot.get(key) and (key != "voiceFileId" or snapshot.get("rhythm") == "旁白驱动"):
             props[field], _ = media(snapshot[key], {".mp3", ".wav", ".m4a"})
+    if shot_index is not None:
+        if not preview or type(shot_index) is not int or not 0 <= shot_index < len(scenes):
+            raise ApiError(400, "选镜预览需要有效的分镜序号，不能用于全片导出")
+        scene = dict(scenes[shot_index])
+        start = scene["start_seconds"]
+        length = min(10, scene["end_seconds"] - start)
+        scene.update(start_seconds=0, end_seconds=length)
+        props["scenes"] = [scene]
+        props["captions"] = [{**captions[shot_index], "startMs":0, "endMs":round(length * 1000)}]
+        props["durationSeconds"] = length
+        props["previewSourceStartSeconds"] = start
+        for key, segment_key in (("audio", "audioSegments"), ("backgroundMusic", "backgroundMusicSegments")):
+            if props.get(key):
+                props[segment_key] = [{"src":props[key], "start_seconds":start, "end_seconds":start+length, "timeline_start_seconds":0}]
     return props
 
 
@@ -891,7 +941,7 @@ def render_yingxu(task, payload):
         if payload.get("revision") != version:
             raise ApiError(409, "制作版本已变化，请刷新并保存后重试")
         preview = payload.get("preview") is True
-        props = yingxu_render_props(task, preview)
+        props = yingxu_render_props(task, preview, payload.get("shot_index"))
         if shutil.disk_usage(ROOT).free < 1024 ** 3:
             raise ApiError(409, "剩余磁盘空间不足 1 GB，请清理缓存后重试")
         directory = ROOT / "renders" / task["content_id"]
@@ -899,12 +949,16 @@ def render_yingxu(task, payload):
         output = directory / ("yingxu-" + uuid.uuid4().hex + ".mp4")
         try:
             run_remotion_render(props, output, scale=0.5 if preview else 1)
-            probe_media(output, "video")
+            info = probe_media(output, "video")
+            if abs(info["duration_seconds"] - props["durationSeconds"]) > 0.15:
+                raise ApiError(502, "渲染时长与当前分镜时间线不符，结果未入库，请检查渲染日志")
+            if (props.get("audio") or props.get("backgroundMusic")) and not any(stream.get("codec_type") == "audio" for stream in info.get("streams", [])):
+                raise ApiError(502, "已配置声音但成片缺少音轨，结果未入库")
             with DB_LOCK, connect() as conn:
                 current = get_task(conn, task["content_id"])
                 if current.get("source", {}).get("yingxu", {}).get("revision") != version:
                     raise ApiError(409, "渲染期间制作版本变化，请按最新版本重试")
-                result = upload_file(current, "asset" if preview else "video", "yingxu-{}-v{}.mp4".format("preview" if preview else "final", version), output.read_bytes(), studio=True)
+                result = upload_file(current, "asset" if preview else "video", "yingxu-{}-v{}.mp4".format("preview" if preview else "final", version), output, studio=True)
             with DB_LOCK, connect() as conn:
                 result['media_info'].update({'yingxu_revision': version, 'yingxu_render_hash': payload_hash(props), 'yingxu_preview': preview})
                 conn.execute("UPDATE files SET media_info_json=? WHERE id=?", (json.dumps(result['media_info']), result['id']))
@@ -1828,7 +1882,10 @@ def upload_file(task, kind, filename, body, studio=False):
         raise ApiError(400, "文件路径无效")
     temporary = path.with_suffix(path.suffix + ".uploading")
     try:
-        temporary.write_bytes(body)
+        if isinstance(body, Path):
+            shutil.copyfile(body, temporary)
+        else:
+            temporary.write_bytes(body)
         probe_kind = kind
         if studio and kind == "asset":
             if Path(filename).suffix in (".mp4", ".mov"):
@@ -1836,6 +1893,8 @@ def upload_file(task, kind, filename, body, studio=False):
             elif Path(filename).suffix in (".mp3", ".wav", ".m4a"):
                 probe_kind = "audio"
         info = probe_media(temporary, probe_kind)
+        from content_workbench.storage.db import file_hash
+        info["source_sha256"] = file_hash(temporary)
         temporary.replace(path)
     except Exception:
         temporary.unlink(missing_ok=True)
@@ -1843,7 +1902,7 @@ def upload_file(task, kind, filename, body, studio=False):
     relative = path.relative_to(ROOT).as_posix()
     with DB_LOCK, connect() as conn:
         cursor = conn.execute("INSERT INTO files(content_id,kind,original_name,relative_path,size,media_info_json,created_at) VALUES (?,?,?,?,?,?,?)",
-                              (task["content_id"], kind, filename, relative, len(body), json.dumps(info), now()))
+                              (task["content_id"], kind, filename, relative, path.stat().st_size, json.dumps(info), now()))
         file_id = cursor.lastrowid
         if kind in ("audio", "srt"):
             update_task(conn, task["content_id"], state="waiting_audio")

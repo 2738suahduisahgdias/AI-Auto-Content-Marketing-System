@@ -25,6 +25,7 @@ export const Narration: React.FC<{audio?: string; audioSegments?: AudioSegment[]
         >
           <Audio
             src={mediaSource(segment.src)}
+            volume={volume}
             trimBefore={Math.max(0, Math.round(segment.start_seconds * fps))}
             durationInFrames={Math.max(1, Math.round((segment.end_seconds - segment.start_seconds) * fps))}
             premountFor={fps}

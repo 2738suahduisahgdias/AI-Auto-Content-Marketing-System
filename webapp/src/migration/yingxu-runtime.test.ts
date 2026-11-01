@@ -19,4 +19,14 @@ describe('原系统中的映序编辑器',()=>{
  expect(localStorage.getItem('yingxu-demo-v1')).toBeNull();
  expect(change.mock.lastCall?.[0].manuscript.versions[0].text).toBe('已有原稿');
  });
+ it('单镜预览传递选择的序号而不是重复渲染开头',async()=>{
+   const root=document.createElement('div');document.body.append(root);
+   root.innerHTML='<span id="crumb"></span><small id="saved"></small><div id="main"></div><div id="modal" hidden></div><div id="toast"></div><input id="upload" type="file">';
+   const renderVideo=vi.fn().mockResolvedValue({});
+   dispose=mountYingxu(root,vi.fn(),vi.fn(),vi.fn(),{initial:{stage:2,workflowV3:true,authoringV1:true,shots:[{title:'实拍',text:'第一镜',source:'人工上传',duration:2},{title:'讲解',text:'第二镜',source:'Remotion 代码',duration:6}],manuscript:{title:'录音验收',text:'原稿',versions:[]}},onChange:vi.fn(),upload:vi.fn(),renderVideo});
+   const buttons=within(root).getAllByText('渲染此镜预览');
+   fireEvent.click(buttons[1]);
+   await waitFor(()=>expect(renderVideo).toHaveBeenCalledWith(true,1));
+ });
+
 });
