@@ -13,7 +13,7 @@ DEFAULT_SETTINGS = {
     "xiaohongshu_prompt": "综合个人小红书收藏夹中的热点、精选、竞品和高赞笔记快照，选择与账号定位相关且能形成差异化表达的主题。收藏只代表个人研究样本，不代表平台全貌；没有明确指标时不得编造热度。",
     "daily_time": "09:00", "daily_enabled": False,
     "featured_collection": "选题", "competitor_collection": "企业AI落地竞对账号", "high_praise_collection": "低粉高赞文案",
-    "xhs_hot_collection": "热点选题", "xhs_featured_collection": "选题", "xhs_competitor_collection": "企业AI落地竞对账号", "xhs_high_praise_collection": "低粉高赞文案",
+    "xhs_hot_collection": "热点选题", "xhs_featured_collection": "精选选题", "xhs_competitor_collection": "竞对账号内容", "xhs_high_praise_collection": "高赞选题",
 }
 SOURCE_KEYS = ("industry", "hot", "featured", "competitor", "high_praise", "xhs_hot", "xhs_featured", "xhs_competitor", "xhs_high_praise", "xhs_notes", "wechat_inbox")
 

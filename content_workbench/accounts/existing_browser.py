@@ -94,18 +94,22 @@ def xhs_notes(bridge):
 def xhs_favorite_cards(bridge):
     return bridge.evaluate("""(() => {
       const result=[];const seen=new Set();
-      for(const a of document.querySelectorAll('a[href*="/explore/"],a[href*="/search_result/"]')){
-        const href=a.href;const match=href.match(/(?:explore|search_result)\\/([0-9a-zA-Z]+)/);
+      for(const a of document.querySelectorAll('a[href*="/explore/"],a[href*="/search_result/"],a[href*="/board/"],a[href*="/user/profile/"]')){
+        const href=a.href;
+        const match=href.match(/(?:explore|search_result)\\/([0-9a-zA-Z]+)/)||href.match(/\\/board\\/[0-9a-zA-Z]+\\/([0-9a-zA-Z]+)/)||href.match(/\\/user\\/profile\\/[0-9a-zA-Z]+\\/([0-9a-zA-Z]+)/);
         if(!match||seen.has(match[1]))continue;
-        const container=a.closest('section,li,article')||a;
+        const container=a.closest('section,li,article')||a.parentElement||a;
         const text=(container.innerText||a.innerText||'').trim();
         const lines=text.split('\\n').map(x=>x.trim()).filter(Boolean);
         const image=a.querySelector('img')||container.querySelector('img');
-        const title=(image?.alt||'').trim()||lines.filter(x=>x.length>1&&!/^\\d+(\\.\\d+)?[万wW]?$/.test(x)).sort((a,b)=>b.length-a.length)[0]||'';
+        const titleLink=container.querySelector('a.title');
+        const title=(titleLink?.innerText||a.innerText||image?.alt||'').trim()||lines.filter(x=>x.length>1&&!/^\\d+(\\.\\d+)?[万wW]?$/.test(x)).sort((a,b)=>b.length-a.length)[0]||'';
         if(!title)continue;
         const like_count=lines.find(x=>/^\\d+(\\.\\d+)?[万wW]?$/.test(x))||null;
-        seen.add(match[1]);result.push({title,canonical_url:'https://www.xiaohongshu.com/explore/'+match[1],platform_item_id:match[1],
-          metadata:{title,visible_text:text.slice(0,1000),cover_url:image?.src||'',like_count,visible_metrics:like_count?[like_count]:[]}});
+        const canonical_url=href.includes('/board/')?href:'https://www.xiaohongshu.com/explore/'+match[1];
+        const author=container.querySelector('a.author')?.innerText.trim()||'';
+        seen.add(match[1]);result.push({title,canonical_url,platform_item_id:match[1],
+          metadata:{title,author_name:author,visible_text:text.slice(0,1000),cover_url:image?.src||'',like_count,visible_metrics:like_count?[like_count]:[]}});
         if(result.length>=100)break;
       }
       return result;
@@ -124,19 +128,27 @@ def xhs_favorites(bridge, collections):
     })()""")
     if not profile_url:
         return {"status": "error", "error": "未找到个人主页入口，可能未登录或页面结构已变化", "action": "确认个人小红书已登录，并检查页面是否改版"}
-    bridge.call("navigate", {"url": profile_url})
-    time.sleep(3)
-    click_dom_text(bridge, "收藏")
+    bridge.call("navigate", {"url": profile_url.split("?", 1)[0] + "?tab=fav&subTab=board"})
+    time.sleep(4)
+    albums = bridge.evaluate("""(() => {
+      const result={};
+      for(const a of document.querySelectorAll('a[href*="/board/"]')){
+        const title=(a.innerText||'').split('\\n').map(x=>x.trim()).filter(Boolean)[0]||'';
+        if(title&&!result[title])result[title]=a.href;
+      }
+      return result;
+    })()""") or {}
     grouped = {}
     errors = []
     for source, title in collections.items():
-        bridge.evaluate("() => { window.scrollTo(0,0); return true; }")
-        if not click_dom_text(bridge, title):
+        album_url = albums.get(title)
+        if not album_url:
             grouped[source] = []
-            errors.append({"source": source, "code": "COLLECTION_NOT_FOUND", "message": "未找到收藏夹：" + title,
-                           "action": "核对收藏夹名称，或在设置中修改后重新同步"})
+            errors.append({"source": source, "code": "COLLECTION_NOT_FOUND", "message": "未找到专辑：" + title,
+                           "action": "在个人小红书“收藏 → 专辑”核对名称，或在设置中修改后重新同步"})
             continue
-        time.sleep(2)
+        bridge.call("navigate", {"url": album_url})
+        time.sleep(3)
         collected = {}
         quiet = 0
         for _ in range(5):
