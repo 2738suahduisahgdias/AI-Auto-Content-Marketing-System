@@ -78,6 +78,40 @@ class TopicCase(unittest.TestCase):
         after = datetime(2026, 10, 26, 1, 0, tzinfo=timezone.utc)
         self.assertEqual("2026-10-27T01:00:00.000Z", next_due("09:00", after))
 
+    def test_xhs_collections_sync_once_and_recommend_real_sources(self):
+        from unittest import mock
+        from content_workbench.topics.executors import TopicExecutors
+        self.service.upsert_item({"title": "抖音精选", "canonical_url": "https://www.douyin.com/video/shared"}, "featured", collection_title="选题")
+        collections = {
+            "xhs_hot": [{"title": "小红书热点", "canonical_url": "https://www.xiaohongshu.com/explore/hot1"}],
+            "xhs_featured": [{"title": "小红书精选", "canonical_url": "https://www.xiaohongshu.com/explore/featured1"}],
+            "xhs_competitor": [{"title": "小红书竞品", "canonical_url": "https://www.xiaohongshu.com/explore/competitor1"}],
+            "xhs_high_praise": [{"title": "小红书高赞", "canonical_url": "https://www.xiaohongshu.com/explore/praise1"}],
+        }
+        executor = TopicExecutors(self.service)
+        with mock.patch("content_workbench.topics.executors.run_existing_browser", return_value={"status": "ok", "collections": collections, "errors": []}) as browser, \
+                mock.patch.object(self.service, "cache_cover", return_value=True):
+            result = executor.xhs_sync({"input": {}}, DummyContext())
+        self.assertEqual("succeeded", result["status"])
+        self.assertEqual(1, browser.call_count)
+        self.assertEqual({"xhs_hot", "xhs_featured", "xhs_competitor", "xhs_high_praise"}, set(browser.call_args.kwargs["collections"]))
+        data = self.service.bootstrap()
+        for source in collections:
+            self.assertEqual(1, len(data["sources"][source]))
+        self.assertEqual(1, len(data["sources"]["featured"]))
+        self.assertEqual("抖音精选", data["sources"]["featured"][0]["title"])
+        self.assertIsNotNone(data["xhs_last_sync"])
+
+        candidate = {"title": "新推荐", "reason": "真实收藏证据", "angle": "新场景", "evidence_ids": []}
+        with mock.patch.object(executor, "kimi_json", return_value=[candidate]) as model:
+            recommended = executor.recommend({"input": {"agent": "xiaohongshu"}}, DummyContext())
+        self.assertEqual(1, recommended["candidates"])
+        prompt = model.call_args.args[2]
+        for source in collections:
+            self.assertIn(source, prompt)
+        self.assertNotIn('"hot"', prompt)
+        self.assertEqual(1, len(self.service.bootstrap()["recommendations"]["xiaohongshu"]))
+
     def test_video_frames_ocr_and_cache(self):
         ocr_python = PROJECT_ROOT / ".venv-topics/bin/python"
         if not ocr_python.is_file() or subprocess.run([str(ocr_python), "-c", "import rapidocr_onnxruntime"], capture_output=True).returncode:

@@ -1,6 +1,15 @@
 import { CalculateMetadataFunction, Composition } from "remotion";
 import { MyComposition } from "./Composition";
 import { TalkingHeadProps, VideoComposition } from "./VideoComposition";
+import {
+  AudiogramComposition,
+  DataStoryComposition,
+  MapStoryComposition,
+  PromoComposition,
+  TechShowcaseComposition,
+} from "./templates";
+import {KaraokeCaptionComposition} from "./ported/karaoke";
+import {KineticTextComposition} from "./ported/kinetic";
 
 const calculateMetadata: CalculateMetadataFunction<TalkingHeadProps> = ({ props }) => {
   return {
@@ -49,6 +58,27 @@ export const RemotionRoot: React.FC = () => {
         defaultProps={studioProps}
         calculateMetadata={calculateMetadata}
       />
+      {([
+        ["Promo", PromoComposition],
+        ["TechShowcase", TechShowcaseComposition],
+        ["DataStory", DataStoryComposition],
+        ["Audiogram", AudiogramComposition],
+        ["MapStory", MapStoryComposition],
+        ["KaraokeCaption", KaraokeCaptionComposition],
+        ["KineticText", KineticTextComposition],
+      ] as const).map(([id, component]) => (
+        <Composition
+          key={id}
+          id={id}
+          component={component}
+          durationInFrames={180}
+          fps={30}
+          width={1080}
+          height={1920}
+          defaultProps={studioProps}
+          calculateMetadata={calculateMetadata}
+        />
+      ))}
     </>
   );
 };

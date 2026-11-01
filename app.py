@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
+import hashlib
+import io
 import json
+import zipfile
 import math
 import mimetypes
 import os
@@ -10,6 +13,7 @@ import sqlite3
 import subprocess
 import tempfile
 import threading
+import time
 import uuid
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -17,6 +21,29 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlsplit
 
 from content_workbench.agents.registry import agent_config
+from content_workbench.domain.errors import DomainError
+from content_workbench.media.contracts import video_brief, video_package
+from content_workbench.agents.writing import (
+    apply_generated_scripts,
+    initial_script_meta,
+    load_writing_skills,
+    merge_manual_scripts,
+    missing_script_fields,
+    validate_generated_scripts,
+    writing_context,
+)
+from content_workbench.media.templates import TemplateError, all_templates, resolve_template, set_template_status, stable_templates, template_key, template_props
+from content_workbench.media.storyboard import ENGINE_VERSION, build_preview_props, build_storyboard
+from content_workbench.media.visual_previews import approved_preview, get_preview, list_previews, preview_dict, set_current
+from content_workbench.media.versioning import (
+    file_sha256,
+    latest_variant,
+    payload_hash,
+    record_stage_revision,
+    upsert_variant,
+    variant_dict,
+    variant_for_file,
+)
 
 os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 os.environ.setdefault("HF_HUB_ETAG_TIMEOUT", "30")
@@ -70,6 +97,7 @@ UPLOADS = {
     "srt": (("subtitles",), {".srt"}),
     "asset": (("assets", "source"), {".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".mov", ".mp3", ".wav", ".m4a", ".pdf", ".txt"}),
     "video": (("renders",), {".mp4", ".mov", ".webm"}),
+    "cover": (("covers",), {".png", ".jpg", ".jpeg", ".webp"}),
 }
 
 
@@ -171,10 +199,56 @@ def init_db():
             event TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL,
             FOREIGN KEY(content_id) REFERENCES tasks(content_id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS render_runs (
+            id TEXT PRIMARY KEY, content_id TEXT NOT NULL,
+            template_id TEXT NOT NULL, template_version TEXT NOT NULL, composition_id TEXT NOT NULL,
+            status TEXT NOT NULL, input_hash TEXT NOT NULL, props_json TEXT NOT NULL,
+            input_snapshot_json TEXT NOT NULL, output_file_id INTEGER, error TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(content_id) REFERENCES tasks(content_id) ON DELETE CASCADE,
+            FOREIGN KEY(output_file_id) REFERENCES files(id) ON DELETE SET NULL
+        );
+        CREATE INDEX IF NOT EXISTS render_runs_lookup ON render_runs(content_id,input_hash,status);
+        CREATE TABLE IF NOT EXISTS stage_revisions (
+            id TEXT PRIMARY KEY, content_id TEXT NOT NULL, stage TEXT NOT NULL,
+            revision_no INTEGER NOT NULL, payload_json TEXT NOT NULL, payload_hash TEXT NOT NULL,
+            status TEXT NOT NULL, created_at TEXT NOT NULL,
+            UNIQUE(content_id,stage,revision_no),
+            FOREIGN KEY(content_id) REFERENCES tasks(content_id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS video_variants (
+            id TEXT PRIMARY KEY, content_id TEXT NOT NULL,
+            template_id TEXT NOT NULL, template_version TEXT NOT NULL,
+            file_id INTEGER NOT NULL UNIQUE, file_sha256 TEXT NOT NULL DEFAULT '',
+            quality_json TEXT NOT NULL DEFAULT '{}', approved_at TEXT, published_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+            FOREIGN KEY(content_id) REFERENCES tasks(content_id) ON DELETE CASCADE,
+            FOREIGN KEY(file_id) REFERENCES files(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS video_variants_task ON video_variants(content_id,created_at);
+        CREATE TABLE IF NOT EXISTS visual_previews (
+            id TEXT PRIMARY KEY, content_id TEXT NOT NULL,
+            template_key TEXT NOT NULL, template_id TEXT NOT NULL, template_version TEXT NOT NULL,
+            composition_id TEXT NOT NULL, mode TEXT NOT NULL, platform TEXT NOT NULL,
+            request_json TEXT NOT NULL, fingerprint TEXT NOT NULL,
+            storyboard_json TEXT NOT NULL, props_json TEXT NOT NULL, input_snapshot_json TEXT NOT NULL,
+            status TEXT NOT NULL, progress REAL NOT NULL DEFAULT 0,
+            video_file_id INTEGER, cover_file_id INTEGER, error TEXT NOT NULL DEFAULT '',
+            approved_at TEXT, is_current INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+            FOREIGN KEY(content_id) REFERENCES tasks(content_id) ON DELETE CASCADE,
+            FOREIGN KEY(video_file_id) REFERENCES files(id) ON DELETE SET NULL,
+            FOREIGN KEY(cover_file_id) REFERENCES files(id) ON DELETE SET NULL
+        );
+        CREATE INDEX IF NOT EXISTS visual_previews_lookup
+            ON visual_previews(content_id,template_key,fingerprint,status,approved_at);
+        CREATE INDEX IF NOT EXISTS visual_previews_current ON visual_previews(content_id,is_current,created_at);
         """)
         columns = {row[1] for row in conn.execute("PRAGMA table_info(tasks)")}
         if "source_json" not in columns:
             conn.execute("ALTER TABLE tasks ADD COLUMN source_json TEXT NOT NULL DEFAULT '{}'")
+        if "script_meta_json" not in columns:
+            conn.execute("ALTER TABLE tasks ADD COLUMN script_meta_json TEXT NOT NULL DEFAULT '{}'")
         if conn.execute("SELECT COUNT(*) FROM topics").fetchone()[0] == 0:
             for topic in seed["topics"]:
                 conn.execute(
@@ -196,6 +270,22 @@ def init_db():
                             VALUES (?,?,?,?,?,?,NULL,NULL,NULL,0,NULL,0,?)""",
                          (voice_id, "system", name, voice_name, "中文（中国大陆）", description, now()))
             conn.execute("UPDATE voice_profiles SET voice_name=? WHERE id=? AND kind='system'", (voice_name, voice_id))
+        stage_by_state = {"topic_approved": "scripts", "script_drafted": "scripts", "script_approved": "audio",
+                          "waiting_audio": "audio", "transcribed": "assets", "assets_planned": "assets",
+                          "assets_approved": "render", "rendered": "quality", "quality_checked": "quality",
+                          "review_required": "review", "approved": "publish", "published": "retro", "analyzed": "retro"}
+        for task_row in conn.execute("SELECT * FROM tasks"):
+            task = task_dict(task_row, conn)
+            if not conn.execute("SELECT 1 FROM stage_revisions WHERE content_id=? LIMIT 1", (task["content_id"],)).fetchone():
+                record_stage_revision(conn, task, stage_by_state.get(task["state"], "content"), "current")
+            video_rows = conn.execute("SELECT * FROM files WHERE content_id=? AND kind='video' ORDER BY id DESC", (task["content_id"],)).fetchall()
+            for index, file_row in enumerate(video_rows):
+                if conn.execute("SELECT 1 FROM video_variants WHERE file_id=?", (file_row["id"],)).fetchone():
+                    continue
+                path = (ROOT / file_row["relative_path"]).resolve()
+                variant_id = upsert_variant(conn, task, dict(file_row), file_path=path if path.is_file() else None)
+                if index == 0 and task.get("final_approved_at"):
+                    conn.execute("UPDATE video_variants SET approved_at=? WHERE id=?", (task["final_approved_at"], variant_id))
 
 
 def run_process(arguments, timeout, output_limit=MAX_CLI_OUTPUT, label="Kimi CLI", cwd=None):
@@ -467,9 +557,10 @@ def parse_json(value, default):
 def task_dict(row, conn):
     item = dict(row)
     for key, target, default in (
-        ("scripts_json", "scripts", {}), ("asset_plan_json", "asset_plan", []),
-        ("quality_json", "quality", {}), ("publications_json", "publications", {}),
-        ("metrics_json", "metrics", {}), ("source_json", "source", {}),
+        ("scripts_json", "scripts", {}), ("script_meta_json", "script_meta", {}),
+        ("asset_plan_json", "asset_plan", []), ("quality_json", "quality", {}),
+        ("publications_json", "publications", {}), ("metrics_json", "metrics", {}),
+        ("source_json", "source", {}),
     ):
         item[target] = parse_json(item.pop(key), default)
     item["files"] = [file_dict(row) for row in conn.execute(
@@ -477,6 +568,18 @@ def task_dict(row, conn):
     item["events"] = [dict(row) for row in conn.execute(
         "SELECT event,detail,created_at FROM events WHERE content_id=? ORDER BY id DESC LIMIT 30",
         (item["content_id"],))]
+    item["render_runs"] = [dict(row) for row in conn.execute(
+        """SELECT id,template_id,template_version,composition_id,status,input_hash,
+                  output_file_id,error,created_at
+           FROM render_runs WHERE content_id=? ORDER BY created_at DESC,rowid DESC""",
+        (item["content_id"],))]
+    item["variants"] = [variant_dict(row) for row in conn.execute(
+        "SELECT * FROM video_variants WHERE content_id=? ORDER BY created_at DESC,rowid DESC",
+        (item["content_id"],))]
+    item["stage_revisions"] = [{**dict(row), "payload": parse_json(row["payload_json"], {})} for row in conn.execute(
+        "SELECT * FROM stage_revisions WHERE content_id=? ORDER BY revision_no DESC,created_at DESC",
+        (item["content_id"],))]
+    item["visual_previews"] = list_previews(conn, item["content_id"])
     return item
 
 
@@ -551,7 +654,14 @@ def create_task(payload):
     source_count = sum(value is not None for value in (topic_id, hotspot_rank, favorite_collection))
     if source_count > 1:
         raise ApiError(400, "候选选题、热点和收藏夹分类只能选择一个任务来源")
-    source = {"type": "manual"}
+    review_mode = payload.get("review_mode", "agent")
+    publish_mode = payload.get("publish_mode", "local_only")
+    if review_mode not in ("agent", "human", "none") or publish_mode not in ("manual", "auto", "local_only"):
+        raise ApiError(400, "审核或发布方式无效", "workflow", "重新选择审核和发布方式。")
+    source = {"type": str(payload.get("source_type", "manual")), "platform": str(payload.get("platform", "douyin")),
+              "production_preset": str(payload.get("production_preset", "enterprise_ai_default")),
+              "review_mode": review_mode, "publish_mode": publish_mode}
+    manual_content = str(payload.get("content", ""))
     with DB_LOCK, connect() as conn:
         if topic_id is not None:
             topic = conn.execute("SELECT * FROM topics WHERE id=?", (topic_id,)).fetchone()
@@ -600,13 +710,14 @@ def create_task(payload):
             raise ApiError(409, "当天任务编号已满")
         content_id = "{}-{:03d}".format(prefix, sequence)
         timestamp = now()
-        conn.execute("""INSERT INTO tasks(content_id,topic_id,title,pillar,audience,pain_point,angle,state,source_json,created_at,updated_at)
-                        VALUES (?,?,?,?,?,?,?,'topic_approved',?,?,?)""",
+        scripts = {source.get("platform", "douyin"): manual_content} if manual_content.strip() else {}
+        conn.execute("""INSERT INTO tasks(content_id,topic_id,title,pillar,audience,pain_point,angle,state,source_json,scripts_json,created_at,updated_at)
+                        VALUES (?,?,?,?,?,?,?,'topic_approved',?,?,?,?)""",
                      (content_id, topic_id, title, pillar, audience, pain_point, angle,
-                      json.dumps(source, ensure_ascii=False), timestamp, timestamp))
+                      json.dumps(source, ensure_ascii=False), json.dumps(scripts, ensure_ascii=False), timestamp, timestamp))
         if topic_id is not None:
             conn.execute("UPDATE topics SET used_at=? WHERE id=?", (timestamp, topic_id))
-        detail = "任务已创建，等待编辑五个脚本版本"
+        detail = "任务已创建，等待手填或按需生成口播稿"
         if source["type"] == "douyin_hotspot":
             detail += "；来源：抖音热点 #{}，{}".format(source["rank"], source["captured_at"])
         elif source["type"] == "douyin_favorite_collection":
@@ -614,28 +725,32 @@ def create_task(payload):
         add_event(conn, content_id, "确认选题", detail)
     make_directories(content_id)
     with connect() as conn:
-        return get_task(conn, content_id)
+        task = get_task(conn, content_id)
+        record_stage_revision(conn, task, "content")
+        return task
 
 
 def save_scripts(task, payload):
     require_state(task, "topic_approved", "script_drafted")
-    scripts = payload.get("scripts")
-    if not isinstance(scripts, dict):
-        raise ApiError(400, "脚本数据格式无效", "scripts", "在脚本页分别编辑五个文本框后再保存。")
+    incoming = payload.get("scripts")
+    if not isinstance(incoming, dict):
+        raise ApiError(400, "脚本数据格式无效", "scripts", "编辑需要的文稿字段后保存；母稿和其他平台版本可留空。")
     labels = {"master": "母稿", "douyin": "抖音版", "wechat_channels": "视频号版", "xiaohongshu": "小红书版", "wechat_official_account": "公众号文章版"}
-    for key in SCRIPT_KEYS:
-        if not isinstance(scripts.get(key), str):
-            raise ApiError(400, "缺少{}文本".format(labels[key]), "scripts." + key,
-                           "在脚本页的“{}”文本框补齐内容，并保留其他四个版本后保存。".format(labels[key]))
-        if len(scripts[key]) > 200000:
+    for key, value in incoming.items():
+        if key not in SCRIPT_KEYS or not isinstance(value, str):
+            raise ApiError(400, "文稿字段无效：{}".format(key), "scripts", "只保存页面提供的文稿字段。")
+        if len(value) > 200000:
             raise ApiError(400, "{}超过 20 万字符".format(labels[key]), "scripts." + key,
                            "精简{}到 20 万字符以内后重新保存。".format(labels[key]))
+    scripts, metadata = merge_manual_scripts(task.get("scripts", {}), task.get("script_meta", {}), incoming)
     with DB_LOCK, connect() as conn:
-        update_task(conn, task["content_id"], scripts_json=json.dumps(scripts, ensure_ascii=False), state="script_drafted")
-        add_event(conn, task["content_id"], "保存脚本", "母稿与四个平台版本已保存")
+        update_task(conn, task["content_id"], scripts_json=json.dumps(scripts, ensure_ascii=False),
+                    script_meta_json=json.dumps(metadata, ensure_ascii=False), state="script_drafted")
+        add_event(conn, task["content_id"], "保存文稿", "手填内容已保存，其他版本未改变")
+        record_stage_revision(conn, get_task(conn, task["content_id"]), "scripts")
 
 
-def build_script_prompt(task):
+def build_script_prompt(task, fields, skill_prompt=""):
     seed = json.loads(SEED_PATH.read_text(encoding="utf-8"))
     strategy = seed["strategy"]
     platform_requirements = {}
@@ -653,20 +768,36 @@ def build_script_prompt(task):
         "source": task.get("source", {}), "candidate_evidence": evidence,
         "account_positioning": strategy["brand"], "audience": strategy["audiences"].get(task["audience"], {}),
         "editorial_rules": strategy["editorial_rules"], "platform_requirements": platform_requirements,
-        "publish_defaults": {"master_short_video_duration": seed["platforms"]["publish_defaults"]["master_short_video_duration"],
-                             "human_review_required": True, "auto_publish": False},
+        "existing_scripts": {key: value for key, value in task.get("scripts", {}).items() if value.strip()},
+        "requested_fields": fields,
     }
-    prompt = ("请根据且仅根据以下资料生成五个独立的中文草稿。不要补造证据，不要把单次数据写成稳定规律。"
-              "最终只输出符合 agent 约束的五字段 JSON，不执行工具或发布操作。\n" +
+    prompt = ("请根据且仅根据以下资料生成指定字段的中文草稿。不要补造证据，不要把单次数据写成稳定规律。"
+              "已有文稿是事实和表达约束，除非资料明确要求，不要改变其核心观点。"
+              "最终只输出请求字段组成的 JSON 对象，不执行工具或发布操作。\n" +
               json.dumps(context, ensure_ascii=False, separators=(",", ":")))
-    if len(prompt) > MAX_PROMPT:
-        raise ApiError(400, "生成资料超过 24000 字符，请缩短痛点或内容切入")
+    if skill_prompt:
+        prompt += "\n\n写作 Skills：\n" + skill_prompt
+    if len(prompt) > MAX_ASSET_PROMPT:
+        raise ApiError(400, "生成资料超过 60000 字符，请缩短输入或减少生成字段")
     return prompt
 
 
-def generate_scripts(task):
+def generate_scripts(task, payload=None):
+    payload = payload or {}
     require_state(task, "topic_approved", "script_drafted")
     content_id = task["content_id"]
+    requested = payload.get("fields")
+    if requested is not None and (not isinstance(requested, list) or any(key not in SCRIPT_KEYS for key in requested)):
+        raise ApiError(400, "生成字段无效", "fields", "从页面提供的文稿字段中选择。")
+    if payload.get("force") and requested:
+        fields = requested
+    else:
+        fields = missing_script_fields(task.get("scripts", {}), requested)
+    if not fields:
+        with connect() as conn:
+            result = get_task(conn, content_id)
+            result["generation_skipped"] = "没有需要补齐的空文稿；手填内容未改变"
+            return result
     with DB_LOCK:
         if content_id in GENERATING:
             raise ApiError(409, "脚本Agent正在为此任务生成，请等待完成")
@@ -676,19 +807,31 @@ def generate_scripts(task):
         if not status["ready"]:
             raise ApiError(409, "请先在设置页完成 Kimi 真实连接测试")
         config = agent_runtime("script_agent")
-        prompt = config["prompt"] + "\n" + build_script_prompt(task)
-        detection = detect_kimi()
         try:
-            scripts = run_kimi_prompt(prompt, config["timeout_seconds"], detection)
+            skill_prompt, agent_snapshot = writing_context(config, PROJECT_ROOT)
+        except ValueError as error:
+            raise ApiError(409, str(error), "skills", "在写作 Agent 配置中检查 Skills 路径和文件。")
+        prompt = config["prompt"] + "\n" + build_script_prompt(task, fields, skill_prompt)
+        detection = detect_kimi()
+        base_revisions = {key: int(task.get("script_meta", {}).get(key, {}).get("revision_no", 0)) for key in fields}
+        request_id = uuid.uuid4().hex
+        try:
+            generated = validate_generated_scripts(run_kimi_agent_json(SCRIPT_AGENT_PATH, prompt, config["timeout_seconds"], detection), fields)
         except ApiError as error:
             record_ai_result(detection, error.message)
             raise
+        except ValueError as error:
+            raise ApiError(502, str(error))
         with DB_LOCK, connect() as conn:
             current = get_task(conn, content_id)
             require_state(current, "topic_approved", "script_drafted")
+            scripts, metadata, conflicts = apply_generated_scripts(current["scripts"], current["script_meta"], generated,
+                                                                    request_id, agent_snapshot, base_revisions)
             update_task(conn, content_id, scripts_json=json.dumps(scripts, ensure_ascii=False),
-                        state="script_drafted", script_approved_at=None)
-            add_event(conn, content_id, "脚本Agent生成五版草稿", "Kimi CLI 真实调用成功；等待人工确认，未自动批准")
+                        script_meta_json=json.dumps(metadata, ensure_ascii=False), state="script_drafted", script_approved_at=None)
+            add_event(conn, content_id, "脚本Agent按需生成", "字段 {} · 候选冲突 {}".format(",".join(fields), len(conflicts)))
+            result = get_task(conn, content_id)
+            result["generation_conflicts"] = conflicts
         record_ai_result(detection)
         with connect() as conn:
             return get_task(conn, content_id)
@@ -884,7 +1027,7 @@ def save_assets(task, payload):
 
 
 def save_quality(task, payload):
-    require_state(task, "rendered", "quality_checked")
+    require_state(task, "rendered", "quality_checked", "review_required", "approved")
     checks = payload.get("checks")
     if not isinstance(checks, dict):
         raise ApiError(400, "质检数据格式无效", "quality", "在质检页逐项检查字幕、声音、画面、版权和平台规格后保存。")
@@ -896,8 +1039,16 @@ def save_quality(task, payload):
     quality = {"checks": {k: checks[k] for k in QUALITY_KEYS}, "passed": all(checks[k] for k in QUALITY_KEYS),
                "note": str(payload.get("note", "")).strip()[:3000], "checked_at": now()}
     with DB_LOCK, connect() as conn:
+        variant = conn.execute("SELECT * FROM video_variants WHERE id=? AND content_id=?",
+                               (payload.get("variant_id"), task["content_id"])).fetchone() if payload.get("variant_id") else latest_variant(conn, task["content_id"])
+        if not variant:
+            raise ApiError(409, "没有可质检的视频版本", "variant_id", "先生成或上传一个有效 MP4，再执行质检。")
+        quality["variant_id"] = variant["id"]
+        conn.execute("UPDATE video_variants SET quality_json=?,updated_at=? WHERE id=?",
+                     (json.dumps(quality, ensure_ascii=False), now(), variant["id"]))
         update_task(conn, task["content_id"], quality_json=json.dumps(quality, ensure_ascii=False), state="quality_checked")
-        add_event(conn, task["content_id"], "完成质检", "通过" if quality["passed"] else "未通过，需返修")
+        add_event(conn, task["content_id"], "完成质检", "{} · {}".format(variant["id"], "通过" if quality["passed"] else "未通过，需返修"))
+        record_stage_revision(conn, get_task(conn, task["content_id"]), "quality")
 
 
 def save_publications(task, payload):
@@ -975,11 +1126,9 @@ def task_action(task, payload):
         current = get_task(conn, content_id)
         if action == "approve_script":
             require_state(current, "script_drafted")
-            labels = {"master": "母稿", "douyin": "抖音版", "wechat_channels": "视频号版", "xiaohongshu": "小红书版", "wechat_official_account": "公众号文章版"}
-            missing = next((key for key in SCRIPT_KEYS if not current["scripts"].get(key, "").strip()), None)
-            if missing:
-                raise ApiError(409, "缺少{}，不能确认脚本".format(labels[missing]), "scripts." + missing,
-                               "在脚本页补齐“{}”，检查其余四个版本后保存，再点击人工确认。".format(labels[missing]))
+            if not any(current["scripts"].get(key, "").strip() for key in ("douyin", "wechat_channels", "xiaohongshu", "master")):
+                raise ApiError(409, "至少需要一份视频口播稿，母稿不是必填项", "scripts.douyin",
+                               "手填或生成当前平台口播稿后即可确认；其他平台版本可留空。")
             update_task(conn, content_id, state="script_approved", script_approved_at=now())
             add_event(conn, content_id, "人工确认脚本")
         elif action == "revise_script":
@@ -1001,7 +1150,8 @@ def task_action(task, payload):
             plan = current["asset_plan"]
             if not plan:
                 update_task(conn, content_id, state="assets_approved", assets_approved_at=now())
-                add_event(conn, content_id, "空素材计划", "无上传素材，允许使用全部 Remotion 文字卡渲染")
+                add_event(conn, content_id, "空素材计划", "无上传素材，允许使用全部 Remotion 内容场景渲染")
+                record_stage_revision(conn, get_task(conn, content_id), "assets")
                 return get_task(conn, content_id)
             file_ids = {f["id"] for f in current["files"] if f["kind"] == "asset"}
             issues = []
@@ -1046,15 +1196,28 @@ def task_action(task, payload):
             update_task(conn, content_id, state="assets_approved", final_approved_at=None, published_at=None, quality_json="{}")
             add_event(conn, content_id, "成片返修", "保留素材审批，等待重新上传成片")
         elif action == "submit_review":
-            require_state(current, "quality_checked")
-            if not current["quality"].get("passed"):
-                raise ApiError(409, "质检未通过，请先返修")
+            require_state(current, "quality_checked", "review_required", "approved")
+            variant = conn.execute("SELECT * FROM video_variants WHERE id=? AND content_id=?",
+                                   (payload.get("variant_id"), content_id)).fetchone() if payload.get("variant_id") else latest_variant(conn, content_id)
+            if not variant:
+                raise ApiError(409, "没有可提交审核的视频版本", "variant_id", "先选择已经质检的视频版本。")
+            if not json.loads(variant["quality_json"] or "{}").get("passed"):
+                raise ApiError(409, "该视频版本质检未通过，请先返修", "variant_id", "完成当前版本的五项质检后再提交。")
             update_task(conn, content_id, state="review_required")
-            add_event(conn, content_id, "提交人工审核")
+            add_event(conn, content_id, "提交人工审核", variant["id"])
         elif action == "approve_final":
-            require_state(current, "review_required")
+            require_state(current, "review_required", "approved")
+            variant = conn.execute("SELECT * FROM video_variants WHERE id=? AND content_id=?",
+                                   (payload.get("variant_id"), content_id)).fetchone() if payload.get("variant_id") else latest_variant(conn, content_id)
+            if not variant:
+                raise ApiError(409, "没有可批准的视频版本", "variant_id", "先选择已提交人工审核的视频版本。")
+            file_row = conn.execute("SELECT relative_path FROM files WHERE id=?", (variant["file_id"],)).fetchone()
+            path = (ROOT / file_row["relative_path"]).resolve() if file_row else None
+            if not path or not path.is_file() or file_sha256(path) != variant["file_sha256"]:
+                raise ApiError(409, "视频文件与提交审核时不一致", "variant_id", "文件已变化，请重新质检和审核该版本。")
+            conn.execute("UPDATE video_variants SET approved_at=?,updated_at=? WHERE id=?", (now(), now(), variant["id"]))
             update_task(conn, content_id, state="approved", final_approved_at=now())
-            add_event(conn, content_id, "人工最终审核通过", "与发布确认分开记录")
+            add_event(conn, content_id, "人工最终审核通过", variant["id"] + " · 与发布确认分开记录")
         elif action == "confirm_publish":
             require_state(current, "approved")
             records = current["publications"]
@@ -1075,6 +1238,12 @@ def task_action(task, payload):
             add_event(conn, content_id, "完成复盘", "结论可回到后续选题")
         else:
             raise ApiError(400, "未知操作")
+        stage_by_action = {"approve_script": "scripts", "revise_script": "scripts", "confirm_audio": "audio",
+                           "approve_assets": "assets", "skip_incomplete_assets": "assets", "revise_assets": "assets",
+                           "revise_render": "render", "submit_review": "review", "approve_final": "review",
+                           "confirm_publish": "publish", "complete_retro": "retro"}
+        if action in stage_by_action:
+            record_stage_revision(conn, get_task(conn, content_id), stage_by_action[action])
     with connect() as conn:
         return get_task(conn, content_id)
 
@@ -1097,6 +1266,17 @@ def probe_media(path, kind):
             raise ApiError(400, "SRT 字幕格式无效", "srt",
                            "按“序号 + HH:MM:SS,mmm --> HH:MM:SS,mmm + 文本”修正时间轴，并保存为 UTF-8 SRT 后重试。")
         return {"format": "SRT", "characters": len(text)}
+    if kind == "cover":
+        ffprobe = shutil.which("ffprobe")
+        if not ffprobe:
+            raise ApiError(503, "未找到 FFprobe，无法检查封面图片", "settings", "安装并确认 FFprobe 在 PATH 中可用后重试。")
+        result = subprocess.run([ffprobe, "-v", "error", "-show_entries", "stream=width,height", "-of", "json", str(path)],
+                                capture_output=True, text=True, timeout=30)
+        streams = json.loads(result.stdout or "{}").get("streams", []) if result.returncode == 0 else []
+        first = streams[0] if streams else {}
+        if not first.get("width") or not first.get("height"):
+            raise ApiError(400, "封面图片无法读取，请上传有效图片", "cover", "用真实 PNG / JPG / WebP 图片重试；不要仅修改扩展名。")
+        return {"width": first["width"], "height": first["height"]}
     if kind not in ("audio", "video"):
         return {}
     ffprobe = shutil.which("ffprobe")
@@ -1224,7 +1404,7 @@ def test_system_voice():
 def generate_audio(task, payload):
     agent_runtime("voice_agent")
     require_state(task, "script_approved", "waiting_audio")
-    script_key = payload.get("script_key", "master")
+    script_key = payload.get("script_key") or next((key for key in ("douyin", "wechat_channels", "xiaohongshu", "master") if task["scripts"].get(key, "").strip()), "douyin")
     if script_key not in SCRIPT_KEYS:
         raise ApiError(400, "脚本版本无效", "script_key", "从母稿、抖音、视频号、小红书或公众号版本中重新选择。")
     text = payload.get("text")
@@ -1266,7 +1446,7 @@ def generate_audio(task, payload):
                                      [("last_voice_id", voice_id), ("tts_ready", "1"), ("tts_last_success", timestamp),
                                       ("tts_last_error", "")])
                     add_event(conn, task["content_id"], "AI生成录音",
-                              "系统音色 {} · 脚本 {} · 仍需上传 SRT".format(voice["name"], script_key))
+                              "系统音色 {} · 脚本 {} · 字幕自动生成中".format(voice["name"], script_key))
                     row = conn.execute("SELECT * FROM files WHERE id=?", (file_id,)).fetchone()
                     generated_file = file_dict(row)
             except Exception:
@@ -1276,6 +1456,7 @@ def generate_audio(task, payload):
         record_tts_result(error.message)
         raise
     record_tts_result()
+    auto_transcribe_async(task["content_id"], generated_file["id"])
     with connect() as conn:
         result = get_task(conn, task["content_id"])
         result["generated_file"] = generated_file
@@ -1309,7 +1490,7 @@ def generate_clone_audio(task, payload):
     require_state(task, "script_approved", "waiting_audio")
     if not media_ai_status()["openvoice"]["ready"]:
         raise ApiError(409, "OpenVoice 尚未通过真实连接测试", "settings", "到设置页检查模型文件并点击“测试 OpenVoice”；成功后再生成克隆录音。")
-    script_key = payload.get("script_key", "master")
+    script_key = payload.get("script_key") or next((key for key in ("douyin", "wechat_channels", "xiaohongshu", "master") if task["scripts"].get(key, "").strip()), "douyin")
     if script_key not in SCRIPT_KEYS:
         raise ApiError(400, "脚本版本无效", "script_key", "从五个脚本版本中重新选择用于克隆的文本。")
     text = payload.get("text")
@@ -1353,7 +1534,7 @@ def generate_clone_audio(task, payload):
                                      [("last_voice_id", voice_id), ("clone_ready", "1"), ("clone_last_success", timestamp),
                                       ("clone_last_error", "")])
                     add_event(conn, task["content_id"], "OpenVoice生成克隆录音",
-                              "本人档案 {} · 脚本 {} · 仍需 SRT".format(voice["name"], script_key))
+                              "本人档案 {} · 脚本 {} · 字幕自动生成中".format(voice["name"], script_key))
                     row = conn.execute("SELECT * FROM files WHERE id=?", (file_id,)).fetchone()
                     generated_file = file_dict(row)
             except Exception:
@@ -1363,6 +1544,7 @@ def generate_clone_audio(task, payload):
         record_media_result("clone", error.message)
         raise
     record_media_result("clone")
+    auto_transcribe_async(task["content_id"], generated_file["id"])
     with connect() as conn:
         result = get_task(conn, task["content_id"])
         result["generated_file"] = generated_file
@@ -1416,7 +1598,8 @@ def upload_file(task, kind, filename, body):
         raise ApiError(400, "上传类型无效", "file", "从当前页面的上传按钮重新选择文件，不要调用其他类型的上传接口。")
     states = {"audio": ("script_approved", "waiting_audio"), "srt": ("script_approved", "waiting_audio"),
               "asset": ("transcribed", "assets_planned"), "video": ("assets_approved", "rendered")}
-    require_state(task, *states[kind])
+    if kind != "cover":
+        require_state(task, *states[kind])
     if not body:
         raise ApiError(400, "不能上传空文件", "file", "重新选择非空且可读取的文件后上传。")
     filename = safe_filename(filename)
@@ -1446,10 +1629,37 @@ def upload_file(task, kind, filename, body):
         if kind in ("audio", "srt"):
             update_task(conn, task["content_id"], state="waiting_audio")
         elif kind == "video":
+            video_row = conn.execute("SELECT * FROM files WHERE id=?", (file_id,)).fetchone()
+            upsert_variant(conn, task, dict(video_row), file_path=path)
             update_task(conn, task["content_id"], state="rendered", quality_json="{}", final_approved_at=None, published_at=None)
         add_event(conn, task["content_id"], "上传文件", "{} · {}".format(kind, filename))
         row = conn.execute("SELECT * FROM files WHERE id=?", (file_id,)).fetchone()
-        return file_dict(row)
+        result = file_dict(row)
+    if kind == "audio":
+        auto_transcribe_async(task["content_id"], file_id)
+    return result
+
+
+def auto_transcribe_async(content_id, audio_file_id):
+    def work():
+        try:
+            with connect() as conn:
+                task = get_task(conn, content_id)
+            already = any(file["kind"] == "srt" and file["media_info"].get("source_audio_file_id") == audio_file_id
+                          for file in task["files"])
+            if already or task["state"] not in ("script_approved", "waiting_audio"):
+                return
+            with DB_LOCK, connect() as conn:
+                add_event(conn, content_id, "自动字幕开始", "WhisperX small · 源文件 #{}".format(audio_file_id))
+            transcribe_audio(task, {"file_id": audio_file_id, "model": "small"})
+        except Exception as error:
+            try:
+                with DB_LOCK, connect() as conn:
+                    message = error.message if isinstance(error, ApiError) else str(error)
+                    add_event(conn, content_id, "自动字幕失败", message[:200])
+            except Exception:
+                pass
+    threading.Thread(target=work, daemon=True).start()
 
 
 def parse_srt_captions(text):
@@ -1481,14 +1691,52 @@ def render_card_text(value, fallback, limit=48):
     return text if len(text) <= limit else text[:limit - 1].rstrip("，。；：、 ") + "…"
 
 
-def fallback_render_scenes(task, duration):
-    descriptions = [render_card_text(task["title"], "企业 AI 落地实战", 36),
-                    render_card_text(task.get("angle"), "真实任务与完整流程"),
-                    "人工检查每一步", "结果可核验，再进入发布"]
-    return [{"id": "text-{}".format(index), "name": "文字卡 {:02d}".format(index + 1),
-             "start_seconds": round(duration * index / 4, 3), "end_seconds": round(duration * (index + 1) / 4, 3),
-             "asset_type": "own", "description": descriptions[index], "media": None}
-            for index, description in enumerate(descriptions)]
+def fallback_render_scenes(task, duration, captions=None):
+    captions = captions or []
+    groups = []
+    current = []
+    for caption in captions:
+        if current:
+            start = current[0]["startMs"] / 1000
+            end = caption["endMs"] / 1000
+            if end - start > 5.6 or len(current) >= 3:
+                groups.append(current)
+                current = []
+        current.append(caption)
+    if current:
+        groups.append(current)
+    if groups:
+        scenes = []
+        for index, group in enumerate(groups):
+            text = " ".join(item["text"] for item in group).strip()
+            scenes.append({"id": "content-{}".format(index), "name": render_card_text(text, task["title"], 22),
+                           "start_seconds": round(group[0]["startMs"] / 1000, 3),
+                           "end_seconds": round(group[-1]["endMs"] / 1000, 3),
+                           "asset_type": "own", "description": text, "narration": text, "media": None})
+        if scenes and scenes[0]["start_seconds"] > 0:
+            scenes[0]["start_seconds"] = 0
+        if scenes and scenes[-1]["end_seconds"] < duration:
+            scenes[-1]["end_seconds"] = round(duration, 3)
+        return scenes
+    script = next((task["scripts"].get(key, "") for key in ("douyin", "master", "wechat_channels", "xiaohongshu")
+                   if task["scripts"].get(key, "").strip()), "")
+    parts = [part.strip() for part in re.split(r"(?<=[。！？!?；])", script) if part.strip()] or [task["title"]]
+    weights = [max(1, len(part)) for part in parts]
+    total = sum(weights)
+    scenes = []
+    cursor = 0.0
+    for index, (text, weight) in enumerate(zip(parts, weights)):
+        end = duration if index == len(parts) - 1 else cursor + duration * weight / total
+        scenes.append({"id": "script-{}".format(index), "name": render_card_text(text, task["title"], 22),
+                       "start_seconds": round(cursor, 3), "end_seconds": round(end, 3),
+                       "asset_type": "own", "description": text, "narration": text, "media": None})
+        cursor = end
+    return scenes
+
+
+def render_media_url(file_id):
+    base = os.environ.get("CONTENT_AGENT_MEDIA_BASE_URL", "http://127.0.0.1:8765").rstrip("/")
+    return "{}/api/files/{}/media".format(base, file_id)
 
 
 def prepare_render_assets(task, mode, platform):
@@ -1546,7 +1794,7 @@ def prepare_render_assets(task, mode, platform):
             if media_kind:
                 target = directory / "scene-{}{}".format(index, suffix)
                 shutil.copyfile(source_path, target)
-                scene["media"] = {"kind": media_kind, "src": "assets/{}/{}".format(task["content_id"], target.name)}
+                scene["media"] = {"kind": media_kind, "src": render_media_url(row["id"])}
                 scene["_local_path"] = str(target)
         scenes.append(scene)
     if mode in ("upload", "mixed"):
@@ -1555,14 +1803,14 @@ def prepare_render_assets(task, mode, platform):
         if mode in ("upload", "mixed"):
             raise ApiError(409, "{}至少需要 1 个已关联且授权的视频或图片场景".format("上传模式" if mode == "upload" else "混合模式"),
                            "asset_plan", "为至少一个分镜上传视频/图片、选择关联文件、填写来源并勾选授权；或改用全部 Remotion。")
-        scenes = fallback_render_scenes(task, duration)
+        scenes = fallback_render_scenes(task, duration, captions)
     if mode in ("upload", "mixed") and not any(scene.get("_local_path") for scene in scenes):
         raise ApiError(409, "已授权场景中没有可渲染的视频或图片", "asset_plan",
                        "至少关联一个 MP4/MOV/WebM 视频或 PNG/JPEG/WebP 图片；其他文件请改作授权凭证，或选择全部 Remotion。")
-    props = {"title": render_card_text(task["title"], "企业 AI 落地实战", 42), "audio": "assets/{}/narration.wav".format(task["content_id"]),
+    props = {"title": render_card_text(task["title"], "企业 AI 落地实战", 42), "audio": render_media_url(audio["id"]),
              "captions": captions, "durationSeconds": duration,
              "scenes": [{key: value for key, value in scene.items() if not key.startswith("_")} for scene in scenes]}
-    return props, scenes, duration
+    return build_storyboard(props, task["content_id"]), scenes, duration
 
 
 def available_render_port():
@@ -1571,19 +1819,108 @@ def available_render_port():
         return sock.getsockname()[1]
 
 
-def run_remotion_render(props, output, timeout=1800):
+def generate_cover(task, payload):
+    content_id = task["content_id"]
+    source = str(payload.get("source") or "ai")
+    if source not in ("ai", "frame"):
+        raise ApiError(400, "封面生成方式无效", "source", "选择 AI 生成或从成片抽帧。")
+    final_directory = ROOT / "covers" / content_id
+    final_directory.mkdir(parents=True, exist_ok=True)
+    final_path = (final_directory / "cover-{}-{}.png".format(source, uuid.uuid4().hex[:12])).resolve()
+    if final_directory.resolve() not in final_path.parents:
+        raise ApiError(400, "封面保存路径无效")
+    try:
+        if source == "frame":
+            ffmpeg = shutil.which("ffmpeg")
+            if not ffmpeg:
+                raise ApiError(503, "未找到 FFmpeg，无法从成片抽帧", "settings", "安装 FFmpeg 后重试。")
+            file_id = payload.get("file_id")
+            file_id = int(file_id) if isinstance(file_id, (int, str)) and str(file_id).isdigit() else None
+            with connect() as conn:
+                video_row = get_task_file(conn, content_id, file_id, "video") if file_id else None
+            if not video_row:
+                latest = latest_task_file(task, "video")
+                if not latest:
+                    raise ApiError(409, "还没有成片，无法抽帧", "file_id", "先生成或上传成片，或改用 AI 生成封面。")
+                with connect() as conn:
+                    video_row = get_task_file(conn, content_id, latest["id"], "video")
+            video_path = (ROOT / video_row["relative_path"]).resolve()
+            if (ROOT / "renders" / content_id).resolve() not in video_path.parents or not video_path.is_file():
+                raise ApiError(404, "成片文件不存在或路径无效", "file_id", "重新生成成片后再抽帧，或改用 AI 生成封面。")
+            media_info = parse_json(video_row["media_info_json"], {})
+            duration = media_info.get("duration_seconds")
+            seek = max(0.0, min(1.5, (duration or 3) * 0.2))
+            run_process([ffmpeg, "-v", "error", "-y", "-ss", "{:.2f}".format(seek), "-i", str(video_path),
+                         "-frames:v", "1", str(final_path)], 120, MAX_CLI_OUTPUT, "FFmpeg")
+        else:
+            key = str(payload.get("template") or "founder-ip@1.0.0")
+            template = resolve_template(key, for_render=True)
+            script = next((task["scripts"].get(name, "") for name in ("douyin", "wechat_channels", "xiaohongshu", "master")
+                           if task["scripts"].get(name, "").strip()), "")
+            first_line = re.split(r"[。！？!?\n]", script)[0].strip()[:40] if script else task["title"]
+            scenes = [{"id": "cover-1", "name": task["title"][:24], "start_seconds": 0, "end_seconds": 2,
+                       "asset_type": "own", "description": first_line or task["title"]}]
+            props = {"title": task["title"], "durationSeconds": 4, "scenes": scenes, "captions": [],
+                     **template_props(template)}
+            run_remotion_render(props, final_path, agent_runtime("remotion_agent")["timeout_seconds"], template["composition_id"])
+        info = probe_media(final_path, "cover")
+        with DB_LOCK, connect() as conn:
+            cursor = conn.execute("""INSERT INTO files(content_id,kind,original_name,relative_path,size,media_info_json,created_at)
+                                     VALUES (?,?,?,?,?,?,?)""",
+                                  (content_id, "cover", "封面-{}.png".format("AI生成" if source == "ai" else "成片抽帧"),
+                                   final_path.relative_to(ROOT).as_posix(), final_path.stat().st_size,
+                                   json.dumps(info, ensure_ascii=False), now()))
+            file_id = cursor.lastrowid
+            add_event(conn, content_id, "生成封面", "AI 模板渲染" if source == "ai" else "成片抽帧")
+            row = conn.execute("SELECT * FROM files WHERE id=?", (file_id,)).fetchone()
+            generated = file_dict(row)
+    except Exception:
+        final_path.unlink(missing_ok=True)
+        raise
+    with connect() as conn:
+        result = get_task(conn, content_id)
+        result["generated_file"] = generated
+        return result
+
+
+def run_remotion_render(props, output, timeout=1800, composition_id="TalkingHead", on_progress=None, scale=1):
     output = Path(output).resolve()
-    npx = shutil.which("npx")
-    if not npx or not (REMOTION_APP / "package.json").is_file():
-        raise ApiError(503, "Remotion 项目或 npx 不可用", "settings", "确认 remotion-app 已安装依赖且 npx 可用，然后重试。")
+    node = shutil.which("node")
+    if not node or not (REMOTION_APP / "package.json").is_file():
+        raise ApiError(503, "Remotion 项目或 Node.js 不可用", "settings", "确认 remotion-app 已安装依赖且 node 可用，然后重试。")
+    if not re.fullmatch(r"[A-Za-z0-9-]+", composition_id):
+        raise ApiError(400, "Composition ID 无效", "template", "从稳定模板注册表重新选择模板。")
+    if not isinstance(scale, (int, float)) or not 0.1 <= scale <= 2:
+        raise ApiError(400, "预览渲染缩放比例无效", "scale", "使用0.5预览或1正式渲染。")
     with tempfile.TemporaryDirectory(prefix="remotion-props-") as directory:
         props_path = Path(directory) / "props.json"
         props_path.write_text(json.dumps(props, ensure_ascii=False), encoding="utf-8")
-        run_process([npx, "remotion", "render", "src/index.ts", "TalkingHead", str(output),
-                     "--props={}".format(props_path), "--codec=h264", "--pixel-format=yuv420p", "--port={}".format(available_render_port())],
-                timeout, MAX_CLI_OUTPUT, "Remotion", REMOTION_APP)
+        command = [node, "scripts/render.mjs", "--props", str(props_path), "--output", str(output),
+                   "--composition-id", composition_id, "--scale", str(scale)]
+        if on_progress is None:
+            run_process(command, timeout, MAX_CLI_OUTPUT, "Remotion", REMOTION_APP)
+        else:
+            error_path = Path(directory) / "stderr.log"
+            with error_path.open("w", encoding="utf-8") as error_file:
+                process = subprocess.Popen(command, cwd=str(REMOTION_APP), stdout=subprocess.PIPE, stderr=error_file,
+                                           text=True, encoding="utf-8", errors="replace")
+                deadline = time.monotonic() + timeout
+                for line in process.stdout:
+                    if time.monotonic() > deadline:
+                        process.kill()
+                        raise ApiError(504, "Remotion 调用超过 {} 秒，已终止".format(timeout))
+                    try:
+                        event = json.loads(line)
+                    except ValueError:
+                        continue
+                    if event.get("stage") == "render" and isinstance(event.get("progress"), (int, float)):
+                        on_progress(max(0.0, min(1.0, float(event["progress"]))))
+                returncode = process.wait()
+            if returncode:
+                message = " ".join(error_path.read_text(encoding="utf-8", errors="replace").strip().split())[:500]
+                raise ApiError(502, "Remotion 调用失败" + ("：{}".format(message) if message else "，请检查本机配置"))
     if not output.is_file() or output.stat().st_size == 0:
-        raise ApiError(502, "Remotion 命令结束但没有生成有效 MP4", "render", "查看渲染日志和输出路径后重试。")
+        raise ApiError(502, "Remotion 命令结束但没有生成有效输出", "render", "查看渲染日志和输出路径后重试。")
 
 
 def caption_overlays(captions, directory):
@@ -1638,7 +1975,284 @@ def validate_rendered_mp4(path):
     return info
 
 
-def render_task(task, payload):
+def render_input_hash(snapshot, props):
+    value = json.dumps({"input": snapshot, "props": props}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def render_template_requests(payload, mode):
+    if mode == "upload":
+        if "template_ids" in payload or "template_props" in payload:
+            raise ApiError(400, "上传模式不使用 Remotion 模板", "template", "保持上传模式，或改用全部 Remotion/混合模式后选择模板。")
+        return [({"id": "upload", "version": "1.0.0", "key": "upload@1.0.0", "composition_id": "FFmpegUpload"}, {})]
+    references = payload.get("template_ids", ["founder-ip@1.0.0"])
+    if not isinstance(references, list) or not 1 <= len(references) <= 4 or any(not isinstance(value, str) for value in references):
+        raise ApiError(400, "请选择 1–4 个有效模板版本", "template_ids", "从稳定模板卡中重新选择，不要手工填写模板 ID。")
+    if len(set(references)) != len(references):
+        raise ApiError(400, "同一个模板版本不能重复选择", "template_ids", "去除重复模板后重试。")
+    overrides = payload.get("template_props", {})
+    if not isinstance(overrides, dict):
+        raise ApiError(400, "模板参数必须是对象", "template_props", "按模板卡片允许的参数重新提交。")
+    try:
+        requests = []
+        for reference in references:
+            template = resolve_template(reference, for_render=True)
+            requests.append((template, template_props(template, overrides.get(reference, {}))))
+        return requests
+    except TemplateError as error:
+        raise ApiError(400, str(error), "template", "刷新稳定模板列表并重新选择；草稿和停用模板不能用于生产。")
+
+
+def render_snapshot(task, mode, platform, template, payload):
+    audio = latest_task_file(task, "audio")
+    subtitle = latest_task_file(task, "srt")
+    return {
+        "title": task["title"], "mode": mode, "platform": platform,
+        "scripts": task.get("scripts", {}), "script_meta": task.get("script_meta", {}),
+        "audio_file_id": audio["id"] if audio else None,
+        "srt_file_id": subtitle["id"] if subtitle else None,
+        "asset_plan": task["asset_plan"],
+        "burn_subtitles": bool(payload.get("burn_subtitles", True)),
+        "template": template["key"], "engine_version": ENGINE_VERSION,
+        "output": {"width": 1080, "height": 1920, "fps": 30, "aspect": "9:16"},
+    }
+
+
+def insert_render_run(conn, run_id, task, template, input_hash, props, snapshot):
+    conn.execute("""INSERT INTO render_runs(id,content_id,template_id,template_version,composition_id,status,
+                    input_hash,props_json,input_snapshot_json,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                 (run_id, task["content_id"], template["id"], template["version"], template["composition_id"],
+                  "rendering", input_hash, json.dumps(props, ensure_ascii=False),
+                  json.dumps(snapshot, ensure_ascii=False), now()))
+
+
+def finish_render_run(conn, run_id, status, output_file_id=None, error=""):
+    conn.execute("UPDATE render_runs SET status=?,output_file_id=?,error=? WHERE id=?",
+                 (status, output_file_id, error, run_id))
+
+
+def cached_render(task, template, input_hash, run_id):
+    with connect() as conn:
+        row = conn.execute("""SELECT f.* FROM render_runs r JOIN files f ON f.id=r.output_file_id
+                              WHERE r.content_id=? AND r.input_hash=? AND r.status='succeeded'
+                              ORDER BY r.created_at DESC LIMIT 1""",
+                           (task["content_id"], input_hash)).fetchone()
+    if not row or not (ROOT / row["relative_path"]).is_file():
+        return None
+    generated = file_dict(row)
+    with DB_LOCK, connect() as conn:
+        finish_render_run(conn, run_id, "cached", generated["id"])
+        update_task(conn, task["content_id"], state="rendered")
+        add_event(conn, task["content_id"], "视频构建命中模板缓存", template["key"])
+    return {"template_id": template["id"], "template_version": template["version"], "status": "cached", "file": generated}
+
+
+def save_render_result(task, template, mode, platform, run_id, output, info):
+    final_directory = ROOT / "renders" / task["content_id"]
+    final_directory.mkdir(parents=True, exist_ok=True)
+    final_path = (final_directory / "{}-{}-{}-{}.mp4".format(template["id"], mode, platform, uuid.uuid4().hex[:12])).resolve()
+    if final_directory.resolve() not in final_path.parents:
+        raise ApiError(400, "成片保存路径无效", "file", "重新创建任务目录后重试，不要修改成片路径。")
+    try:
+        shutil.copyfile(output, final_path)
+        info.update({"mode": mode, "platform": platform, "template_id": template["id"],
+                     "template_version": template["version"], "render_run_id": run_id})
+        with DB_LOCK, connect() as conn:
+            current = get_task(conn, task["content_id"])
+            require_state(current, "assets_approved", "rendered")
+            cursor = conn.execute("""INSERT INTO files(content_id,kind,original_name,relative_path,size,media_info_json,created_at)
+                                     VALUES (?,?,?,?,?,?,?)""",
+                                  (task["content_id"], "video", "{}-{}.mp4".format(template["id"], platform),
+                                   final_path.relative_to(ROOT).as_posix(), final_path.stat().st_size,
+                                   json.dumps(info, ensure_ascii=False), now()))
+            file_id = cursor.lastrowid
+            video_row = conn.execute("SELECT * FROM files WHERE id=?", (file_id,)).fetchone()
+            upsert_variant(conn, current, dict(video_row), template, final_path)
+            finish_render_run(conn, run_id, "succeeded", file_id)
+            update_task(conn, task["content_id"], state="rendered", quality_json="{}", final_approved_at=None, published_at=None)
+            add_event(conn, task["content_id"], "视频构建Agent渲染完成",
+                      "{} · {} · {} · {:.3f} 秒".format(template["key"], mode, platform, info["duration_seconds"]))
+            row = conn.execute("SELECT * FROM files WHERE id=?", (file_id,)).fetchone()
+            return file_dict(row)
+    except Exception:
+        final_path.unlink(missing_ok=True)
+        raise
+
+
+def visual_preview_candidate(task, payload):
+    require_state(task, "assets_approved", "rendered")
+    mode = payload.get("mode", "remotion")
+    if mode not in ("remotion", "mixed"):
+        raise ApiError(400, "视觉预览只用于 Remotion 或混合模式", "mode", "纯上传模式没有模板效果，可直接渲染。")
+    platform = payload.get("platform") or "douyin"
+    if platform not in PLATFORMS:
+        raise ApiError(400, "目标平台无效", "platform", "选择有效目标平台后重试。")
+    requests = render_template_requests(payload, mode)
+    if len(requests) != 1:
+        raise ApiError(400, "每次只预览一种视觉风格", "template_ids", "先选择一种风格，确认后再生成其他版本。")
+    template, overrides = requests[0]
+    base_props, _, _ = prepare_render_assets(task, mode, platform)
+    props = {**base_props, **overrides}
+    request = {"mode": mode, "platform": platform, "burn_subtitles": bool(payload.get("burn_subtitles", True)),
+               "template_ids": [template["key"]], "template_props": {template["key"]: overrides}}
+    snapshot = render_snapshot(task, mode, platform, template, request)
+    return {"template": template, "props": props, "request": request, "snapshot": snapshot,
+            "fingerprint": render_input_hash(snapshot, props)}
+
+
+def visual_preview_response(content_id, preview_id):
+    with connect() as conn:
+        preview = preview_dict(get_preview(conn, content_id, preview_id))
+    if not preview:
+        raise ApiError(404, "视觉预览不存在")
+    job = None
+    if V2:
+        job = next((item for item in V2.jobs.list(200) if item["kind"] == "video.preview"
+                    and item.get("input", {}).get("preview_id") == preview_id), None)
+    return {"preview": preview, "job": job}
+
+
+def create_visual_preview(task, payload):
+    content_id = task["content_id"]
+    if payload.get("mode", "remotion") == "remotion" and task["state"] in ("transcribed", "assets_planned"):
+        with DB_LOCK, connect() as conn:
+            update_task(conn, content_id, state="assets_approved", assets_approved_at=now())
+            add_event(conn, content_id, "自动确认纯 Remotion 素材", "内容场景引擎无需上传素材")
+            task = get_task(conn, content_id)
+    candidate = visual_preview_candidate(task, payload)
+    template = candidate["template"]
+    fingerprint = candidate["fingerprint"]
+    with DB_LOCK, connect() as conn:
+        conn.execute("""UPDATE visual_previews SET status='superseded',is_current=0,updated_at=?
+                        WHERE content_id=? AND status IN ('queued','rendering')
+                          AND NOT (template_key=? AND fingerprint=?)""",
+                     (now(), content_id, template["key"], fingerprint))
+        row = conn.execute("""SELECT * FROM visual_previews WHERE content_id=? AND template_key=? AND fingerprint=?
+                              AND status IN ('queued','rendering','succeeded')
+                              ORDER BY created_at DESC LIMIT 1""",
+                           (content_id, template["key"], fingerprint)).fetchone()
+        if row:
+            preview_id = row["id"]
+            set_current(conn, content_id, preview_id)
+        else:
+            preview_id = "vp_" + uuid.uuid4().hex[:20]
+            timestamp = now()
+            conn.execute("""INSERT INTO visual_previews(
+                            id,content_id,template_key,template_id,template_version,composition_id,mode,platform,
+                            request_json,fingerprint,storyboard_json,props_json,input_snapshot_json,status,progress,
+                            error,is_current,created_at,updated_at)
+                            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'queued',0,'',1,?,?)""",
+                         (preview_id, content_id, template["key"], template["id"], template["version"],
+                          template["composition_id"], candidate["request"]["mode"], candidate["request"]["platform"],
+                          json.dumps(candidate["request"], ensure_ascii=False), fingerprint,
+                          json.dumps(candidate["props"]["storyboard"], ensure_ascii=False),
+                          json.dumps(candidate["props"], ensure_ascii=False),
+                          json.dumps(candidate["snapshot"], ensure_ascii=False), timestamp, timestamp))
+            row = get_preview(conn, content_id, preview_id)
+        add_event(conn, content_id, "选择视觉风格", "{} · {}".format(template["key"], "复用预览" if row["status"] == "succeeded" else "生成10秒预览"))
+    job = None
+    if row["status"] in ("queued", "rendering") and V2:
+        job = next((item for item in V2.jobs.list(200) if item["kind"] == "video.preview"
+                    and item.get("input", {}).get("preview_id") == preview_id
+                    and item["status"] in ("queued", "leased", "running", "retry_wait", "cancel_requested")), None)
+        if not job:
+            job = V2.jobs.enqueue("video.preview", {"preview_id": preview_id}, content_id, preview_id,
+                                  scope="video.preview:{}".format(content_id), resource_key="render")
+    return visual_preview_response(content_id, preview_id)
+
+
+def produce_visual_preview(job, context):
+    preview_id = job["input"]["preview_id"]
+    content_id = job["aggregate_id"]
+    with connect() as conn:
+        row = get_preview(conn, content_id, preview_id)
+        if not row:
+            raise ApiError(404, "视觉预览不存在")
+        if row["status"] == "superseded":
+            return {"preview_id": preview_id, "status": "superseded"}
+    context.progress("preview_prepare", 0.08)
+    props = build_preview_props(json.loads(row["props_json"]))
+    directory = ROOT / "previews" / content_id
+    directory.mkdir(parents=True, exist_ok=True)
+    output = (directory / "{}.mp4".format(preview_id)).resolve()
+    cover = (directory / "{}.png".format(preview_id)).resolve()
+    if directory.resolve() not in output.parents or directory.resolve() not in cover.parents:
+        raise ApiError(400, "预览保存路径无效")
+    with DB_LOCK, connect() as conn:
+        conn.execute("UPDATE visual_previews SET status='rendering',progress=0.05,error='',updated_at=? WHERE id=?",
+                     (now(), preview_id))
+    last_progress = [0.05]
+
+    def progress(value):
+        context.progress("preview_render", 0.08 + value * 0.72)
+        if value - last_progress[0] >= 0.03 or value >= 0.999:
+            last_progress[0] = value
+            with DB_LOCK, connect() as conn:
+                conn.execute("UPDATE visual_previews SET progress=?,updated_at=? WHERE id=? AND status='rendering'",
+                             (value, now(), preview_id))
+
+    try:
+        run_remotion_render(props, output, agent_runtime("remotion_agent")["timeout_seconds"], row["composition_id"],
+                            on_progress=progress, scale=0.5)
+        context.progress("preview_cover", 0.86)
+        run_remotion_render(props, cover, agent_runtime("remotion_agent")["timeout_seconds"], row["composition_id"], scale=0.5)
+        info = validate_rendered_mp4(output)
+        if abs(info["duration_seconds"] - props["durationSeconds"]) > 0.15:
+            raise ApiError(502, "预览时长与10秒效果规格不一致", "render", "重新生成预览并检查分镜片段。")
+        cover_info = probe_media(cover, "cover")
+        with DB_LOCK, connect() as conn:
+            current = get_preview(conn, content_id, preview_id)
+            if current["status"] == "superseded":
+                output.unlink(missing_ok=True)
+                cover.unlink(missing_ok=True)
+                return {"preview_id": preview_id, "status": "superseded"}
+            file_ids = []
+            for kind, path, original_name, media_info in (
+                ("preview_video", output, "10秒效果预览.mp4", info),
+                ("preview_cover", cover, "效果预览封面.png", cover_info),
+            ):
+                media_info = {**media_info, "preview_id": preview_id, "fingerprint": row["fingerprint"],
+                              "template_key": row["template_key"], "engine_version": ENGINE_VERSION}
+                cursor = conn.execute("""INSERT INTO files(content_id,kind,original_name,relative_path,size,media_info_json,created_at)
+                                         VALUES (?,?,?,?,?,?,?)""",
+                                      (content_id, kind, original_name, path.relative_to(ROOT).as_posix(), path.stat().st_size,
+                                       json.dumps(media_info, ensure_ascii=False), now()))
+                file_ids.append(cursor.lastrowid)
+            conn.execute("""UPDATE visual_previews SET status='succeeded',progress=1,video_file_id=?,cover_file_id=?,
+                            error='',approved_at=NULL,updated_at=? WHERE id=?""",
+                         (*file_ids, now(), preview_id))
+            add_event(conn, content_id, "10秒视觉预览完成", row["template_key"])
+        context.progress("completed", 1)
+        return {"preview_id": preview_id, "status": "succeeded", "duration_seconds": info["duration_seconds"],
+                "preview_manifest": props["previewManifest"]}
+    except Exception as error:
+        output.unlink(missing_ok=True)
+        cover.unlink(missing_ok=True)
+        message = error.message if isinstance(error, ApiError) else str(error)
+        with DB_LOCK, connect() as conn:
+            conn.execute("UPDATE visual_previews SET status='failed',error=?,updated_at=? WHERE id=? AND status!='superseded'",
+                         (message[:1000], now(), preview_id))
+        raise
+
+
+def approve_visual_preview(task, preview_id):
+    with connect() as conn:
+        row = get_preview(conn, task["content_id"], preview_id)
+    if not row:
+        raise ApiError(404, "视觉预览不存在")
+    if row["status"] != "succeeded" or not row["video_file_id"]:
+        raise ApiError(409, "预览尚未成功完成，不能确认", "preview", "等待10秒预览生成成功后再确认。")
+    candidate = visual_preview_candidate(task, json.loads(row["request_json"]))
+    if candidate["fingerprint"] != row["fingerprint"]:
+        raise ApiError(409, "文案、配音、素材或风格已变化，请重新预览", "preview", "使用当前内容生成新的10秒预览后再确认。")
+    with DB_LOCK, connect() as conn:
+        conn.execute("UPDATE visual_previews SET approved_at=?,updated_at=? WHERE id=?", (now(), now(), preview_id))
+        set_current(conn, task["content_id"], preview_id)
+        add_event(conn, task["content_id"], "确认视觉效果并允许成片", row["template_key"])
+    return visual_preview_response(task["content_id"], preview_id)
+
+
+def render_task(task, payload, on_progress=None):
     config = agent_runtime("remotion_agent")
     require_state(task, "assets_approved", "rendered")
     mode = payload.get("mode")
@@ -1647,50 +2261,132 @@ def render_task(task, payload):
     platform = payload.get("platform") or "douyin"
     if platform not in PLATFORMS:
         raise ApiError(400, "目标平台无效", "platform", "选择抖音、视频号、小红书或公众号。")
+    requests = render_template_requests(payload, mode)
     try:
-        props, scenes, _ = prepare_render_assets(task, mode, platform)
-        with tempfile.TemporaryDirectory(prefix="content-render-") as directory:
-            output = Path(directory) / "render.mp4"
-            if mode == "upload":
-                run_upload_render(scenes, props, output, payload.get("burn_subtitles", True), config["timeout_seconds"])
-            else:
-                run_remotion_render(props, output, config["timeout_seconds"])
-            info = validate_rendered_mp4(output)
-            final_directory = ROOT / "renders" / task["content_id"]
-            final_directory.mkdir(parents=True, exist_ok=True)
-            final_path = (final_directory / "{}-{}-{}.mp4".format(mode, platform, uuid.uuid4().hex[:12])).resolve()
-            if final_directory.resolve() not in final_path.parents:
-                raise ApiError(400, "成片保存路径无效", "file", "重新创建任务目录后重试，不要修改成片路径。")
-            try:
-                shutil.copyfile(output, final_path)
-                info.update({"mode": mode, "platform": platform})
-                with DB_LOCK, connect() as conn:
-                    current = get_task(conn, task["content_id"])
-                    require_state(current, "assets_approved", "rendered")
-                    cursor = conn.execute("""INSERT INTO files(content_id,kind,original_name,relative_path,size,media_info_json,created_at)
-                                             VALUES (?,?,?,?,?,?,?)""",
-                                          (task["content_id"], "video", "{}-{}.mp4".format(mode, platform),
-                                           final_path.relative_to(ROOT).as_posix(), final_path.stat().st_size,
-                                           json.dumps(info, ensure_ascii=False), now()))
-                    file_id = cursor.lastrowid
-                    update_task(conn, task["content_id"], state="rendered", quality_json="{}", final_approved_at=None, published_at=None)
-                    add_event(conn, task["content_id"], "视频构建Agent渲染完成",
-                              "{} · {} · {:.3f} 秒".format(mode, platform, info["duration_seconds"]))
-                    row = conn.execute("SELECT * FROM files WHERE id=?", (file_id,)).fetchone()
-                    generated = file_dict(row)
-            except Exception:
-                final_path.unlink(missing_ok=True)
-                raise
+        base_props, scenes, _ = prepare_render_assets(task, mode, platform)
     except ApiError as error:
         record_render_result(error.message)
-        if not error.field:
-            error.field, error.action = "render", "检查渲染模式、素材和本地 Remotion/FFmpeg 日志，修正后重试；旧成片未改变。"
         raise
+    results = []
+    failures = []
+    total = max(1, len(requests))
+    for request_index, (template, overrides) in enumerate(requests):
+        props = {**base_props, **overrides}
+        snapshot = render_snapshot(task, mode, platform, template, payload)
+        input_hash = render_input_hash(snapshot, props)
+        if mode != "upload":
+            with connect() as conn:
+                approval = approved_preview(conn, task["content_id"], template["key"], input_hash)
+            if not approval:
+                raise ApiError(409, "当前内容和风格尚未确认10秒效果预览", "preview",
+                               "先选择视觉风格，等待10秒预览生成并确认；修改内容后需要重新确认。")
+            props = json.loads(approval["props_json"])
+        run_id = uuid.uuid4().hex
+        with DB_LOCK, connect() as conn:
+            insert_render_run(conn, run_id, task, template, input_hash, props, snapshot)
+        cached = cached_render(task, template, input_hash, run_id)
+        if cached:
+            results.append(cached)
+            continue
+        try:
+            with tempfile.TemporaryDirectory(prefix="content-render-") as directory:
+                output = Path(directory) / "render.mp4"
+                if mode == "upload":
+                    run_upload_render(scenes, props, output, payload.get("burn_subtitles", True), config["timeout_seconds"])
+                else:
+                    def render_progress(value, index=request_index):
+                        if on_progress:
+                            on_progress((index + value) / total)
+                    run_remotion_render(props, output, config["timeout_seconds"], template["composition_id"],
+                                        on_progress=render_progress if on_progress else None)
+                info = validate_rendered_mp4(output)
+                generated = save_render_result(task, template, mode, platform, run_id, output, info)
+            results.append({"template_id": template["id"], "template_version": template["version"],
+                            "status": "succeeded", "file": generated})
+        except Exception as error:
+            message = error.message if isinstance(error, ApiError) else "模板渲染失败：{}".format(error)
+            with DB_LOCK, connect() as conn:
+                finish_render_run(conn, run_id, "failed", error=message)
+                add_event(conn, task["content_id"], "视频构建模板渲染失败", "{} · {}".format(template["key"], message))
+            failures.append({"template_id": template["id"], "template_version": template["version"],
+                             "status": "failed", "error": message})
+            record_render_result(message)
+    results.extend(failures)
+    if not any(item["status"] in ("succeeded", "cached") for item in results):
+        first = failures[0] if failures else {"error": "没有模板完成渲染"}
+        raise ApiError(502, first["error"], "render", "检查模板、素材和本地 Remotion/FFmpeg 日志后重试；旧成片未改变。")
     record_render_result()
     with connect() as conn:
         result = get_task(conn, task["content_id"])
+        generated = next((item["file"] for item in results if item["status"] in ("succeeded", "cached")), None)
         result["generated_file"] = generated
+        result["render_results"] = results
         return result
+
+
+def produce_video_task(job, context):
+    content_id = job["aggregate_id"]
+    input_data = job.get("input", {})
+    mode = input_data.get("mode", "remotion")
+    platform = input_data.get("platform", "douyin")
+    timings = []
+    with connect() as conn:
+        task = get_task(conn, content_id)
+
+    def step(name, progress, action):
+        nonlocal task
+        context.progress(name, progress)
+        context.check_cancelled()
+        started = time.monotonic()
+        result = action()
+        timings.append({"stage": name, "duration_ms": round((time.monotonic() - started) * 1000)})
+        if isinstance(result, dict) and result.get("content_id"):
+            task = result
+        return result
+
+    if not latest_task_file(task, "audio") and not any(task["scripts"].get(key, "").strip() for key in ("douyin", "wechat_channels", "xiaohongshu", "master")):
+        step("script", 0.05, lambda: generate_scripts(task, {}))
+    if task["state"] == "script_drafted":
+        step("script_approve", 0.12, lambda: task_action(task, {"action": "approve_script"}))
+    audio = latest_task_file(task, "audio")
+    if not audio:
+        script_key = input_data.get("script_key") or next(
+            (key for key in ("douyin", "wechat_channels", "xiaohongshu", "master") if task["scripts"].get(key, "").strip()), "douyin")
+        voice_id = input_data.get("voice_id") or get_voices().get("last_used_id") or "system-tingting"
+        step("audio", 0.24, lambda: generate_audio(task, {"script_key": script_key, "text": task["scripts"][script_key], "voice_id": voice_id}))
+        audio = latest_task_file(task, "audio")
+    subtitle = latest_task_file(task, "srt")
+    pair_valid = subtitle and (not subtitle["media_info"].get("source_audio_file_id") or subtitle["media_info"]["source_audio_file_id"] == audio["id"])
+    if not pair_valid:
+        step("subtitle", 0.38, lambda: transcribe_audio(task, {"file_id": audio["id"], "model": input_data.get("model", "base")}))
+    if task["state"] in ("script_approved", "waiting_audio"):
+        step("audio_confirm", 0.46, lambda: task_action(task, {"action": "confirm_audio"}))
+    if task["state"] in ("transcribed", "assets_planned"):
+        if mode == "remotion":
+            def approve_remotion_assets():
+                with DB_LOCK, connect() as conn:
+                    update_task(conn, content_id, state="assets_approved", assets_approved_at=now())
+                    add_event(conn, content_id, "自动确认纯 Remotion 素材", "跳过上传素材授权")
+                    return get_task(conn, content_id)
+            step("assets", 0.55, approve_remotion_assets)
+        else:
+            if not task["asset_plan"]:
+                subtitle = latest_task_file(task, "srt")
+                step("asset_plan", 0.52, lambda: generate_asset_plan(task, {"file_id": subtitle["id"], "allowed_types": ["own", "screen_record", "stock"]}))
+            step("assets", 0.58, lambda: task_action(task, {"action": "skip_incomplete_assets"}))
+    render_payload = {"mode": mode, "platform": platform, "burn_subtitles": input_data.get("burn_subtitles", True)}
+    if mode != "upload":
+        render_payload["template_ids"] = input_data.get("template_ids", ["founder-ip@1.0.0"])
+        render_payload["template_props"] = input_data.get("template_props", {})
+    result = step("render", 0.55, lambda: render_task(task, render_payload,
+                                                      on_progress=lambda value: context.progress("render", 0.55 + 0.43 * max(0.0, min(1.0, value)))))
+    with DB_LOCK, connect() as conn:
+        record_stage_revision(conn, get_task(conn, content_id), "render")
+    with connect() as conn:
+        task = get_task(conn, content_id)
+    context.progress("completed", 1)
+    return {"content_id": content_id, "stage_timings": timings, "render_results": result.get("render_results", []),
+            "video_package": video_package(task)}
 
 
 def test_render_agent():
@@ -1702,7 +2398,7 @@ def test_render_agent():
         subprocess.run([shutil.which("ffmpeg"), "-v", "error", "-y", "-i", str(directory / "narration.aiff"), str(directory / "narration.wav")], check=True, timeout=30)
         props = {"title": "视频构建测试", "audio": "assets/_render_test/narration.wav", "durationSeconds": 2,
                  "captions": [{"text": "视频构建连接测试", "startMs": 0, "endMs": 1800, "timestampMs": None, "confidence": None}],
-                 "scenes": [{"id": "test", "name": "文字卡", "start_seconds": 0, "end_seconds": 2,
+                 "scenes": [{"id": "test", "name": "内容场景", "start_seconds": 0, "end_seconds": 2,
                              "asset_type": "own", "description": "真实 Remotion 渲染", "media": None}]}
         with tempfile.TemporaryDirectory(prefix="render-test-") as temp:
             output = Path(temp) / "test.mp4"
@@ -1749,6 +2445,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def log_message(self, fmt, *args):
         print("{} {}".format(self.address_string(), fmt % args), flush=True)
+
+    def authenticate_legacy(self, path):
+        if not path.startswith("/api/") or (V2 and V2.matches(path)):
+            return
+        if not V2:
+            raise ApiError(503, "本地会话服务尚未就绪", action="稍后刷新页面再试")
+        try:
+            V2.authenticate(self, write=self.command in ("POST", "PUT", "PATCH", "DELETE"))
+        except DomainError as error:
+            raise ApiError(error.status, error.message, error.field, error.action, error.item)
 
     def json_response(self, data, status=200):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
@@ -1822,13 +2528,54 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def serve_template_preview(self, key):
+        match = re.fullmatch(r"([a-z0-9-]+)@(\d+\.\d+\.\d+)", key)
+        previews = (REMOTION_APP / "public-static" / "previews").resolve()
+        target = (previews / "{}-{}.png".format(match.group(1), match.group(2))).resolve()
+        if previews not in target.parents or not target.is_file():
+            raise ApiError(404, "模板预览图不存在，请先运行 remotion-app/scripts/preview-stills.mjs")
+        body = target.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "max-age=3600")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def serve_task_zip(self, content_id):
+        with connect() as conn:
+            task = get_task(conn, content_id)
+        variants = task.get("variants") or []
+        entries = []
+        for variant in variants:
+            row_file = next((item for item in task["files"] if item["id"] == variant["file_id"]), None)
+            if not row_file:
+                continue
+            target = (ROOT / row_file["relative_path"]).resolve()
+            if (ROOT / "renders" / content_id).resolve() not in target.parents or not target.is_file():
+                continue
+            entries.append((target, "{}-{}".format(variant["template_id"], target.name)))
+        if not entries:
+            raise ApiError(404, "当前任务还没有可下载的成片版本")
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+            for target, name in entries:
+                archive.write(target, name)
+        body = buffer.getvalue()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/zip")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Disposition", "attachment; filename=\"{}-videos.zip\"".format(content_id))
+        self.end_headers()
+        self.wfile.write(body)
+
     def serve_media(self, file_id, download=False):
         with connect() as conn:
             row = conn.execute("SELECT * FROM files WHERE id=?", (file_id,)).fetchone()
         if not row:
             raise ApiError(404, "文件不存在")
         path = (ROOT / row["relative_path"]).resolve()
-        expected = ROOT / ("subtitles" if row["kind"] == "srt" else {"audio": "voice", "asset": "assets", "video": "renders"}[row["kind"]]) / row["content_id"]
+        expected = ROOT / ("subtitles" if row["kind"] == "srt" else {"audio": "voice", "asset": "assets", "video": "renders", "cover": "covers", "preview_video": "previews", "preview_cover": "previews"}[row["kind"]]) / row["content_id"]
         if row["kind"] != "srt" and row["kind"] == "asset":
             expected = expected / "source"
         if expected.resolve() not in path.parents or not path.is_file():
@@ -1851,6 +2598,10 @@ class Handler(BaseHTTPRequestHandler):
                 raise ApiError(416, "媒体范围无效")
             status = 206
         self.send_response(status)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Range")
+        self.send_header("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges, Content-Type")
         content_type = "text/plain; charset=utf-8" if row["kind"] == "srt" else mimetypes.guess_type(path.name)[0] or "application/octet-stream"
         self.send_header("Content-Type", content_type)
         self.send_header("Accept-Ranges", "bytes")
@@ -1871,10 +2622,18 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(chunk)
                 remaining -= len(chunk)
 
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Range, Content-Type, X-CSRF-Token, Idempotency-Key")
+        self.end_headers()
+
     def do_GET(self):
         try:
             parsed = urlsplit(self.path)
             path = parsed.path
+            self.authenticate_legacy(path)
             if V2 and V2.matches(path):
                 return V2.handle(self, "GET", path, parse_qs(parsed.query))
             if path == "/api/ai/status":
@@ -1898,6 +2657,7 @@ class Handler(BaseHTTPRequestHandler):
                     media_ai = media_ai_status()
                     asset_ai = get_asset_ai_status()
                     render_ai = get_render_ai_status()
+                    video_jobs = [job for job in V2.jobs.list(50) if job["kind"] == "video.produce"]
                     capabilities = [{"name": "账号分析Agent", "status": "已接入"},
                                     {"name": "选题Agent", "status": "已配置"},
                                     {"name": "脚本Agent", "status": "已连接" if ai["ready"] else "未测试" if ai["installed"] else "未配置"},
@@ -1912,10 +2672,32 @@ class Handler(BaseHTTPRequestHandler):
                                         "favorites": seed["douyin_favorite_collections"],
                                         "strategy": seed["strategy"], "platforms": seed["platforms"],
                                         "capabilities": capabilities, "ai": ai, "voices": voices, "media_ai": media_ai,
-                                        "asset_ai": asset_ai, "render_ai": render_ai})
+                                        "asset_ai": asset_ai, "render_ai": render_ai, "video_templates": stable_templates(), "video_jobs": video_jobs})
+            elif re.fullmatch(r"/api/tasks/\d{8}-\d{3}/jobs", path):
+                content_id = path.split("/")[3]
+                jobs = [job for job in V2.jobs.list(200) if job["aggregate_id"] == content_id and job["kind"] == "video.produce"][:20]
+                self.json_response({"jobs": jobs})
+            elif re.fullmatch(r"/api/tasks/\d{8}-\d{3}/(brief|package)", path):
+                with connect() as conn:
+                    task = get_task(conn, path.split("/")[3])
+                    self.json_response(video_brief(task) if path.endswith("/brief") else video_package(task))
+            elif re.fullmatch(r"/api/tasks/\d{8}-\d{3}/visual-previews", path):
+                with connect() as conn:
+                    content_id = path.split("/")[3]
+                    get_task(conn, content_id)
+                    self.json_response({"previews": list_previews(conn, content_id)})
+            elif re.fullmatch(r"/api/tasks/\d{8}-\d{3}/visual-previews/vp_[a-f0-9]+", path):
+                parts = path.split("/")
+                self.json_response(visual_preview_response(parts[3], parts[5]))
             elif re.fullmatch(r"/api/tasks/\d{8}-\d{3}", path):
                 with connect() as conn:
                     self.json_response(get_task(conn, path.rsplit("/", 1)[1]))
+            elif path == "/api/video-templates":
+                self.json_response({"templates": all_templates()})
+            elif re.fullmatch(r"/api/tasks/\d{8}-\d{3}/download.zip", path):
+                self.serve_task_zip(path.split("/")[3])
+            elif re.fullmatch(r"/api/video-templates/[a-z0-9-]+@\d+\.\d+\.\d+/preview", path):
+                self.serve_template_preview(path.split("/")[3])
             elif re.fullmatch(r"/api/files/\d+/media", path):
                 self.serve_media(int(path.split("/")[3]), parse_qs(parsed.query).get("download") == ["1"])
             else:
@@ -1931,6 +2713,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             path = urlsplit(self.path).path
+            self.authenticate_legacy(path)
             if V2 and V2.matches(path):
                 return V2.handle(self, "POST", path, parse_qs(urlsplit(self.path).query))
             if path == "/api/ai/test":
@@ -1970,7 +2753,56 @@ class Handler(BaseHTTPRequestHandler):
             if generate:
                 with connect() as conn:
                     task = get_task(conn, generate.group(1))
-                self.json_response(generate_scripts(task))
+                self.json_response(generate_scripts(task, self.read_json()))
+                return
+            job_action_match = re.fullmatch(r"/api/tasks/(\d{8}-\d{3})/jobs/([^/]+)/(cancel|retry)", path)
+            if job_action_match:
+                content_id = job_action_match.group(1)
+                job = V2.jobs.get(job_action_match.group(2))
+                if job["aggregate_id"] != content_id or job["kind"] != "video.produce":
+                    raise ApiError(404, "生产任务不存在")
+                result = V2.jobs.cancel(job["id"]) if job_action_match.group(3) == "cancel" else V2.jobs.retry(job["id"])
+                self.json_response(result, 202)
+                return
+            preview_create = re.fullmatch(r"/api/tasks/(\d{8}-\d{3})/visual-previews", path)
+            if preview_create:
+                with connect() as conn:
+                    task = get_task(conn, preview_create.group(1))
+                self.json_response(create_visual_preview(task, self.read_json()), 202)
+                return
+            preview_approve = re.fullmatch(r"/api/tasks/(\d{8}-\d{3})/visual-previews/(vp_[a-f0-9]+)/approve", path)
+            if preview_approve:
+                with connect() as conn:
+                    task = get_task(conn, preview_approve.group(1))
+                self.json_response(approve_visual_preview(task, preview_approve.group(2)))
+                return
+            produce_match = re.fullmatch(r"/api/tasks/(\d{8}-\d{3})/produce", path)
+            if produce_match:
+                content_id = produce_match.group(1)
+                payload = self.read_json()
+                with connect() as conn:
+                    task = get_task(conn, content_id)
+                if payload.get("mode", "remotion") != "upload":
+                    candidate = visual_preview_candidate(task, payload)
+                    with connect() as conn:
+                        approval = approved_preview(conn, content_id, candidate["template"]["key"], candidate["fingerprint"])
+                    if not approval:
+                        raise ApiError(409, "请先确认当前视觉风格的10秒效果预览", "preview",
+                                       "等待预览完成并点击“确认效果并生成成片”后再提交生产。")
+                active = next((job for job in V2.jobs.list(200)
+                               if job["aggregate_id"] == content_id and job["kind"] == "video.produce"
+                               and job["status"] in ("queued", "leased", "running", "retry_wait", "cancel_requested")), None)
+                if active:
+                    self.json_response(active, 202)
+                    return
+                job = V2.jobs.enqueue("video.produce", payload, content_id, self.headers.get("Idempotency-Key"), resource_key="render")
+                self.json_response(job, 202)
+                return
+            cover_match = re.fullmatch(r"/api/tasks/(\d{8}-\d{3})/cover", path)
+            if cover_match:
+                with connect() as conn:
+                    task = get_task(conn, cover_match.group(1))
+                self.json_response(generate_cover(task, self.read_json()))
                 return
             generate_audio_match = re.fullmatch(r"/api/tasks/(\d{8}-\d{3})/generate-audio", path)
             if generate_audio_match:
@@ -2005,6 +2837,14 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/tasks":
                 self.json_response(create_task(self.read_json()), 201)
                 return
+            template_status = re.fullmatch(r"/api/video-templates/([a-z0-9-]+@\d+\.\d+\.\d+)/status", path)
+            if template_status:
+                try:
+                    status = str(self.read_json().get("status", ""))
+                    self.json_response({"templates": set_template_status(template_status.group(1), status)})
+                except TemplateError as error:
+                    raise ApiError(409, str(error), "status", "草稿模板需先用真实渲染预览验收，再升级为稳定。")
+                return
             upload = re.fullmatch(r"/api/tasks/(\d{8}-\d{3})/files", path)
             if upload:
                 query = parse_qs(urlsplit(self.path).query)
@@ -2038,6 +2878,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_PUT(self):
         try:
             path = urlsplit(self.path).path
+            self.authenticate_legacy(path)
             if V2 and V2.matches(path):
                 return V2.handle(self, "PUT", path, parse_qs(urlsplit(self.path).query))
             match = re.fullmatch(r"/api/tasks/(\d{8}-\d{3})/(scripts|assets|quality|publications|metrics|subtitles)", path)
@@ -2067,7 +2908,7 @@ if __name__ == "__main__":
         raise SystemExit("端口无效")
     init_db()
     from content_workbench.api.v2 import V2Application
-    V2 = V2Application(DB_PATH, ROOT, create_task)
+    V2 = V2Application(DB_PATH, ROOT, create_task, {"video.produce": produce_video_task, "video.preview": produce_visual_preview})
     V2.start()
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     print("Content Workflow v2: http://127.0.0.1:{}".format(args.port), flush=True)

@@ -11,6 +11,12 @@ METRICS = ("reach", "likes", "comments", "shares", "favorites", "avgConsumptionS
 ANALYTICS_FIELDS = {"impressions": "曝光", "views": "阅读/播放", "likes": "点赞", "comments": "评论",
                     "shares": "分享", "favorites": "收藏", "completionRate": "完播率",
                     "avgConsumptionSeconds": "平均观看时长", "profileVisits": "主页访客", "newFollowers": "净增粉丝"}
+PLATFORM_COVERAGE_FIELDS = {
+    "douyin": ANALYTICS_FIELDS,
+    "xiaohongshu": ANALYTICS_FIELDS,
+    "wechat_channels": {"views": "播放", "likes": "点赞", "comments": "评论", "shares": "分享", "newFollowers": "净增关注"},
+    "wechat_official_account": {"views": "阅读次数", "readers": "阅读人数", "shares": "分享", "favorites": "收藏", "newFollowers": "新关注"},
+}
 
 
 def parse_time(value):
@@ -274,7 +280,8 @@ class AccountAnalytics:
         for platform in PLATFORMS:
             snapshot = snapshots.get(platform) or {}
             profile = snapshot.get("profile") or {}
-            missing = [label for key, label in ANALYTICS_FIELDS.items() if profile.get(key) in (None, "")]
+            fields = PLATFORM_COVERAGE_FIELDS[platform]
+            missing = [label for key, label in fields.items() if profile.get(key) in (None, "")]
             coverage[platform] = {"source": profile.get("analytics_source") or "内容列表", "data_period": profile.get("data_period"),
                                   "missing_fields": missing, "complete": not missing}
         return {"timezone": "Asia/Shanghai", "generated_at": local_now.isoformat(), "platforms": platforms,

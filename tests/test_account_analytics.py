@@ -110,6 +110,15 @@ class AccountAnalyticsCase(unittest.TestCase):
         self.assertEqual(50, second["platforms"]["wechat_channels"]["metrics"]["today"]["reach"])
         self.assertEqual(50, second["totals"]["today"]["reach"])
 
+    def test_coverage_uses_each_platforms_actual_core_fields(self):
+        self.accounts.save_snapshot("wechat_channels", {"views": 10, "likes": 2, "comments": 1, "shares": 1, "newFollowers": 0}, [])
+        self.accounts.save_snapshot("wechat_official_account", {"views": 5, "readers": 4, "shares": 1, "favorites": 2, "newFollowers": 1}, [])
+        data = AccountAnalytics(self.db).bootstrap(datetime(2026, 10, 28, 12, tzinfo=ZoneInfo("Asia/Shanghai")))
+        self.assertTrue(data["coverage"]["wechat_channels"]["complete"])
+        self.assertTrue(data["coverage"]["wechat_official_account"]["complete"])
+        self.assertNotIn("完播率", data["coverage"]["wechat_channels"]["missing_fields"])
+        self.assertNotIn("平均观看时长", data["coverage"]["wechat_official_account"]["missing_fields"])
+
 
 if __name__ == "__main__":
     unittest.main()

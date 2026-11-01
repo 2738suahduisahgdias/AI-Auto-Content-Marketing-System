@@ -13,6 +13,9 @@ export interface PublishingSource {
   id: string;
   title: string;
   body: string;
+  fileId?: number;
+  previewUrl?: string;
+  variantId?: string;
 }
 
 interface TargetForm {
@@ -47,9 +50,16 @@ function targetDefaults(source: PublishingSource, platform: string, definitions:
   }));
   return {
     enabled: supported && !lockedStatuses.has(status),
-    values,
+    values: { ...payload, ...values },
     assetNames: Object.fromEntries(definitions.filter(item => item.control === "asset" && payload[item.name]).map(item => [item.name, "已关联图片资产"])),
   };
+}
+
+function payloadHash(value: unknown) {
+  const text = JSON.stringify(value);
+  let hash = 0;
+  for (let index = 0; index < text.length; index += 1) hash = ((hash << 5) - hash + text.charCodeAt(index)) | 0;
+  return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
 function statusTone(status: string): "neutral" | "green" | "orange" | "red" | "blue" {
@@ -60,7 +70,7 @@ function statusTone(status: string): "neutral" | "green" | "orange" | "red" | "b
 }
 
 export function PublishingPanel(props: { kind: ContentKind; source: PublishingSource | null }) {
-  return <PublishingPanelEditor key={`${props.kind}:${props.source?.id || "none"}`} {...props} />;
+  return <PublishingPanelEditor key={`${props.kind}:${props.source?.id || "none"}:${props.source?.fileId || 0}`} {...props} />;
 }
 
 function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: PublishingSource | null }) {
@@ -171,6 +181,7 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
     const job = await execute("generate-fields", () => api("/api/publishing/generate-fields", jsonOptions("POST", {
       content_kind: kind,
       source_id: source.id,
+      source_file_id: source.fileId,
       platforms: generatablePlatforms,
       prompt: generationPrompt,
     })), "字段生成任务已提交，不会自动保存或发布") as Job | null;
@@ -191,6 +202,7 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
     const saved = await execute("save", () => api("/api/publishing/batches", jsonOptions("POST", {
       content_kind: kind,
       source_id: source.id,
+      source_file_id: source.fileId,
       targets,
     })), "发布批次已保存；下一步生成平台预览");
     if (saved) {
@@ -214,6 +226,8 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
   const selectedReady = batch?.targets.filter(target => target.status === "ready" && forms[target.platform]?.enabled) || [];
   const selectedPreparable = batch?.targets.filter(target => ["draft", "failed"].includes(target.status) && forms[target.platform]?.enabled) || [];
   const hasDirtySelection = platforms.some(platform => forms[platform]?.enabled && dirtyPlatforms.has(platform));
+  const previewPayload = useMemo(() => platforms.filter(platform => forms[platform]?.enabled).map(platform => ({ platform, ...forms[platform].values })), [forms, platforms]);
+  const previewHash = payloadHash(previewPayload);
 
   if (!source) {
     return <Empty title={kind === "article" ? "没有可发布的已批准文章" : "没有可发布的已批准视频"} description={kind === "article" ? "先保存正文并完成人工审批；文章发布不会读取视频任务。" : "先完成 MP4、五项质检和人工最终审核；视频发布不会读取文章正文。"} action={<Link className="button button-primary" to={kind === "article" ? "/articles" : "/tasks"}>{kind === "article" ? "前往文章任务" : "前往视频任务"}</Link>} />;
@@ -269,6 +283,7 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
         </Card>;
       })}
     </div>
+    <section className="publishing-local-preview"><div className="publishing-local-preview-head"><div><h3>本地发布预览</h3><p>预览与提交共用 payload_hash <code>{previewHash}</code>，不是平台实时页面。</p></div></div>{source.previewUrl && <video className="publishing-source-video" controls preload="metadata" src={source.previewUrl} />}<div className="publishing-preview-grid">{previewPayload.map((item: Json) => <article key={item.platform}><Badge tone="blue">{platformNames[item.platform]}</Badge><h4>{item.title || "未填写标题"}</h4><p>{item.description || item.body || "未填写发布描述"}</p>{item.tags && <small>{item.tags}</small>}</article>)}</div></section>
     <div className="publishing-batch-bar">
       <div><strong>{batch ? `批次 ${batch.id}` : "尚未创建发布批次"}</strong><p>{active ? "后台正在执行，离开页面后任务仍会保留。" : "先保存选中平台，再预览；只有预览就绪的平台可以确认公开。"}</p></div>
       <div className="button-row">

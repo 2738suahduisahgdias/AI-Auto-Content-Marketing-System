@@ -98,27 +98,64 @@ def read_xls(path):
     return json.loads(process.stdout)
 
 
+def export_date(value):
+    text = str(value or "").strip()
+    match = re.match(r"^(20\d{2})[-/年]?(\d{1,2})[-/月]?(\d{1,2})日?$", text)
+    return "-".join((match.group(1), match.group(2).zfill(2), match.group(3).zfill(2))) if match else text or None
+
+
+def export_period(history):
+    dates = sorted(date for date in (export_date(row.get("date")) for row in history) if date)
+    if not dates:
+        return None
+    return dates[0] if dates[0] == dates[-1] else dates[0] + " 至 " + dates[-1]
+
+
 def official_metrics(path):
     rows = read_xls(path)
     history = []
     for row in rows:
         if row.get("渠道") != "全部":
             continue
-        history.append({"date": row.get("日期"), "views": number(row.get("阅读次数")), "readers": number(row.get("阅读人数")),
+        history.append({"date": export_date(row.get("日期")), "views": number(row.get("阅读次数")), "readers": number(row.get("阅读人数")),
                         "shares": number(row.get("分享次数")), "favorites": number(row.get("收藏次数")),
                         "publications": number(row.get("群发篇数"))})
     latest = history[0] if history else {}
     return {"views": latest.get("views"), "readers": latest.get("readers"), "shares": latest.get("shares"),
-            "favorites": latest.get("favorites"), "daily_history": history, "analytics_source": "公众号内容分析官方明细"}
+            "favorites": latest.get("favorites"), "daily_history": history, "data_period": export_period(history),
+            "analytics_source": "公众号内容分析官方明细"}
+
+
+def official_article_metrics(path):
+    rows = read_xls(path)
+    if not rows or len(rows[0]) < 3:
+        raise ValueError(f"{Path(path).name} 不是可识别的公众号单篇数据明细")
+    title = next((key for key in rows[0] if not key.startswith("column_")), "")
+    labels = {"阅读(人)": "readers", "平均停留时长(秒)": "avgConsumptionSeconds", "新增关注（人）": "newFollowers",
+              "分享(人)": "shares", "点赞(人)": "likes", "收藏(人)": "favorites", "评论（条）": "comments"}
+    metrics = {}
+    for row in rows:
+        key = labels.get(row.get(title))
+        if key:
+            metrics[key] = number(row.get("column_3"))
+        if row.get(title) == "完读率":
+            rate = number(row.get("column_3"))
+            metrics["completionRate"] = round(rate * 100, 2) if rate is not None and rate <= 1 else rate
+    if not title or metrics.get("readers") is None:
+        raise ValueError(f"{Path(path).name} 缺少文章标题或阅读人数，未作为有效文章导入")
+    return {"title": title, "canonical_url": None,
+            "metadata": {"title": title, "published_at": None, "record_scope": "official_article_export",
+                         "source_file": Path(path).name, "analytics_source": "公众号单篇文章官方数据明细"},
+            "metrics": metrics}
 
 
 def channels_metrics(path):
     with open(path, encoding="utf-8-sig", newline="") as handle:
         rows = list(csv.DictReader(handle.readlines()[2:]))
-    history = [{"date": row.get("时间"), "views": number(row.get("播放")), "likes": number(row.get("喜欢")),
+    history = [{"date": export_date(row.get("时间")), "views": number(row.get("播放")), "likes": number(row.get("喜欢")),
                 "comments": number(row.get("评论")), "shares": number(row.get("分享")),
                 "newFollowers": number(row.get("关注"))} for row in rows]
-    return {"views": history[0]["views"] if history else None, "daily_history": history,
+    return {"views": history[0]["views"] if history else None, "daily_history": history, "data_period": export_period(history),
             "periodViews": total(history, "views"), "likes": total(history, "likes"),
             "comments": total(history, "comments"), "shares": total(history, "shares"),
             "newFollowers": total(history, "newFollowers"), "analytics_source": "视频号官方逐日导出"}

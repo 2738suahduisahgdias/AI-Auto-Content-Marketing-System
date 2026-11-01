@@ -9,6 +9,17 @@ from content_workbench.topics.service import TopicService
 
 
 class SetupCase(unittest.TestCase):
+    def test_webbridge_install_and_connection_checks_are_documented(self):
+        readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+        mac_setup = (PROJECT_ROOT / "scripts/setup.sh").read_text(encoding="utf-8")
+        windows_setup = (PROJECT_ROOT / "scripts/setup.ps1").read_text(encoding="utf-8")
+        self.assertIn("extension_connected", readme)
+        self.assertIn("kimi-webbridge start", readme)
+        self.assertIn("kimi-webbridge.exe", readme)
+        self.assertIn("10086/status", mac_setup)
+        self.assertIn("10086/status", windows_setup)
+        self.assertIn("extension_connected", windows_setup)
+
     def test_environment_contract_and_real_platform_evidence(self):
         with tempfile.TemporaryDirectory(prefix="setup-test-") as temp:
             db = Path(temp) / "setup.db"

@@ -64,6 +64,30 @@ powershell -ExecutionPolicy Bypass -File scripts/setup.ps1 -Check
 
 安装脚本会创建 `.venv-topics` 隔离采集环境、安装 `requirements-topics.txt`、执行两个前端项目的 `npm ci`、构建工作台并初始化脱敏 seed。启动脚本会打开接入向导。
 
+## 浏览器桥接服务（平台采集与微信发布必装）
+
+基础文章和本地视频页面可以先启动，但复用已登录 Chrome 的账号采集、视频号和公众号发布还需要 **Kimi WebBridge 本机服务 + Chrome 扩展**。它不包含在项目 ZIP 中，也不会由安装脚本静默安装。
+
+1. 按官方页面安装服务：<https://www.kimi.com/zh-cn/features/webbridge>。
+2. 启动服务（已经运行时命令会安全地保持现状）：
+
+   macOS / Linux：
+   ```bash
+   ~/.kimi-webbridge/bin/kimi-webbridge start
+   curl http://127.0.0.1:10086/status
+   ```
+
+   Windows PowerShell：
+   ```powershell
+   & "$env:USERPROFILE\.kimi-webbridge\bin\kimi-webbridge.exe" start
+   Invoke-RestMethod http://127.0.0.1:10086/status
+   ```
+
+3. 安装并启用 [Chrome Web Store 扩展](https://chromewebstore.google.com/detail/kimi-webbridge/fldmhceldgbpfpkbgopacenieobmligc)。无法访问商店时，可下载[官方扩展 ZIP](https://kimi-web-img.moonshot.cn/webbridge/latest/extension/kimi-webbridge-extension.zip)，解压后在 `chrome://extensions` 开启开发者模式并选择“加载已解压的扩展程序”。
+4. 再运行 `bash scripts/setup.sh --check`（Windows：`scripts/setup.ps1 -Check`）。状态中必须同时看到 `running: true` 和 `extension_connected: true`；只启动服务但未连接扩展时，账号功能仍不可用。
+
+服务异常时按官方指引处理。项目脚本不会自动停止、重启或卸载 WebBridge，也不会另开一套浏览器。
+
 ## 首次登录平台
 
 1. 打开 `http://127.0.0.1:8765/setup`，先完成依赖检查。
@@ -85,9 +109,33 @@ powershell -ExecutionPolicy Bypass -File scripts/setup.ps1 -Check
 - React + TypeScript + Vite 工作台
 - Remotion + FFmpeg 视频生产
 - 隔离 Playwright/RapidOCR 采集环境
-- 可选 Kimi CLI、macOS say、OpenVoice、faster-whisper
+- 本地社媒数据能力目录与 `/api/social/*` 接口；目录覆盖 167 项，`supported` 与 `adapter_required` 分开标识，不接外部社媒数据 API 或积分计费
+- 文本模型 Provider 默认使用本机 Kimi CLI，Codex CLI 作为后续可验收扩展；口播转写使用本地 faster-whisper
 
 这些本地模型、虚拟环境和账号数据不纳入 Git。未配置的能力显示“未配置/未测试”，不会冒充已连接。
+
+## 视频模板工作流
+
+- 项目级 Remotion Skills 位于 `.agents/skills/`；重新安装：`npx skills add remotion-dev/skills --all --yes`。
+- `config/video_templates.json` 是模板注册表。`draft` 用于开发和验收，`stable` 才能进入生产，`deprecated` 不再用于新任务；模板以 `id@version` 标识。
+- 生产端在视频任务的“成片”步骤选择 1–4 个稳定模板，共享同一音频、SRT 和分镜。模板 Props 受 `allowed_props` 白名单限制，不能通过接口注入 Composition 或代码。
+- `render_runs` 保存模板版本、完整 Props、内容输入快照和输出文件。输入 SHA-256 与本地 MP4 均匹配时命中缓存；多模板中单个失败不影响其他成功结果。
+- 成片保存在 `renders/<任务ID>/`，文件名包含模板 ID、模式和平台；未传模板的旧请求默认使用 `founder-ip@1.0.0`，上传模式仍由 FFmpeg 处理。
+
+多模板渲染请求示例：
+
+```json
+{
+  "mode": "remotion",
+  "platform": "douyin",
+  "template_ids": ["founder-ip@1.0.0", "enterprise-explainer@1.0.0"],
+  "template_props": {
+    "founder-ip@1.0.0": {
+      "appearance": {"accentColor": "#d7f277"}
+    }
+  }
+}
+```
 
 ## 测试
 

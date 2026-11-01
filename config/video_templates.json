@@ -1,0 +1,249 @@
+[
+  {
+    "id": "founder-ip",
+    "version": "1.0.0",
+    "composition_id": "TalkingHead",
+    "status": "stable",
+    "name": "创始人·口播金句",
+    "category": "创始人 IP",
+    "description": "深绿商务风，适合观点、创业经验和企业 AI 口播。",
+    "default_props": {
+      "appearance": {
+        "variant": "founder",
+        "background": "#10251e",
+        "sceneBackground": "linear-gradient(145deg, #173d2e 0%, #0c1f19 70%)",
+        "textColor": "#f5f8f3",
+        "accentColor": "#d7f277",
+        "titleBackground": "rgba(9, 27, 21, 0.84)",
+        "sceneLabelBackground": "rgba(8, 25, 19, 0.76)",
+        "captionBackground": "rgba(64, 64, 64, 0.75)",
+        "captionColor": "#ffffff"
+      }
+    },
+    "allowed_props": [
+      "appearance"
+    ]
+  },
+  {
+    "id": "enterprise-explainer",
+    "version": "1.0.0",
+    "composition_id": "TalkingHead",
+    "status": "stable",
+    "name": "企业 AI·流程解说",
+    "category": "企业 AI 落地",
+    "description": "浅色清晰风格，适合实施步骤、业务流程和方法论。",
+    "default_props": {
+      "appearance": {
+        "variant": "enterprise",
+        "background": "#eef2ed",
+        "sceneBackground": "linear-gradient(145deg, #f8faf6 0%, #e5ece8 70%)",
+        "textColor": "#18332b",
+        "accentColor": "#28785f",
+        "titleBackground": "rgba(250, 252, 248, 0.92)",
+        "sceneLabelBackground": "rgba(250, 252, 248, 0.9)",
+        "captionBackground": "rgba(24, 51, 43, 0.86)",
+        "captionColor": "#ffffff"
+      }
+    },
+    "allowed_props": [
+      "appearance"
+    ]
+  },
+  {
+    "id": "warm-story",
+    "version": "0.1.0",
+    "composition_id": "TalkingHead",
+    "status": "stable",
+    "name": "情感·温暖叙述",
+    "category": "情感故事",
+    "description": "暖米色柔和风格，节奏舒缓，适合更年期情感、陪伴和个人故事。",
+    "default_props": {
+      "appearance": {
+        "variant": "warm",
+        "eyebrow": "温暖叙述",
+        "background": "#f4ede4",
+        "sceneBackground": "linear-gradient(145deg, #fbf6ef 0%, #eadbce 70%)",
+        "textColor": "#503b34",
+        "accentColor": "#ad6f55",
+        "titleBackground": "rgba(255, 250, 243, 0.9)",
+        "sceneLabelBackground": "rgba(255, 250, 243, 0.88)",
+        "captionBackground": "rgba(80, 59, 52, 0.82)",
+        "captionColor": "#ffffff"
+      }
+    },
+    "allowed_props": [
+      "appearance"
+    ]
+  },
+  {
+    "id": "promo",
+    "version": "1.0.0",
+    "composition_id": "TalkingHead",
+    "status": "stable",
+    "name": "宣传·产品推广",
+    "category": "宣传广告",
+    "description": "大标题卖点推进 + 结尾行动号召，适合产品发布、活动和课程推广。",
+    "default_props": {
+      "appearance": {
+        "variant": "promo",
+        "background": "#2b1420",
+        "sceneBackground": "linear-gradient(150deg, #3d1a2c 0%, #24101d 75%)",
+        "textColor": "#fdf3f0",
+        "accentColor": "#ff8a5c",
+        "titleBackground": "rgba(43, 20, 32, 0.86)",
+        "sceneLabelBackground": "rgba(43, 20, 32, 0.78)",
+        "captionBackground": "rgba(43, 20, 32, 0.8)",
+        "captionColor": "#ffffff"
+      }
+    },
+    "allowed_props": [
+      "appearance"
+    ]
+  },
+  {
+    "id": "tech-showcase",
+    "version": "1.0.0",
+    "composition_id": "TalkingHead",
+    "status": "stable",
+    "name": "科技·产品演示",
+    "category": "科技类",
+    "description": "深色网格 + 终端风格功能卡，适合软件功能、AI 产品和技术方案演示。",
+    "default_props": {
+      "appearance": {
+        "variant": "tech",
+        "background": "#0a0f1e",
+        "sceneBackground": "#0a0f1e",
+        "textColor": "#e8f0ff",
+        "accentColor": "#4dd0e1",
+        "titleBackground": "rgba(10, 15, 30, 0.88)",
+        "sceneLabelBackground": "rgba(10, 15, 30, 0.8)",
+        "captionBackground": "rgba(10, 15, 30, 0.82)",
+        "captionColor": "#ffffff"
+      }
+    },
+    "allowed_props": [
+      "appearance"
+    ]
+  },
+  {
+    "id": "data-story",
+    "version": "1.0.0",
+    "composition_id": "DataStory",
+    "status": "stable",
+    "name": "数据·案例复盘",
+    "category": "数据复盘",
+    "description": "柱状图随分镜生长并显示占比，适合客户案例、业务数据和前后对比。",
+    "default_props": {
+      "appearance": {
+        "background": "#101826",
+        "sceneBackground": "#101826",
+        "textColor": "#eef2f8",
+        "accentColor": "#7aa2ff",
+        "titleBackground": "rgba(16, 24, 38, 0.88)",
+        "sceneLabelBackground": "rgba(16, 24, 38, 0.8)",
+        "captionBackground": "rgba(16, 24, 38, 0.82)",
+        "captionColor": "#ffffff"
+      }
+    },
+    "allowed_props": [
+      "appearance"
+    ]
+  },
+  {
+    "id": "audiogram",
+    "version": "1.0.0",
+    "composition_id": "Audiogram",
+    "status": "stable",
+    "name": "音频·波形金句",
+    "category": "情感故事",
+    "description": "大金句 + 流动波形，适合播客切片、情感叙述和访谈摘选。",
+    "default_props": {
+      "appearance": {
+        "background": "#241d2e",
+        "sceneBackground": "linear-gradient(160deg, #2e2440 0%, #1d1726 75%)",
+        "textColor": "#f3eefc",
+        "accentColor": "#c9a7ff",
+        "titleBackground": "rgba(36, 29, 46, 0.86)",
+        "sceneLabelBackground": "rgba(36, 29, 46, 0.78)",
+        "captionBackground": "rgba(36, 29, 46, 0.8)",
+        "captionColor": "#ffffff"
+      }
+    },
+    "allowed_props": [
+      "appearance"
+    ]
+  },
+  {
+    "id": "map-story",
+    "version": "1.0.0",
+    "composition_id": "TalkingHead",
+    "status": "stable",
+    "name": "地图·路线叙事",
+    "category": "地图类",
+    "description": "抽象地图上的站点连线动画，适合企业布局、项目分布和路线故事。",
+    "default_props": {
+      "appearance": {
+        "variant": "map",
+        "background": "#0e1a16",
+        "sceneBackground": "#0e1a16",
+        "textColor": "#e9f4ec",
+        "accentColor": "#5fd39a",
+        "titleBackground": "rgba(14, 26, 22, 0.88)",
+        "sceneLabelBackground": "rgba(14, 26, 22, 0.8)",
+        "captionBackground": "rgba(14, 26, 22, 0.82)",
+        "captionColor": "#ffffff"
+      }
+    },
+    "allowed_props": [
+      "appearance"
+    ]
+  },
+  {
+    "id": "karaoke-caption",
+    "version": "1.0.0",
+    "composition_id": "KaraokeCaption",
+    "status": "stable",
+    "name": "字幕·卡拉OK金句",
+    "category": "创始人 IP",
+    "description": "逐字高亮卡拉OK字幕 + 进度条，移植自 MIT 开源模板，适合口播金句和观点输出。",
+    "default_props": {
+      "appearance": {
+        "background": "#0B1220",
+        "sceneBackground": "#0B1220",
+        "textColor": "#FAFAFA",
+        "accentColor": "#FACC15",
+        "titleBackground": "rgba(11, 18, 32, 0.86)",
+        "sceneLabelBackground": "rgba(11, 18, 32, 0.78)",
+        "captionBackground": "rgba(11, 18, 32, 0.8)",
+        "captionColor": "#ffffff"
+      }
+    },
+    "allowed_props": [
+      "appearance"
+    ]
+  },
+  {
+    "id": "kinetic-text",
+    "version": "1.0.0",
+    "composition_id": "KineticText",
+    "status": "stable",
+    "name": "动感文字·观点陈述",
+    "category": "个人思考",
+    "description": "逐字弹性进入的大字排版，移植自 MIT 开源模板，适合观点、金句和态度表达。",
+    "default_props": {
+      "appearance": {
+        "background": "#09090B",
+        "sceneBackground": "#09090B",
+        "textColor": "#FAFAFA",
+        "accentColor": "#60A5FA",
+        "titleBackground": "rgba(9, 9, 11, 0.86)",
+        "sceneLabelBackground": "rgba(9, 9, 11, 0.78)",
+        "captionBackground": "rgba(9, 9, 11, 0.8)",
+        "captionColor": "#ffffff"
+      }
+    },
+    "allowed_props": [
+      "appearance"
+    ]
+  }
+]

@@ -147,9 +147,13 @@ class JobStore:
             row = conn.execute("SELECT * FROM wb_jobs WHERE id=?", (job_id,)).fetchone()
             if not row or row["status"] not in ("failed", "cancelled", "blocked"):
                 raise DomainError("JOB_NOT_RETRYABLE", "当前任务不能重试；unknown_remote 必须先对账", 409, item=job_id)
+            max_attempts = max(row["max_attempts"], row["attempt_count"] + 1)
+            timestamp = utcnow()
             conn.execute("""UPDATE wb_jobs SET status='queued',stage='queued',available_at=?,error_json=NULL,cancel_requested_at=NULL,
-                lease_owner=NULL,lease_expires_at=NULL,updated_at=? WHERE id=?""", (utcnow(), utcnow(), job_id))
-            return self.get(job_id)
+                lease_owner=NULL,lease_expires_at=NULL,max_attempts=?,updated_at=? WHERE id=?""",
+                (timestamp, max_attempts, timestamp, job_id))
+            Workbench.event(conn, "job", job_id, "job.retried", {"attempt_count": row["attempt_count"], "max_attempts": max_attempts})
+        return self.get(job_id)
 
     def events(self, after=0, aggregate_id=None):
         query = "SELECT * FROM wb_events WHERE sequence>?"

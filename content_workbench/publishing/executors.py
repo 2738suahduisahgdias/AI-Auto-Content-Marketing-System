@@ -11,6 +11,12 @@ from .knowledge import publish_knowledge
 from .schemas import PLATFORM_NAMES
 
 
+def browser_python(root):
+    environment = Path(root) / ".venv-topics"
+    windows = environment / "Scripts/python.exe"
+    return str(windows if windows.is_file() else environment / "bin/python")
+
+
 class PublishingExecutors:
     def __init__(self, service):
         self.service = service
@@ -114,7 +120,7 @@ class PublishingExecutors:
         with tempfile.TemporaryDirectory(prefix="publishing-job-") as directory:
             use_bridge = platform in ("wechat_channels", "wechat_official_account") and action in ("prepare", "execute")
             worker = "webbridge_worker.py" if use_bridge else "browser_worker.py"
-            python = sys.executable if use_bridge else str(self.root / ".venv-topics/bin/python")
+            python = sys.executable if use_bridge else browser_python(self.root)
             arguments = [python, str(self.root / "content_workbench/publishing" / worker),
                          "--action", action, "--platform", platform]
             if not use_bridge:

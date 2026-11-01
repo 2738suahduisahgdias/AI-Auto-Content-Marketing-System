@@ -5,6 +5,7 @@ AGENTS = {
     "hotspot_agent": {"name": "热点情报Agent", "description": "热榜与收藏快照采集", "engines": ["playwright"], "engine": "playwright", "model": "topics-v1", "timeout": 1800, "attempts": 3, "concurrency": 1, "prompt": False, "connected": True},
     "industry_topic_agent": {"name": "行业选题Agent", "description": "行业资讯分析与今日推荐", "engines": ["kimi_cli"], "engine": "kimi_cli", "model": "default_unpinned", "timeout": 600, "attempts": 3, "concurrency": 2, "prompt": True, "connected": True},
     "douyin_topic_agent": {"name": "抖音选题Agent", "description": "抖音热榜、收藏与今日推荐", "engines": ["kimi_cli"], "engine": "kimi_cli", "model": "default_unpinned", "timeout": 600, "attempts": 3, "concurrency": 2, "prompt": True, "connected": True},
+    "xiaohongshu_topic_agent": {"name": "小红书选题Agent", "description": "小红书笔记研究与今日推荐", "engines": ["kimi_cli"], "engine": "kimi_cli", "model": "default_unpinned", "timeout": 600, "attempts": 3, "concurrency": 2, "prompt": True, "connected": True},
     "script_agent": {"name": "脚本Agent", "description": "母稿与平台版本生成", "engines": ["kimi_cli"], "engine": "kimi_cli", "model": "default_unpinned", "timeout": 600, "attempts": 3, "concurrency": 2, "prompt": True, "connected": True},
     "asset_planning_agent": {"name": "素材规划Agent", "description": "口播与 SRT 分镜规划", "engines": ["kimi_cli"], "engine": "kimi_cli", "model": "default_unpinned", "timeout": 600, "attempts": 3, "concurrency": 2, "prompt": True, "connected": True},
     "voice_agent": {"name": "配音Agent", "description": "macOS 系统语音生成", "engines": ["macos_say"], "engine": "macos_say", "model": "system_voice", "timeout": 300, "attempts": 2, "concurrency": 1, "prompt": False, "connected": True},
@@ -24,6 +25,7 @@ AGENTS = {
 DEFAULT_PROMPTS = {
     "industry_topic_agent": "优先真实业务、流程改造、验收和可复用方法。",
     "douyin_topic_agent": "热点只作场景，优先差异化、真实证据和账号定位。",
+    "xiaohongshu_topic_agent": "只根据真实笔记总结新实验，不把本账号样本当作平台趋势，不编造高赞或爆款。",
     "script_agent": "语言直接具体，不编造证据，短视频适合自然口播。",
     "asset_planning_agent": "优先真实业务画面、录屏、流程图和简洁文字卡。",
     "account_analysis_agent": "区分事实、推断和待验证实验，不编造指标或稳定规律。",

@@ -12,6 +12,8 @@ import {
 type BasicCaptionsProps = InteractiveTransformProps &
 	Pick<SequenceProps, 'width'> & {
 		readonly captions: Caption[];
+		readonly captionBackground?: string;
+		readonly captionColor?: string;
 	};
 
 const defaultWidth = 900;
@@ -32,6 +34,8 @@ const BasicCaptionsContent: React.FC<BasicCaptionsProps> = ({
 	captions,
 	style,
 	width = defaultWidth,
+	captionBackground = 'rgba(64, 64, 64, 0.75)',
+	captionColor = '#ffffff',
 }) => {
 	const frame = useCurrentFrame();
 	const {fps} = useVideoConfig();
@@ -55,13 +59,13 @@ const BasicCaptionsContent: React.FC<BasicCaptionsProps> = ({
 			{page ? (
 				<div
 					style={{
-						backgroundColor: 'rgba(64, 64, 64, 0.75)',
-						color: '#ffffff',
+						backgroundColor: captionBackground,
+						color: captionColor,
 						fontFamily: 'Arial, Helvetica, sans-serif',
 						fontSize: 42,
 						fontWeight: 400,
 						lineHeight: 1.35,
-							maxWidth: 860,
+						maxWidth: 860,
 						padding: '14px 22px',
 						textAlign: 'center',
 						textWrap: 'balance',

@@ -25,6 +25,8 @@ voice/
 voice_profiles/
 subtitles/
 renders/
+previews/
+agent/memory/
 covers/
 analytics/
 reports/

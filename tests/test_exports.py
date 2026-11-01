@@ -6,7 +6,7 @@ from xml.sax.saxutils import escape
 
 from unittest import mock
 
-from content_workbench.accounts.exports import channels_metrics, douyin_metrics, official_metrics, read_xlsx, xhs_metrics
+from content_workbench.accounts.exports import channels_metrics, douyin_metrics, official_article_metrics, official_metrics, read_xlsx, xhs_metrics
 
 
 def workbook(path, rows):
@@ -78,6 +78,29 @@ class ExportCase(unittest.TestCase):
         self.assertEqual(5, official["views"])
         self.assertEqual(2, official["favorites"])
         self.assertEqual(1, len(official["daily_history"]))
+        self.assertEqual("2025-10-28", official["data_period"])
+        self.assertEqual("2026-10-27 至 2026-10-28", metrics["data_period"])
+
+    def test_official_single_article_export_keeps_real_metrics(self):
+        title = "真实文章"
+        rows = [
+            {"column_1": "", title: "", "column_3": "", "column_4": "", "column_5": ""},
+            {"column_1": "", title: "阅读(人)", "column_3": 191, "column_4": "", "column_5": ""},
+            {"column_1": "", title: "平均停留时长(秒)", "column_3": 69, "column_4": "", "column_5": ""},
+            {"column_1": "", title: "完读率", "column_3": "0.272251", "column_4": "", "column_5": ""},
+            {"column_1": "", title: "分享(人)", "column_3": 9, "column_4": "", "column_5": ""},
+            {"column_1": "", title: "点赞(人)", "column_3": 3, "column_4": "", "column_5": ""},
+            {"column_1": "", title: "收藏(人)", "column_3": 6, "column_4": "", "column_5": ""},
+            {"column_1": "", title: "评论（条）", "column_3": 0, "column_4": "", "column_5": ""},
+        ]
+        with mock.patch("content_workbench.accounts.exports.read_xls", return_value=rows):
+            item = official_article_metrics("article.xls")
+        self.assertEqual(title, item["title"])
+        self.assertEqual(191, item["metrics"]["readers"])
+        self.assertEqual(27.23, item["metrics"]["completionRate"])
+        self.assertEqual(69, item["metrics"]["avgConsumptionSeconds"])
+        self.assertEqual("official_article_export", item["metadata"]["record_scope"])
+        self.assertIsNone(item["metadata"]["published_at"])
 
 
 if __name__ == "__main__":

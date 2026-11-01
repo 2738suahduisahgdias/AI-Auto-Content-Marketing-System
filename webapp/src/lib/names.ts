@@ -10,3 +10,25 @@ export const scriptNames: Record<string, string> = { master: "母稿", douyin: "
 export function stageFor(task: { state: string }) {
   return ({ topic_approved: 1, script_drafted: 1, script_approved: 2, waiting_audio: 2, transcribed: 3, assets_planned: 3, assets_approved: 4, rendered: 5, quality_checked: 5, review_required: 6, approved: 7, published: 8, analyzed: 8 } as Record<string, number>)[task.state] ?? 0;
 }
+
+export const videoGroups = ["文本", "录音", "成片"];
+export const videoGroupOwners = ["选题Agent · 脚本Agent", "用户 · 字幕自动生成", "素材 · 视频构建 · 质检发布"];
+const stageToGroup = [0, 0, 1, 2, 2, 2, 2, 2, 2];
+export const groupStages: number[][] = [[0, 1], [2], [3, 4, 5, 6, 7, 8]];
+export function groupFor(task: { state: string }) {
+  return stageToGroup[stageFor(task)] ?? 0;
+}
+
+export function nextStepFor(task: { state: string; content_id: string }, jobs: { aggregate_id: string; status: string; progress?: number; stage?: string }[]) {
+  const active = jobs.find(job => job.aggregate_id === task.content_id && ["queued", "leased", "running", "retry_wait", "cancel_requested"].includes(job.status));
+  if (active) return `自动生产中 · ${active.stage || "处理中"} ${Math.round((active.progress || 0) * 100)}%`;
+  const failed = jobs.find(job => job.aggregate_id === task.content_id && ["failed", "cancelled"].includes(job.status));
+  if (failed && ["assets_approved", "rendered"].includes(task.state)) return "生产失败 · 查看原因并重试";
+  return stateNames[task.state] || task.state;
+}
+
+export function taskAttention(task: { state: string; content_id: string }, jobs: { aggregate_id: string; status: string }[]) {
+  const failed = jobs.some(job => job.aggregate_id === task.content_id && job.status === "failed");
+  if (failed) return 0;
+  return ({ review_required: 1, quality_checked: 2, rendered: 2, waiting_audio: 3, script_drafted: 3, assets_planned: 3, approved: 4, published: 5, analyzed: 6 } as Record<string, number>)[task.state] ?? 3;
+}

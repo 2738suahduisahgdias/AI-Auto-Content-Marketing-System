@@ -176,6 +176,7 @@ class PublishingService:
             targets = [dict(value) for value in conn.execute("SELECT * FROM publish_targets WHERE batch_id=? ORDER BY created_at,platform", (batch_id,))]
         for target in targets:
             target["payload"] = loads(target.pop("payload_json"), {})
+            target["payload_hash"] = payload_hash(target["payload"])
             target["preview"] = loads(target.pop("preview_json"), {})
             target["error"] = loads(target.pop("error_json"), None)
             target["platform_name"] = PLATFORM_NAMES[target["platform"]]
@@ -209,6 +210,51 @@ class PublishingService:
             })
         return {"platforms": result, "total_published": len(rows),
                 "note": "仅包含已核验发布记录；提升建议来自工作流证据，不代表内容效果已得到验证。"}
+
+    def publication_queue(self):
+        with self.conn(readonly=True) as conn:
+            tasks = conn.execute("SELECT * FROM tasks ORDER BY created_at DESC").fetchall()
+            variants = conn.execute("SELECT * FROM video_variants WHERE approved_at IS NOT NULL ORDER BY created_at DESC").fetchall()
+            batches = conn.execute("SELECT * FROM publish_batches ORDER BY created_at DESC").fetchall()
+        variants_by_task = {}
+        for variant in variants:
+            variants_by_task.setdefault(variant["content_id"], []).append(dict(variant))
+        items = []
+        for task in tasks:
+            selected = variants_by_task.get(task["content_id"])
+            if selected:
+                candidates = selected
+            elif task["state"] == "approved":
+                with self.conn(readonly=True) as conn:
+                    file = conn.execute("SELECT * FROM files WHERE content_id=? AND kind='video' ORDER BY id DESC LIMIT 1",
+                                        (task["content_id"],)).fetchone()
+                candidates = [dict(file) ] if file else []
+            else:
+                continue
+            for candidate in candidates:
+                file_id = candidate["file_id"]
+                batch_row = next((row for row in batches if row["content_kind"] == "video" and row["source_id"] == task["content_id"]
+                                  and (row["source_file_id"] == file_id or not row["source_file_id"])), None)
+                batch = self.get_batch(batch_row["id"]) if batch_row else None
+                metadata_incomplete = False
+                if batch:
+                    for target in batch["targets"]:
+                        try:
+                            validate_payload("video", target["platform"], target["payload"])
+                        except DomainError:
+                            metadata_incomplete = True
+                statuses = {target["status"] for target in batch["targets"]} if batch else set()
+                status = ("unknown_remote" if "unknown_remote" in statuses else "failed" if "failed" in statuses
+                          else "publishing" if statuses & {"preparing", "publishing"} else "ready" if "ready" in statuses
+                          else "metadata_incomplete" if metadata_incomplete else "draft")
+                items.append({
+                    "id": task["content_id"], "title": task["title"],
+                    "body": loads(task["scripts_json"], {}).get("douyin") or loads(task["scripts_json"], {}).get("master") or task["title"],
+                    "file_id": file_id, "variant_id": candidate.get("id"),
+                    "preview_url": "/api/files/{}/media".format(file_id),
+                    "status": status, "batch": batch,
+                })
+        return {"items": items}
 
     def bootstrap(self, kind=None, source_id=None):
         batch = None

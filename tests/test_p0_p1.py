@@ -204,6 +204,26 @@ class Case(unittest.TestCase):
         with self.assertRaises(DomainError):
             self.store.retry(job["id"])
 
+    def test_exhausted_job_manual_retry_gets_budget_and_preserves_attempts(self):
+        job = self.store.enqueue("test.exhausted", {}, idempotency_key="exhausted", max_attempts=1)
+        leased = self.store.lease("worker")
+        first_attempt = self.store.get(job["id"])["attempts"][0]
+        self.store.finish(job["id"], "worker", leased["fencing_token"], error={"code": "TEST_FAILURE"}, status="retry_wait", retry_delay=-1)
+        self.assertIsNone(self.store.lease("worker"))
+        self.assertEqual("ATTEMPTS_EXHAUSTED", self.store.get(job["id"])["error"]["code"])
+
+        retried = self.store.retry(job["id"])
+        self.assertEqual("queued", retried["status"])
+        self.assertEqual(2, retried["max_attempts"])
+        self.assertEqual(1, len(retried["attempts"]))
+        leased = self.store.lease("worker")
+        self.assertIsNotNone(leased)
+        self.assertEqual(2, leased["attempt_count"])
+        attempts = self.store.get(job["id"])["attempts"]
+        self.assertEqual(2, len(attempts))
+        self.assertEqual(first_attempt["id"], attempts[0]["id"])
+        self.assertEqual(first_attempt["fencing_token"], attempts[0]["fencing_token"])
+
     def test_a26_cas_conflict_does_not_overwrite(self):
         item, _ = self.article()
         stale_version = item["version"]

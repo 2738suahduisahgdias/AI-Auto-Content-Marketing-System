@@ -7,6 +7,7 @@ const Today = lazy(() => import("@/pages/Today"));
 const Topics = lazy(() => import("@/pages/Topics"));
 const Accounts = lazy(() => import("@/pages/AccountAnalytics"));
 const Competitors = lazy(() => import("@/pages/Competitors"));
+const SocialData = lazy(() => import("@/pages/SocialData"));
 const Retrospective = lazy(() => import("@/pages/Retrospective"));
 const Articles = lazy(() => import("@/pages/Articles"));
 const Tasks = lazy(() => import("@/pages/Tasks"));
@@ -24,6 +25,7 @@ export default function App() {
     <Route path="/topics/:source" element={<Topics />} />
     <Route path="/accounts/:view?" element={<Accounts />} />
     <Route path="/competitors" element={<Competitors />} />
+    <Route path="/social" element={<SocialData />} />
     <Route path="/retrospective" element={<Retrospective />} />
     <Route path="/articles/:id?" element={<Articles />} />
     <Route path="/tasks/:id?" element={<Tasks />} />

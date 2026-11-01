@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Bot, Film, LoaderCircle, Mic2, RefreshCw, RotateCcw, Save, Settings2, Subtitles, Volume2, WandSparkles } from "lucide-react";
 import { useApp } from "@/AppContext";
 import { Badge, Button, Card, Empty, ErrorBox, Field, Input, PageHeader, Textarea, Busy } from "@/components/ui";
@@ -27,6 +27,7 @@ interface AgentConfig {
   timeout_seconds: number;
   max_attempts: number;
   concurrency: number;
+  custom: Record<string, any>;
 }
 
 type DraftNumber = number | string;
@@ -91,6 +92,7 @@ function toDraft(config: AgentConfig): AgentDraft {
     timeout_seconds: config.timeout_seconds,
     max_attempts: config.max_attempts,
     concurrency: config.concurrency,
+    custom: config.custom || {},
   };
 }
 
@@ -111,7 +113,7 @@ function validateDraft(draft: AgentDraft): AgentConfig {
     }
     numbers[key] = value;
   }
-  return { enabled: draft.enabled, engine: draft.engine, model: draft.model.trim(), prompt: draft.prompt, ...numbers };
+  return { enabled: draft.enabled, engine: draft.engine, model: draft.model.trim(), prompt: draft.prompt, custom: draft.custom || {}, ...numbers };
 }
 
 function ConnectionCard({
@@ -171,6 +173,64 @@ function ConnectionCard({
     {disabledReason && <p className="settings-disabled-reason">{disabledReason}</p>}
     <p className="settings-connection-footnote">{footnote}</p>
   </Card>;
+}
+
+interface VideoTemplate {
+  key: string;
+  id: string;
+  version: string;
+  name: string;
+  category: string;
+  description: string;
+  status: string;
+  preview_url?: string;
+}
+
+const templateStatusNames: Record<string, string> = { draft: "草稿", stable: "稳定", deprecated: "已停用" };
+
+function TemplateLibrary() {
+  const [templates, setTemplates] = useState<VideoTemplate[]>([]);
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let current = true;
+    api("/api/video-templates").then(data => { if (current) { setTemplates(data.templates || []); setError(""); } }).catch((cause: unknown) => { if (current) setError(errorText(cause)); });
+    return () => { current = false; };
+  }, []);
+  const setStatus = async (template: VideoTemplate, status: string) => {
+    if (status === "stable" && !window.confirm(`将「${template.name} v${template.version}」升级为稳定模板？升级后生产任务可以直接选择它。`)) return;
+    setBusy(template.key);
+    try {
+      const data = await api(`/api/video-templates/${template.key}/status`, jsonOptions("POST", { status }));
+      setTemplates(data.templates || []);
+      setError("");
+    } catch (cause) {
+      setError(errorText(cause));
+    } finally {
+      setBusy("");
+    }
+  };
+  return <section className="settings-connections" aria-label="视频模板库">
+    <div className="section-heading"><div><h2>视频模板库</h2><p>模板开发在 remotion-app 中由 Agent 使用 Remotion skills 完成并写入注册表；这里验收预览、升级稳定或停用。生产任务只能选择稳定模板。</p></div></div>
+    {error && <ErrorBox>{error}</ErrorBox>}
+    <div className="settings-template-grid">
+      {templates.map(template => <article className="settings-template-card" key={template.key}>
+        {template.preview_url ? <img src={template.preview_url} alt={`${template.name} 真实渲染预览`} loading="lazy" /> : <div className="settings-template-empty">预览图未生成</div>}
+        <div className="settings-template-meta">
+          <strong>{template.name} <small>v{template.version}</small></strong>
+          <span>{template.category} · {template.key}</span>
+          <p>{template.description}</p>
+          <div className="tag-row">
+            <Badge tone={template.status === "stable" ? "green" : template.status === "draft" ? "orange" : "neutral"}>{templateStatusNames[template.status] || template.status}</Badge>
+            {template.status === "draft" && <Button size="small" disabled={busy === template.key} onClick={() => { void setStatus(template, "stable"); }}>{busy === template.key ? "正在升级…" : "升级为稳定"}</Button>}
+            {template.status === "stable" && <Button size="small" disabled={busy === template.key} onClick={() => { void setStatus(template, "deprecated"); }}>{busy === template.key ? "正在停用…" : "停用"}</Button>}
+            {template.status === "deprecated" && <Button size="small" disabled={busy === template.key} onClick={() => { void setStatus(template, "draft"); }}>{busy === template.key ? "正在恢复…" : "恢复为草稿"}</Button>}
+          </div>
+        </div>
+      </article>)}
+      {!templates.length && !error && <Empty title="模板注册表为空" description="由 Agent 在 remotion-app 中开发模板并写入 config/video_templates.json 后，会出现在这里。" />}
+    </div>
+  </section>;
 }
 
 export default function Settings() {
@@ -315,6 +375,7 @@ export default function Settings() {
                 <Field label="并发上限" hint="1～2"><Input type="number" min={1} max={2} step={1} value={draft.concurrency} onChange={event => updateDraft("concurrency", event.target.value)} /></Field>
               </div>
               {definition.prompt ? <Field label="补充提示词" hint={`只追加到该 Agent，不覆盖原有安全约束，不影响其他 Agent。${draft.prompt.length} / 12000 字符`}><Textarea rows={5} maxLength={12000} value={draft.prompt} onChange={event => updateDraft("prompt", event.target.value)} /></Field> : <p className="settings-no-prompt">该 Agent 是确定性工具或调度器，没有可编辑提示词。</p>}
+              {["script_agent", "article_agent"].includes(selectedId) && <Field label="写作 Skills（每行一个只读 Markdown 路径）" hint="默认加载去 AI 味儿和写作技巧；仅允许 skills/ 或 .agents/skills/ 下的 .md 文件，生成与改写时真实注入。"><Textarea rows={3} value={(draft.custom.skills || ["skills/writing/de-ai/SKILL.md", "skills/writing/techniques/SKILL.md"]).join("\n")} onChange={event => updateDraft("custom", { ...draft.custom, skills: event.target.value.split("\n").map(value => value.trim()).filter(Boolean) })} /></Field>}
               {configError && <ErrorBox>{configError}</ErrorBox>}
               <div className="settings-editor-actions"><Button variant="primary" onClick={() => { void saveAgent(); }}><Save size={14} />{configBusy === `save:${selectedId}` ? "正在保存…" : `保存${definition.name}`}</Button><Button onClick={() => { void resetAgent(); }}><RotateCcw size={14} />{configBusy === `reset:${selectedId}` ? "正在恢复…" : "恢复该 Agent 默认"}</Button><span>保存与恢复均只调用当前 Agent 的配置接口。</span></div>
             </fieldset>
@@ -337,6 +398,8 @@ export default function Settings() {
           </ConnectionCard>
         </div>
       </section>}
+
+      <TemplateLibrary />
 
       <Card className="settings-boundary"><div><p className="eyebrow">SAFETY / LOCAL FIRST</p><h2>数据与自动化边界</h2></div><ul><li>任务、设置和审批保存在本机 SQLite，服务只监听 127.0.0.1；页面不会读取凭据文件。</li><li>生成输入仅包含当前任务、候选 / 热点证据和必要账号策略，不发送全库历史文章。</li><li>生成成功不会自动人工批准；连接测试不会自动发布任何内容。</li><li>未接入的质检、发布复盘和数据分析 Agent 不能启用；发布助手仅做预览填充，公开发布始终需要人工确认。</li></ul></Card>
     </>}

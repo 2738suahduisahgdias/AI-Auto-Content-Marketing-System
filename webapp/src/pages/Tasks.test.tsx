@@ -1,7 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import Tasks from "./Tasks";
+
+afterEach(() => { vi.unstubAllGlobals(); });
 
 const tasks = Array.from({ length: 12 }, (_, index) => ({
   content_id: `video-${index}`, title: `视频 ${index}`, state: "approved",
@@ -18,10 +20,13 @@ vi.mock("@/AppContext", () => ({
 }));
 
 describe("Video delivery and pagination", () => {
-  it("shows only the real video delivery and paginates tasks", () => {
+  it("shows the real video delivery in the result stage and paginates tasks", () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ jobs: [] }) }));
     render(<MemoryRouter><Tasks /></MemoryRouter>);
+    expect(screen.getAllByText("成片").length).toBeGreaterThan(0);
+    expect(screen.getByText("发布封面")).toBeInTheDocument();
     expect(screen.getByText("交付视频")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "下载成片" })).toHaveAttribute("href", "/api/files/1/media?download=1");
+    expect(screen.getAllByRole("link", { name: "下载成片" })[0]).toHaveAttribute("href", "/api/files/1/media?download=1");
     expect(screen.getByRole("link", { name: "前往发布中心" })).toHaveAttribute("href", "/publish?kind=video&id=video-0");
     fireEvent.click(screen.getByRole("button", { name: "下一页" }));
     expect(screen.getByText("2 / 2 页")).toBeInTheDocument();

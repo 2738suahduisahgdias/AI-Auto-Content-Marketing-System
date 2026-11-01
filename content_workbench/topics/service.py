@@ -10,10 +10,12 @@ DEFAULT_SETTINGS = {
     "industry_scope": "人工智能 企业应用 AI落地 企业转型",
     "industry_prompt": "关注企业AI落地、AI教学、AI营销获客。优先真实业务任务、流程改造、验收和可复用方法，不推荐泛娱乐或无法核实的案例。",
     "douyin_prompt": "综合今日热榜和收藏快照，选择与账号定位相关且能形成差异化表达的主题。热点只作场景，不硬蹭灾难、隐私或无关娱乐事件。",
+    "xiaohongshu_prompt": "综合个人小红书收藏夹中的热点、精选、竞品和高赞笔记快照，选择与账号定位相关且能形成差异化表达的主题。收藏只代表个人研究样本，不代表平台全貌；没有明确指标时不得编造热度。",
     "daily_time": "09:00", "daily_enabled": False,
     "featured_collection": "选题", "competitor_collection": "企业AI落地竞对账号", "high_praise_collection": "低粉高赞文案",
+    "xhs_hot_collection": "热点选题", "xhs_featured_collection": "选题", "xhs_competitor_collection": "企业AI落地竞对账号", "xhs_high_praise_collection": "低粉高赞文案",
 }
-SOURCE_KEYS = ("industry", "hot", "featured", "competitor", "high_praise", "xhs_notes", "wechat_inbox")
+SOURCE_KEYS = ("industry", "hot", "featured", "competitor", "high_praise", "xhs_hot", "xhs_featured", "xhs_competitor", "xhs_high_praise", "xhs_notes", "wechat_inbox")
 
 
 def stable_id(prefix, value):
@@ -42,7 +44,8 @@ class TopicService:
 
     def save_settings(self, values):
         current = self.settings()
-        for key in ("industry_scope", "industry_prompt", "douyin_prompt", "featured_collection", "competitor_collection", "high_praise_collection"):
+        for key in ("industry_scope", "industry_prompt", "douyin_prompt", "xiaohongshu_prompt", "featured_collection", "competitor_collection", "high_praise_collection",
+                    "xhs_hot_collection", "xhs_featured_collection", "xhs_competitor_collection", "xhs_high_praise_collection"):
             if key in values:
                 current[key] = str(values[key]).strip()[:12000]
         if "daily_time" in values:
@@ -52,19 +55,19 @@ class TopicService:
             current["daily_time"] = value
         if "daily_enabled" in values:
             current["daily_enabled"] = bool(values["daily_enabled"])
-        if not current["industry_scope"] or not current["industry_prompt"] or not current["douyin_prompt"]:
-            raise ValueError("行业范围、行业提示词和抖音提示词不能为空")
+        if not current["industry_scope"] or not current["industry_prompt"] or not current["douyin_prompt"] or not current["xiaohongshu_prompt"]:
+            raise ValueError("行业范围、行业提示词、抖音提示词和小红书提示词不能为空")
         with self.conn() as conn, immediate(conn):
             conn.execute("INSERT OR REPLACE INTO settings(key,value) VALUES ('topics_settings',?)", (dumps(current),))
         from .scheduler import configure_schedule
         configure_schedule(self.db_path, current)
         return current
 
-    def ensure_account(self, profile_ref="data/topic-browser-profile"):
-        account_id = "source_douyin_main"
+    def ensure_account(self, profile_ref="data/topic-browser-profile", platform="douyin"):
+        account_id = "source_{}_main".format(platform)
         with self.conn() as conn, immediate(conn):
             conn.execute("INSERT OR IGNORE INTO wb_source_accounts VALUES (?,?,?,?,?,?)",
-                         (account_id, "douyin", "main", profile_ref, "unknown", utcnow()))
+                         (account_id, platform, "main", profile_ref, "unknown", utcnow()))
         return account_id
 
     def collection(self, title, account_id=None):
@@ -88,7 +91,7 @@ class TopicService:
                 metadata[key] = item[key]
         metadata["source_key"] = source_key
         metadata["title"] = item.get("title") or metadata.get("title") or "未读取标题"
-        collection_id = self.collection(collection_title) if collection_title else None
+        collection_id = self.collection(collection_title, self.ensure_account(platform=platform)) if collection_title else None
         with self.conn() as conn, immediate(conn):
             existing = conn.execute("SELECT id FROM wb_research_items WHERE platform=? AND canonical_url_hash=?", (platform, url_hash)).fetchone()
             if existing:
@@ -136,10 +139,10 @@ class TopicService:
             metadata.update(values)
             conn.execute("UPDATE wb_research_items SET metadata_json=?,observed_at=? WHERE id=?", (dumps(metadata), utcnow(), item_id))
 
-    def reconcile_collection(self, title, item_ids, run_id, complete):
+    def reconcile_collection(self, title, item_ids, run_id, complete, account_id=None):
         if not complete:
             return
-        collection_id = self.collection(title)
+        collection_id = self.collection(title, account_id)
         with self.conn() as conn, immediate(conn):
             rows = conn.execute("SELECT item_id FROM wb_memberships WHERE collection_id=? AND status='present'", (collection_id,)).fetchall()
             missing = [row[0] for row in rows if row[0] not in set(item_ids)]
@@ -148,8 +151,8 @@ class TopicService:
                     last_seen_run_id=? WHERE collection_id=? AND item_id=?""", (run_id, collection_id, item_id))
             conn.execute("UPDATE wb_memberships SET status='removed' WHERE collection_id=? AND consecutive_full_scan_misses>=2", (collection_id,))
 
-    def start_sync(self, mode="incremental", scope=None):
-        account_id = self.ensure_account()
+    def start_sync(self, mode="incremental", scope=None, platform="douyin"):
+        account_id = self.ensure_account(platform=platform)
         run_id = new_id("sync")
         with self.conn() as conn, immediate(conn):
             conn.execute("INSERT INTO wb_sync_runs VALUES (?,?,?,?,'running','{}','topics-v1',0,?,NULL,'{}',NULL)",
@@ -173,6 +176,21 @@ class TopicService:
                 ids.append(candidate_id)
         return ids
 
+    def get_candidate(self, candidate_id):
+        with self.conn(readonly=True) as conn:
+            row = conn.execute("SELECT * FROM wb_topic_candidates WHERE id=?", (candidate_id,)).fetchone()
+        if not row:
+            from content_workbench.domain.errors import DomainError
+            raise DomainError("TOPIC_CANDIDATE_NOT_FOUND", "推荐选题不存在", 404, "id", "刷新今日推荐后重新选择")
+        return {**loads(row["payload_json"], {}), "id": row["id"], "status": row["status"], "created_at": row["created_at"]}
+
+    def mark_candidate_converted(self, candidate_id, task_id):
+        candidate = self.get_candidate(candidate_id)
+        payload = {key: value for key, value in candidate.items() if key not in ("id", "status", "created_at")}
+        payload["task_id"] = task_id
+        with self.conn() as conn, immediate(conn):
+            conn.execute("UPDATE wb_topic_candidates SET status='converted',payload_json=? WHERE id=?", (dumps(payload), candidate_id))
+
     def item_dict(self, row, analyses=None):
         metadata = loads(row["metadata_json"], {})
         analyses = analyses or []
@@ -191,12 +209,15 @@ class TopicService:
     def bootstrap(self):
         settings = self.settings()
         mapping = {"featured": settings["featured_collection"], "competitor": settings["competitor_collection"], "high_praise": settings["high_praise_collection"]}
+        xhs_mapping = {"xhs_hot": settings["xhs_hot_collection"], "xhs_featured": settings["xhs_featured_collection"],
+                       "xhs_competitor": settings["xhs_competitor_collection"], "xhs_high_praise": settings["xhs_high_praise_collection"]}
         with self.conn(readonly=True) as conn:
             rows = [dict(row) for row in conn.execute("SELECT * FROM wb_research_items ORDER BY last_seen_at DESC")]
             analysis_rows = [dict(row) for row in conn.execute("SELECT id,item_id,status,created_at FROM wb_analyses ORDER BY created_at DESC")]
-            memberships = [dict(row) for row in conn.execute("""SELECT m.item_id,c.title FROM wb_memberships m JOIN wb_collections c ON c.id=m.collection_id WHERE m.status='present'""")]
+            memberships = [dict(row) for row in conn.execute("""SELECT m.item_id,c.title,c.account_id FROM wb_memberships m JOIN wb_collections c ON c.id=m.collection_id WHERE m.status='present'""")]
             candidates = [dict(row) for row in conn.execute("SELECT * FROM wb_topic_candidates ORDER BY created_at DESC LIMIT 40")]
-            sync = conn.execute("SELECT * FROM wb_sync_runs ORDER BY started_at DESC LIMIT 1").fetchone()
+            sync = conn.execute("SELECT * FROM wb_sync_runs WHERE account_id='source_douyin_main' ORDER BY started_at DESC LIMIT 1").fetchone()
+            xhs_sync = conn.execute("SELECT * FROM wb_sync_runs WHERE account_id='source_xiaohongshu_main' ORDER BY started_at DESC LIMIT 1").fetchone()
             account = conn.execute("SELECT * FROM wb_source_accounts WHERE id='source_douyin_main'").fetchone()
         by_item = {}
         for row in analysis_rows:
@@ -205,7 +226,8 @@ class TopicService:
         archived = []
         for row in rows:
             item = self.item_dict(row, by_item.get(row["id"]))
-            item["collections"] = [m["title"] for m in memberships if m["item_id"] == row["id"]]
+            item_memberships = [m for m in memberships if m["item_id"] == row["id"]]
+            item["collections"] = [m["title"] for m in item_memberships]
             if item["archived"]:
                 archived.append(item)
                 continue
@@ -213,12 +235,15 @@ class TopicService:
             if source in ("hot", "industry", "xhs_notes", "wechat_inbox"):
                 grouped[source].append(item)
             for key, title in mapping.items():
-                if title in item["collections"] and item not in grouped[key]:
+                if any(m["account_id"] == "source_douyin_main" and m["title"] == title for m in item_memberships) and item not in grouped[key]:
+                    grouped[key].append(item)
+            for key, title in xhs_mapping.items():
+                if any(m["account_id"] == "source_xiaohongshu_main" and m["title"] == title for m in item_memberships) and item not in grouped[key]:
                     grouped[key].append(item)
         if grouped["hot"]:
             grouped["hot"] = sorted(grouped["hot"], key=lambda item: item["last_seen_at"], reverse=True)[:20]
             grouped["hot"].sort(key=lambda item: item["metadata"].get("rank") or 9999)
-        recommendations = {"industry": [], "douyin": []}
+        recommendations = {"industry": [], "douyin": [], "xiaohongshu": []}
         for row in candidates:
             payload = loads(row["payload_json"], {})
             agent = payload.get("agent")
@@ -227,9 +252,10 @@ class TopicService:
         return {"settings": settings, "sources": grouped, "recommendations": recommendations,
                 "archived": archived, "archived_count": len(archived),
                 "hot_complete": len(grouped["hot"]) >= 20, "hot_count": len(grouped["hot"]),
-                "last_sync": dict(sync) if sync else None, "connection": dict(account) if account else {"connection_status": "not_configured"},
-                "jobs": [job for job in self.jobs.list() if job["kind"].startswith("topics.") or job["kind"] == "research.analyze"][:20],
-                "collection_mapping": mapping}
+                "last_sync": dict(sync) if sync else None, "xhs_last_sync": dict(xhs_sync) if xhs_sync else None,
+                "connection": dict(account) if account else {"connection_status": "not_configured"},
+                "jobs": [job for job in self.jobs.list() if job["kind"].startswith("topics.") or job["kind"] in ("research.analyze", "research.snapshot")][:20],
+                "collection_mapping": mapping, "xhs_collection_mapping": xhs_mapping}
 
     def get_item(self, item_id):
         with self.conn(readonly=True) as conn:

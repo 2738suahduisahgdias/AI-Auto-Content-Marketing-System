@@ -3,11 +3,15 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from content_workbench.accounts.existing_browser import run as run_existing_browser
 from content_workbench.agents.registry import require_agent_enabled
 from content_workbench.domain.errors import DomainError
 from content_workbench.domain.services import Workbench
+from content_workbench.topics.douyin_download import download_douyin_video
 from content_workbench.topics.industry_connector import fetch_industry
 from content_workbench.topics.media_analysis import analyze_video
+from content_workbench.topics.snapshot_executor import WechatSnapshotExecutor
+from content_workbench.topics.wechat_inbox import WechatInboxService
 
 
 class TopicExecutors:
@@ -15,10 +19,12 @@ class TopicExecutors:
         self.service = service
         self.root = service.root
         self.workbench = Workbench(service.db_path, self.root)
+        self.wechat_snapshot = WechatSnapshotExecutor(WechatInboxService(service.db_path, service))
 
     def mapping(self):
-        return {"topics.login": self.login, "topics.sync": self.sync, "topics.industry": self.industry,
-                "topics.recommend": self.recommend, "research.analyze": self.analyze}
+        return {"topics.login": self.login, "topics.sync": self.sync, "topics.xhs_login": self.xhs_login,
+                "topics.xhs_sync": self.xhs_sync, "topics.industry": self.industry,
+                "topics.recommend": self.recommend, "research.analyze": self.analyze, "research.snapshot": self.wechat_snapshot.run}
 
     def browser(self, context, action, stage, collection=None, url=None, cover_url=None, output=None, wait_seconds=30):
         config = require_agent_enabled(self.service.db_path, "hotspot_agent")
@@ -104,6 +110,57 @@ class TopicExecutors:
             self.service.finish_sync(run_id, "failed", stats, False, {"message": str(error)[:500]})
             raise
 
+    def xhs_login(self, job, context):
+        require_agent_enabled(self.service.db_path, "hotspot_agent")
+        result = run_existing_browser("xhs_personal_login")
+        if result.get("status") != "ok" or not result.get("login_verified"):
+            raise DomainError("LOGIN_REQUIRED", result.get("error") or "个人小红书需要登录", 409, "browser",
+                              result.get("action") or "在现有浏览器完成个人小红书扫码后重试")
+        account_id = self.service.ensure_account(platform="xiaohongshu")
+        with self.service.conn() as conn:
+            conn.execute("UPDATE wb_source_accounts SET connection_status='ready' WHERE id=?", (account_id,))
+        return {"login": result, "sync": self.xhs_sync(job, context)}
+
+    def xhs_sync(self, job, context):
+        require_agent_enabled(self.service.db_path, "hotspot_agent")
+        settings = self.service.settings()
+        collections = {"xhs_hot": settings["xhs_hot_collection"], "xhs_featured": settings["xhs_featured_collection"],
+                       "xhs_competitor": settings["xhs_competitor_collection"], "xhs_high_praise": settings["xhs_high_praise_collection"]}
+        account_id = self.service.ensure_account(platform="xiaohongshu")
+        run_id = self.service.start_sync("full", {"sources": list(collections)}, platform="xiaohongshu")
+        stats = {key: 0 for key in collections}
+        stats.update({"errors": [], "media_downloaded": 0})
+        try:
+            context.progress("xhs_personal_collections", 0.2)
+            result = run_existing_browser("xhs_favorites", collections=collections)
+            if result.get("status") == "login_required":
+                raise DomainError("LOGIN_REQUIRED", result.get("error") or "个人小红书需要登录", 409, "browser",
+                                  result.get("action") or "连接个人小红书并完成扫码后重试")
+            if result.get("status") != "ok":
+                raise DomainError("XHS_SYNC_FAILED", result.get("error") or "个人小红书收藏夹读取失败", 502, "browser",
+                                  result.get("action") or "检查个人主页和收藏夹结构后手动重试")
+            stats["errors"] = result.get("errors") or []
+            failed_sources = {error.get("source") for error in stats["errors"]}
+            for source, title in collections.items():
+                context.progress("xhs_" + source, 0.3 + 0.15 * list(collections).index(source))
+                item_ids = []
+                for item in result.get("collections", {}).get(source, []):
+                    item_id = self.service.upsert_item(item, source, collection_title=title, run_id=run_id, platform="xiaohongshu")
+                    item_ids.append(item_id)
+                    try:
+                        self.service.cache_cover(item_id)
+                    except Exception:
+                        pass
+                self.service.reconcile_collection(title, item_ids, run_id, complete=source not in failed_sources, account_id=account_id)
+                stats[source] = len(item_ids)
+            complete = not stats["errors"]
+            status = "succeeded" if complete else "partial"
+            self.service.finish_sync(run_id, status, stats, complete)
+            return {"sync_run_id": run_id, "status": status, "stats": stats}
+        except Exception as error:
+            self.service.finish_sync(run_id, "failed", stats, False, {"message": str(error)[:500]})
+            raise
+
     def industry(self, job, context):
         require_agent_enabled(self.service.db_path, "industry_topic_agent")
         settings = self.service.settings()
@@ -155,14 +212,15 @@ class TopicExecutors:
 
     def recommend(self, job, context):
         agent = job["input"].get("agent", "douyin")
-        if agent not in ("douyin", "industry"):
-            raise DomainError("INVALID_TOPIC_AGENT", "推荐Agent类型无效", 422, "agent", "选择 industry 或 douyin")
+        if agent not in ("douyin", "industry", "xiaohongshu"):
+            raise DomainError("INVALID_TOPIC_AGENT", "推荐Agent类型无效", 422, "agent", "选择 industry、douyin 或 xiaohongshu")
         config = require_agent_enabled(self.service.db_path, agent + "_topic_agent")
         data = self.service.bootstrap()
         settings = data["settings"]
-        sources = data["sources"] if agent == "douyin" else {"industry": data["sources"]["industry"]}
+        sources = data["sources"] if agent == "douyin" else {key: data["sources"][key] for key in ("xhs_hot", "xhs_featured", "xhs_competitor", "xhs_high_praise", "xhs_notes")} if agent == "xiaohongshu" else {"industry": data["sources"]["industry"]}
         if not any(sources.values()):
-            raise DomainError("NO_TOPIC_SNAPSHOT", "当前没有可分析的真实快照", 409, "snapshot", "先同步热点、收藏或行业资讯")
+            action = "先同步个人小红书的热点、精选、竞品或高赞收藏夹" if agent == "xiaohongshu" else "先同步热点、收藏或行业资讯"
+            raise DomainError("NO_TOPIC_SNAPSHOT", "当前没有可分析的真实快照", 409, "snapshot", action)
         context.progress(agent + "_topic_analysis", 0.4)
         prompt = json.dumps({"agent": agent, "industry_scope": settings["industry_scope"],
                              "custom_prompt": settings[agent + "_prompt"] + "\n" + config["prompt"], "sources": sources}, ensure_ascii=False)
@@ -177,7 +235,8 @@ class TopicExecutors:
             return {"analysis_id": item["analysis_id"], "cache_hit": True}
         with tempfile.TemporaryDirectory(prefix="topic-analysis-") as directory:
             video = Path(directory) / "source.mp4"
-            result = self.browser(context, "download", "download_selected_video", url=item["url"], output=video, wait_seconds=120)
-            if result.get("needs_upload"):
-                raise DomainError("NEEDS_UPLOAD", "当前页面未能取得可解码视频", 409, "file", "在原链接观看后手动下载，再上传本地视频；其他条目不受影响")
-            return analyze_video(self.workbench, self.service, item_id, video, context)
+            download = download_douyin_video(item["url"], video, context)
+            result = analyze_video(self.workbench, self.service, item_id, video, context)
+            result["download"] = {key: download.get(key) for key in
+                                  ("downloader", "source_kind", "video_id", "duration_seconds", "bytes", "verification")}
+            return result

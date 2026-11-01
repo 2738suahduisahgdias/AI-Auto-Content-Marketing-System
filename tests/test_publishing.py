@@ -254,6 +254,16 @@ class PublishingCase(unittest.TestCase):
         payload["original"] = False
         self.assertIsNone(unsupported_payload_field("wechat_official_account", "article", payload, supported))
 
+    def test_browser_python_uses_windows_scripts_environment(self):
+        from content_workbench.publishing.executors import browser_python
+        with tempfile.TemporaryDirectory(prefix="browser-python-") as directory:
+            root = Path(directory)
+            self.assertEqual(str(root / ".venv-topics/bin/python"), browser_python(root))
+            windows = root / ".venv-topics/Scripts/python.exe"
+            windows.parent.mkdir(parents=True)
+            windows.touch()
+            self.assertEqual(str(windows), browser_python(root))
+
     def test_publish_knowledge_matches_actual_validation_contract(self):
         official = publish_knowledge(platform="wechat_official_account", content_kind="article")["platforms"][0]
         fields = {field["name"]: field for field in official["content_types"][0]["fields"]}

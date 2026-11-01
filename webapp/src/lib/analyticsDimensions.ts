@@ -32,9 +32,18 @@ export function periodFor(range: DimensionRange, start?: string, end?: string, n
   return { start: new Date(now.getTime() - days * 86400000), end: now };
 }
 
+function analyticsTimestamp(value: string) {
+  const chineseDate = value.match(/^(20\d{2})年(\d{1,2})月(\d{1,2})日(?:\s+(\d{1,2}):(\d{2}))?/);
+  if (chineseDate) {
+    const [, year, month, day, hour = "0", minute = "00"] = chineseDate;
+    return new Date(`${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}T${hour.padStart(2, "0")}:${minute}:00+08:00`).getTime();
+  }
+  return new Date(value).getTime();
+}
+
 export function inPeriod(value: string | null | undefined, period: Period) {
   if (!value) return false;
-  const time = new Date(value).getTime();
+  const time = analyticsTimestamp(value);
   return Number.isFinite(time) && time >= period.start.getTime() && time < period.end.getTime();
 }
 

@@ -9,6 +9,11 @@ if [[ ! -f "$ROOT/web/react-dist/index.html" ]]; then
   echo "前端尚未构建，请先运行 bash scripts/setup.sh"
   exit 1
 fi
+if [[ -f "$ROOT/data/wechat-inbox.env" ]]; then
+  set -a
+  source "$ROOT/data/wechat-inbox.env"
+  set +a
+fi
 if command -v open >/dev/null 2>&1; then
   (sleep 2; open "http://127.0.0.1:8765/setup") &
 fi

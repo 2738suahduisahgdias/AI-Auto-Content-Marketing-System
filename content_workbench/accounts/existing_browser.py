@@ -8,6 +8,7 @@ from content_workbench.publishing.webbridge_worker import Bridge
 
 LOGIN_URLS = {
     "xiaohongshu_login": "https://creator.xiaohongshu.com/",
+    "xhs_personal_login": "https://www.xiaohongshu.com/explore",
     "douyin_publish_login": "https://creator.douyin.com/creator-micro/content/upload",
     "channels_login": "https://channels.weixin.qq.com/login.html",
     "official_login": "https://mp.weixin.qq.com/",
@@ -21,8 +22,8 @@ def text(snapshot):
 def verified(snapshot, action):
     url = snapshot.get("url", "")
     body = text(snapshot)
-    if action == "xiaohongshu_login":
-        return "login" not in url and "扫码登录" not in body
+    if action in ("xiaohongshu_login", "xhs_personal_login"):
+        return "login" not in url and "扫码登录" not in body and "电脑设备登录超限" not in body
     if action == "douyin_publish_login":
         return "login" not in url and "短信验证" not in body and "扫码登录" not in body
     if action == "channels_login":
@@ -88,6 +89,76 @@ def xhs_notes(bridge):
                                    "visible_metrics": re.findall(r"\d+(?:\.\d+)?[万wW]?", card["text"]),
                                    "published_at": published_at.group(0) if published_at else None}})
     return {"status": "ok", "profile": {"published_notes_count": len(items)}, "items": items}
+
+
+def xhs_favorite_cards(bridge):
+    return bridge.evaluate("""(() => {
+      const result=[];const seen=new Set();
+      for(const a of document.querySelectorAll('a[href*="/explore/"],a[href*="/search_result/"]')){
+        const href=a.href;const match=href.match(/(?:explore|search_result)\\/([0-9a-zA-Z]+)/);
+        if(!match||seen.has(match[1]))continue;
+        const container=a.closest('section,li,article')||a;
+        const text=(container.innerText||a.innerText||'').trim();
+        const lines=text.split('\\n').map(x=>x.trim()).filter(Boolean);
+        const image=a.querySelector('img')||container.querySelector('img');
+        const title=(image?.alt||'').trim()||lines.filter(x=>x.length>1&&!/^\\d+(\\.\\d+)?[万wW]?$/.test(x)).sort((a,b)=>b.length-a.length)[0]||'';
+        if(!title)continue;
+        const like_count=lines.find(x=>/^\\d+(\\.\\d+)?[万wW]?$/.test(x))||null;
+        seen.add(match[1]);result.push({title,canonical_url:'https://www.xiaohongshu.com/explore/'+match[1],platform_item_id:match[1],
+          metadata:{title,visible_text:text.slice(0,1000),cover_url:image?.src||'',like_count,visible_metrics:like_count?[like_count]:[]}});
+        if(result.length>=100)break;
+      }
+      return result;
+    })()""") or []
+
+
+def xhs_favorites(bridge, collections):
+    bridge.goto("https://www.xiaohongshu.com/explore")
+    time.sleep(3)
+    current = body(bridge)
+    if "login" in bridge.snapshot().get("url", "") or "扫码登录" in current or "电脑设备登录超限" in current or "手机号登录" in current:
+        return {"status": "login_required", "error": "个人小红书需要重新登录", "action": "点击连接个人小红书，在现有浏览器完成扫码后重试"}
+    profile_url = bridge.evaluate("""(() => {
+      const link=Array.from(document.querySelectorAll('a[href*="/user/profile/"]')).find(a=>a.href);
+      return link?link.href:'';
+    })()""")
+    if not profile_url:
+        return {"status": "error", "error": "未找到个人主页入口，可能未登录或页面结构已变化", "action": "确认个人小红书已登录，并检查页面是否改版"}
+    bridge.call("navigate", {"url": profile_url})
+    time.sleep(3)
+    click_dom_text(bridge, "收藏")
+    grouped = {}
+    errors = []
+    for source, title in collections.items():
+        bridge.evaluate("() => { window.scrollTo(0,0); return true; }")
+        if not click_dom_text(bridge, title):
+            grouped[source] = []
+            errors.append({"source": source, "code": "COLLECTION_NOT_FOUND", "message": "未找到收藏夹：" + title,
+                           "action": "核对收藏夹名称，或在设置中修改后重新同步"})
+            continue
+        time.sleep(2)
+        collected = {}
+        quiet = 0
+        for _ in range(5):
+            for item in xhs_favorite_cards(bridge):
+                item["metadata"]["collection_name"] = title
+                item["metadata"]["source_name"] = "个人小红书收藏夹"
+                collected[item["canonical_url"]] = item
+            previous = len(collected)
+            bridge.evaluate("() => { window.scrollBy(0,1800); return true; }")
+            time.sleep(1)
+            for item in xhs_favorite_cards(bridge):
+                item["metadata"]["collection_name"] = title
+                item["metadata"]["source_name"] = "个人小红书收藏夹"
+                collected[item["canonical_url"]] = item
+            quiet = quiet + 1 if len(collected) == previous else 0
+            if quiet >= 2:
+                break
+        grouped[source] = list(collected.values())
+        if not grouped[source]:
+            errors.append({"source": source, "code": "EMPTY_OR_STRUCTURE_CHANGED", "message": "收藏夹未读取到笔记：" + title,
+                           "action": "确认收藏夹确实为空；不为空时检查页面结构，不重复刷新"})
+    return {"status": "ok", "collections": grouped, "errors": errors}
 
 
 def douyin_account(bridge):
@@ -355,7 +426,7 @@ def official_analytics(bridge):
     return {"status": "ok", "profile": profile}
 
 
-def run(action):
+def run(action, **kwargs):
     bridge = Bridge()
     try:
         if action in LOGIN_URLS:
@@ -364,9 +435,12 @@ def run(action):
             while time.monotonic() < deadline:
                 snapshot = bridge.snapshot()
                 if verified(snapshot, action):
-                    return {"status": "ok", "login_verified": True, "next_action": "自动同步全部账号并刷新数据"}
+                    next_action = "同步个人小红书四个收藏夹" if action == "xhs_personal_login" else "自动同步全部账号并刷新数据"
+                    return {"status": "ok", "login_verified": True, "next_action": next_action}
                 time.sleep(3)
             return {"status": "login_required", "error": "3 分钟内未完成登录", "action": "请重新发起登录，在现有浏览器中完成扫码或验证"}
+        if action == "xhs_favorites":
+            return xhs_favorites(bridge, kwargs.get("collections") or {})
         collectors = {"xhs_notes": xhs_notes, "douyin_account": douyin_account,
                       "channels_account": channels_account, "official_account": official_account,
                       "douyin_analytics": douyin_analytics, "xhs_analytics": xhs_analytics,

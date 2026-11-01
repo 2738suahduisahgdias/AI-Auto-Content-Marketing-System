@@ -21,6 +21,15 @@ export function TopicCard({ item, busy = false, allowAnalyze = true, onCreate, o
   const hasOriginalUrl = /^https?:\/\//.test(item.url) && !item.url.startsWith("https://wechat.local/");
   const source = item.source_key || metadata.source_key;
   const showCover = !["hot", "industry"].includes(String(source || ""));
+  if (source === "hot") return <Card className="topic-hot-item">
+    <span className="topic-hot-rank">{metadata.rank ? `#${metadata.rank}` : "—"}</span>
+    <div className="topic-hot-copy"><h3>{item.title}</h3><small>抖音热点榜 · 采集于 {item.last_seen_at || "未读取"}</small></div>
+    <div className="topic-card-actions">
+      {hasOriginalUrl && <a className="button button-small" href={item.url} target="_blank" rel="noreferrer"><ExternalLink size={13} />原链接</a>}
+      {!archived && <Button size="small" disabled={busy} onClick={() => onCreate(item)}><Plus size={13} />转为选题</Button>}
+      {onArchive && <Button size="small" variant="ghost" disabled={busy} onClick={() => onArchive(item)}>{archived ? <><ArchiveRestore size={13} />恢复</> : <><Archive size={13} />归档</>}</Button>}
+    </div>
+  </Card>;
   return <Card className="topic-research-card">
     {showCover && <div className="topic-research-cover-native">
       {metadata.cover_cached ? <img src={`/api/topics/items/${encodeURIComponent(item.id)}/cover`} alt={`${item.title} 封面`} loading="lazy" /> : <span className="topic-cover-pending">封面待同步</span>}

@@ -13,13 +13,15 @@ class PublishingAPI:
         body = body or {}
         if method == "POST" and path == "/api/publishing/generate-fields":
             job = self.service.generate_fields(body.get("content_kind"), body.get("source_id"), body.get("platforms"),
-                                               body.get("prompt", ""), handler.headers.get("Idempotency-Key"))
+                                               body.get("prompt", ""), handler.headers.get("Idempotency-Key"), body.get("source_file_id"))
             return self.app.response(handler, job, 202)
         if method == "GET" and path == "/api/publishing/knowledge":
             return self.app.response(handler, publish_knowledge())
         match = re.fullmatch(r"/api/publishing/knowledge/([^/]+)/([^/]+)", path)
         if method == "GET" and match:
             return self.app.response(handler, publish_knowledge(platform=match.group(1), content_kind=match.group(2)))
+        if method == "GET" and path == "/api/publishing/queue":
+            return self.app.response(handler, self.service.publication_queue())
         if method == "GET" and path == "/api/publishing/bootstrap":
             data = self.service.bootstrap(query.get("kind", [None])[0], query.get("source_id", [None])[0])
             data["csrf_token"] = self.app.csrf(self.app.cookie(handler))
@@ -27,7 +29,7 @@ class PublishingAPI:
         if method == "GET" and path == "/api/publishing/retrospective":
             return self.app.response(handler, self.service.retrospective())
         if method == "POST" and path == "/api/publishing/batches":
-            batch = self.service.create_batch(body.get("content_kind"), body.get("source_id"), body.get("targets"))
+            batch = self.service.create_batch(body.get("content_kind"), body.get("source_id"), body.get("targets"), body.get("source_file_id"))
             return self.app.response(handler, batch, 201)
         match = re.fullmatch(r"/api/publishing/batches/([^/]+)", path)
         if method == "GET" and match:

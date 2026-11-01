@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aggregateCustom, periodFor, publicationTrend } from "./analyticsDimensions";
+import { aggregateCustom, inPeriod, periodFor, publicationTrend } from "./analyticsDimensions";
 import type { LeadRecord } from "@/components/LeadPanel";
 
 const lead: LeadRecord = { id: "lead-1", platform: "douyin", author_alias: "测试", profile_text: "", message_text: "详情", need_text: "", source_content_id: null, source_url: null,
@@ -19,5 +19,11 @@ describe("analytics dimensions", () => {
     expect(yesterdayMetrics.inquiries).toBe(1);
     expect(yesterdayMetrics.deals).toBe(0);
     expect(publicationTrend(contents, today).values).toEqual([1]);
+  });
+
+  it("parses video account Chinese publication dates", () => {
+    const period = periodFor("custom", "2026-10-27", "2026-10-27", new Date("2026-10-28T12:00:00+08:00"));
+    expect(inPeriod("2026年10月27日 22:27", period)).toBe(true);
+    expect(inPeriod("2026年10月26日 22:27", period)).toBe(false);
   });
 });

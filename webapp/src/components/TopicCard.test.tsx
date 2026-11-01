@@ -23,6 +23,14 @@ describe("TopicCard covers", () => {
     expect(container.querySelector(".topic-research-cover")).not.toBeInTheDocument();
   });
 
+  it("renders hot topics as text rows without authors or video analysis", () => {
+    const { container } = render(<TopicCard {...props} item={{ ...base, source_key: "hot", metadata: { rank: 1, author: "不应显示的作者", author_followers: 1000 } }} />);
+    expect(container.querySelector(".topic-hot-item")).toBeInTheDocument();
+    expect(screen.queryByText("不应显示的作者")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "下载并拆解" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "转为选题" })).toBeInTheDocument();
+  });
+
   it("restores archived topics without exposing production actions", () => {
     const onArchive = vi.fn();
     render(<TopicCard {...props} item={base} archived onArchive={onArchive} />);

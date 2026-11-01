@@ -60,7 +60,7 @@ class Bridge:
             current = self.snapshot().get("url", "")
             if current == url or current.startswith(url):
                 return
-        except RuntimeError:
+        except (RuntimeError, urllib.error.HTTPError):
             pass
         try:
             self.call("navigate", {"url": url, "newTab": True, "group_title": "发布预览验证"})

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from content_workbench.accounts.collection_knowledge import error_type
 from content_workbench.accounts.existing_browser import run as run_existing_browser
-from content_workbench.accounts.exports import channels_metrics, douyin_metrics, official_metrics, xhs_metrics
+from content_workbench.accounts.exports import channels_metrics, douyin_metrics, official_article_metrics, official_metrics, xhs_metrics
 from content_workbench.accounts.snapshot_rules import snapshot_has_data
 from content_workbench.agents.registry import require_agent_enabled
 from content_workbench.domain.errors import DomainError
@@ -36,7 +36,7 @@ class AccountExecutors:
         return {**result, "sync": snapshot, "refresh": "all_account_data"}
 
     def platform(self, context, action, stage, **kwargs):
-        result = run_existing_browser(action)
+        result = run_existing_browser(action, **kwargs)
         if result.get("status") == "login_required":
             raise DomainError("LOGIN_REQUIRED", result.get("error") or "平台创作者后台需要登录", 409, "browser", result.get("action") or "请重新发起登录并完成扫码")
         if result.get("status") == "error":
@@ -46,6 +46,8 @@ class AccountExecutors:
     def export_metrics(self, platform):
         cutoff = time.time() - 36 * 3600
         if platform in ("wechat_channels", "wechat_official_account"):
+            metrics = {}
+            export_files = []
             candidates = sorted(self.downloads.glob(".com.google.Chrome.*"), key=lambda path: path.stat().st_mtime, reverse=True)
             for path in candidates:
                 if path.stat().st_mtime < cutoff:
@@ -57,12 +59,23 @@ class AccountExecutors:
                         metrics = official_metrics(path)
                     else:
                         continue
-                    metrics["export_files"] = [path.name]
-                    metrics["export_imported_at"] = utcnow()
-                    return metrics
+                    export_files.append(path.name)
+                    break
                 except (OSError, ValueError, KeyError, IndexError):
                     continue
-            return {}
+            if platform == "wechat_official_account":
+                articles = []
+                paths = sorted(self.downloads.glob("数据明细（*）.xls"), key=lambda path: path.stat().st_mtime, reverse=True)
+                for path in paths:
+                    articles.append(official_article_metrics(path))
+                    export_files.append(path.name)
+                if articles:
+                    metrics["content_items"] = articles
+                    metrics["content_analytics_source"] = "公众号单篇文章官方数据明细"
+            if metrics:
+                metrics["export_files"] = export_files
+                metrics["export_imported_at"] = utcnow()
+            return metrics
         names = {"douyin": ["数据表现_短视频全量指标.xlsx", "数据表现_粉丝全量指标.xlsx"],
                  "xiaohongshu": ["近7日观看数据.xlsx", "近7日互动数据.xlsx", "近7日涨粉数据.xlsx", "近7日发布数据.xlsx"]}
         if platform == "xiaohongshu":
@@ -105,6 +118,9 @@ class AccountExecutors:
                 collected_count = len(items)
                 if not items:
                     items = self.service.latest_items(platform)
+                if platform == "wechat_official_account":
+                    titles = {item.get("title") for item in items}
+                    items.extend(item for item in self.service.latest_items(platform) if item.get("title") not in titles)
                 profile = {**(snapshot.get("profile") or {}), "connection": "ready" if items else "empty"}
                 if not collected_count and items:
                     profile["content_preserved"] = True
@@ -120,6 +136,10 @@ class AccountExecutors:
                 try:
                     exported = self.export_metrics(platform)
                     if exported:
+                        exported_items = exported.pop("content_items", [])
+                        if exported_items:
+                            titles = {item.get("title") for item in exported_items}
+                            items = exported_items + [item for item in items if item.get("title") not in titles]
                         profile.update(exported)
                         result["accounts"][platform + "_exports"] = len(exported["export_files"])
                 except Exception as error:

@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import json
 import mimetypes
+import os
 import re
 import secrets
 import tempfile
@@ -19,7 +20,7 @@ from content_workbench.storage.db import expand_schema, loads
 
 
 class V2Application:
-    def __init__(self, db_path, root, legacy_task_creator=None):
+    def __init__(self, db_path, root, legacy_task_creator=None, extra_executors=None):
         from content_workbench.accounts.api import AccountAPI
         from content_workbench.accounts.executors import AccountExecutors
         from content_workbench.accounts.scheduler import AccountScheduler, configure_account_schedule
@@ -36,28 +37,37 @@ class V2Application:
         from content_workbench.review.service import ReviewService
         from content_workbench.schedule.api import ScheduleAPI, ScheduleDispatcher
         from content_workbench.schedule.service import ScheduleService
+        from content_workbench.social.api import SocialAPI
+        from content_workbench.social.executors import SocialExecutors
+        from content_workbench.social.service import SocialDataService
         from content_workbench.topics.api import TopicAPI
         from content_workbench.topics.executors import TopicExecutors
         from content_workbench.topics.scheduler import TopicScheduler, configure_schedule
         from content_workbench.topics.service import TopicService
         self.root = Path(root).resolve()
         self.workbench = Workbench(db_path, self.root)
+        with self.workbench.conn() as conn:
+            expand_schema(conn)
         self.jobs = JobStore(db_path)
         self.topics = TopicService(db_path, self.root)
+        self.social = SocialDataService(db_path, self.root)
         self.accounts = AccountService(db_path, self.topics)
         self.publishing = PublishingService(db_path, self.root)
         self.review = ReviewService(db_path, self.root)
         self.schedule = ScheduleService(db_path, self.root, self.publishing)
         executors = LocalExecutors(self.workbench).mapping()
         executors.update(TopicExecutors(self.topics).mapping())
+        executors.update(SocialExecutors(self.social, self.topics).mapping())
         executors.update(AccountExecutors(self.accounts).mapping())
         executors.update(PublishingExecutors(self.publishing).mapping())
         executors.update(ReviewExecutors(self.review).mapping())
+        executors.update(extra_executors or {})
         self.worker = Worker(db_path, executors, self.root)
         self.topic_scheduler = TopicScheduler(db_path)
         self.account_scheduler = AccountScheduler(db_path)
         self.schedule_dispatcher = ScheduleDispatcher(self.schedule)
         self.topic_api = TopicAPI(self, self.topics, legacy_task_creator)
+        self.social_api = SocialAPI(self, self.social)
         self.account_api = AccountAPI(self, self.accounts)
         self.article_api = ArticleAPI(self)
         self.knowledge = KnowledgeService(db_path, self.root)
@@ -68,8 +78,6 @@ class V2Application:
         self.agent_api = AgentAPI(self, db_path)
         self.secret = secrets.token_bytes(32)
         self.sessions = set()
-        with self.workbench.conn() as conn:
-            expand_schema(conn)
         configure_schedule(db_path, self.topics.settings())
         configure_account_schedule(db_path)
 
@@ -87,7 +95,7 @@ class V2Application:
 
     @staticmethod
     def matches(path):
-        return path in ("/api/articles", "/api/schedule") or path.startswith(("/api/v2/", "/api/topics/", "/api/agents/", "/api/accounts/", "/api/publish/", "/api/publishing/", "/api/review/", "/api/schedule/", "/api/articles/", "/api/knowledge/"))
+        return path in ("/api/articles", "/api/schedule") or path.startswith(("/api/v2/", "/api/topics/", "/api/social/", "/api/agents/", "/api/accounts/", "/api/publish/", "/api/publishing/", "/api/review/", "/api/schedule/", "/api/articles/", "/api/knowledge/"))
 
     def cookie(self, handler):
         parsed = SimpleCookie(handler.headers.get("Cookie", ""))
@@ -111,6 +119,12 @@ class V2Application:
         origin = handler.headers.get("Origin")
         if origin and not re.fullmatch(r"http://(127\.0\.0\.1|localhost):\d{1,5}", origin):
             raise DomainError("INVALID_ORIGIN", "拒绝其他来源的写请求", 403)
+        if write and handler.path.split("?", 1)[0] == "/api/topics/wechat/messages" and handler.headers.get("X-Wechat-Ingest-Token"):
+            expected = os.environ.get("CONTENT_AGENT_WECHAT_TOKEN", "")
+            provided = handler.headers.get("X-Wechat-Ingest-Token", "")
+            if not expected or not hmac.compare_digest(provided, expected):
+                raise DomainError("WECHAT_INGEST_UNAUTHORIZED", "微信入库凭据无效", 403, "auth", "在本机配置相同的 CONTENT_AGENT_WECHAT_TOKEN 后重试")
+            return "wechat_ingest"
         session = self.cookie(handler)
         if not session:
             raise DomainError("SESSION_REQUIRED", "本地会话已失效", 401, action="刷新首页建立新会话后重试")
@@ -127,6 +141,8 @@ class V2Application:
             body = handler.read_json() if method in ("POST", "PUT", "PATCH") and path not in ("/api/v2/assets", "/api/review/uploads") else None
             if path.startswith("/api/topics/"):
                 return self.topic_api.handle(handler, method, path, query, body)
+            if path.startswith("/api/social/"):
+                return self.social_api.handle(handler, method, path, query, body)
             if path.startswith("/api/agents/"):
                 return self.agent_api.handle(handler, method, path, body)
             if path.startswith("/api/accounts/") or path.startswith("/api/publish/"):
