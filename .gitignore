@@ -38,3 +38,6 @@ webapp/tsconfig.tsbuildinfo
 # Keep the compiled workspace so a source download can start without a local build.
 !web/react-dist/assets/
 !web/react-dist/assets/**
+
+# Local-only migration preview build; production bundle remains untouched.
+web/demo-dist/
