@@ -3,3 +3,5 @@
 # - .venv-faster-whisper (faster-whisper, Pillow)
 # - vendor/openvoice-venv (OpenVoice/MeloTTS/Torch)
 # Remotion dependencies are locked in remotion-app/package-lock.json.
+
+# Offline licensing uses the OpenSSL 3+ executable (Ed25519), not a Python package.

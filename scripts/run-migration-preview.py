@@ -16,5 +16,6 @@ from content_workbench.jobs.worker import Worker
 from content_workbench.review.executors import ReviewExecutors
 app.V2.review.local_only=True
 review_worker=Worker(app.DB_PATH,ReviewExecutors(app.V2.review).mapping(),app.ROOT,allowed_kinds=["review.scan","review.repair"])
+review_worker.before_execute=app.V2.license.require_active
 review_worker.start()
 app.ThreadingHTTPServer(("127.0.0.1",8876),app.Handler).serve_forever()

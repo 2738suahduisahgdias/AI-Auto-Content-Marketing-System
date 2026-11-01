@@ -13,7 +13,7 @@ it("loads exact linked batch and saves chosen rules to original preflight",async
  render(<MemoryRouter initialEntries={["/review?batch_id=review_linked"]}><Review/></MemoryRouter>);
  await screen.findByText("映序成片已自动带入");
  expect(api).toHaveBeenCalledWith("/api/review/bootstrap?batch_id=review_linked");
- expect(screen.getByRole("button",{name:"人工通过",exact:true})).toBeDisabled();
+ expect(screen.getByRole("button",{name:/^人工通过$/})).toBeDisabled();
  expect(screen.getByRole("button",{name:"通过全部无阻断项"})).toBeDisabled();
  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
  fireEvent.change(screen.getByRole("spinbutton",{name:"最长时长（秒）"}),{target:{value:"120"}});

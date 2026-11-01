@@ -2721,6 +2721,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/" and react_index.is_file():
             target = react_index
             react_route = True
+        elif path == "/demo-wechat.png":
+            target = WEB_ROOT / "react-dist" / "demo-wechat.png"
+            if not target.is_file():
+                raise ApiError(404, "联系二维码尚未包含在前端构建中")
         elif path.startswith("/assets/"):
             target = (WEB_ROOT / "react-dist" / path.lstrip("/")).resolve()
             if (WEB_ROOT / "react-dist") not in target.parents or not target.is_file():
@@ -2733,7 +2737,7 @@ class Handler(BaseHTTPRequestHandler):
         else:
             raise ApiError(404, "页面不存在")
         body = target.read_bytes()
-        content_type = "text/html" if target.suffix == ".html" else "text/css" if target.suffix == ".css" else "application/javascript"
+        content_type = "image/png" if target.suffix == ".png" else "text/html" if target.suffix == ".html" else "text/css" if target.suffix == ".css" else "application/javascript"
         session_header = V2.session_header(self) if V2 and (react_route or path in ("/v2", "/legacy")) else None
         self.send_response(200)
         if session_header:

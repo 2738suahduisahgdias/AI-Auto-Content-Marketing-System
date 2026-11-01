@@ -12,6 +12,8 @@ def ready(url):
     except Exception:return False
 if not ready('http://127.0.0.1:8876/'):
     env={**os.environ,'CONTENT_AGENT_ROOT':str(preview),'CONTENT_AGENT_DB':str(database),'CONTENT_AGENT_MEDIA_BASE_URL':'http://127.0.0.1:8876'}
+    if (preview/'license/public-keys.json').is_file():
+        env['CONTENT_AGENT_LICENSE_MODE']='required'
     with (preview/'server.log').open('ab') as log:
         process=subprocess.Popen(['python3',str(repo/'scripts/run-migration-preview.py')],cwd=repo,env=env,stdin=subprocess.DEVNULL,stdout=log,stderr=log,start_new_session=True)
     (preview/'server.pid').write_text(str(process.pid))

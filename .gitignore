@@ -47,3 +47,8 @@ webapp/dist/
 
 # Content-addressed render copies; original media remains in local task storage
 remotion-app/public-static/yingxu-assets/
+
+# Local license credentials and operator records must never be committed.
+license/
+*.encrypted.pem
+customers.sqlite3*

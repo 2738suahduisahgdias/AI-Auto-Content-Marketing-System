@@ -1,0 +1,15 @@
+import {useEffect,useState} from 'react';
+import {Link,useNavigate} from 'react-router-dom';
+import {api,errorText,jsonOptions} from '../lib/api';
+import {Button,Card,ErrorBox,PageHeader} from '../components/ui';
+import './Activation.css';
+export default function Activation(){
+ const [data,setData]=useState<any>(null),[token,setToken]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);const navigate=useNavigate();
+ useEffect(()=>{api('/api/v2/license').then(setData).catch(e=>setError(errorText(e)))},[]);
+ async function activate(){setBusy(true);setError('');try{const result=await api<any>('/api/v2/license/activate',jsonOptions('POST',{token}));setData(result);setToken('');sessionStorage.removeItem('yx-read-only');sessionStorage.setItem('yx-guide-session','1');navigate(result.onboarding.completed?'/':'/welcome')}catch(e){setError(errorText(e))}finally{setBusy(false)}}
+ return <div className="activation-page"><PageHeader eyebrow="LOCAL LICENSE" title="离线授权" description="加微信获取本机授权，激活后即可开始。视频、文案和账号数据仍保存在你的电脑。"/>{error&&<ErrorBox>{error}</ErrorBox>}{notice&&<p role="status">{notice}</p>}
+ {data?.mode==='legacy'&&<p className="license-note">当前为原系统兼容开发模式，未强制激活。正式客户启动器需启用 required 授权模式。</p>}
+ <div className="activation-grid"><Card><h2>1. 联系刘洋，发送申请码</h2><a href="/demo-wechat.png" target="_blank" rel="noreferrer"><img className="activation-qr" src="/demo-wechat.png" alt="刘洋的微信二维码，点击查看原图"/></a><p>微信：liuyangfjnu · 添加后发送下面的本机申请码。</p><label htmlFor="request-code">本机申请码</label><textarea id="request-code" readOnly value={data?.requestCode||''}/><Button disabled={!data} onClick={()=>void navigator.clipboard.writeText(data.requestCode).then(()=>setNotice('申请码已复制')).catch(()=>setError('复制失败，请选中申请码手动复制'))}>复制申请码</Button><p>换电脑或重新建立安装目录需重新申请。申请码不包含手机号或视频内容。</p></Card>
+ <Card><h2>2. 导入授权码</h2><p>状态：{data?.status==='valid'?'已激活':data?.status==='unactivated'?'尚未激活':data?.message||'读取中…'}</p>{data?.license&&<p>授权编号：{data.license.licenseId}<br/>有效期：{data.license.expiresAt?new Date(data.license.expiresAt).toLocaleString():'长期'}</p>}{data&&!data.configured&&<p role="alert">尚未配置签发公钥，请联系经营者提供正确的客户端安装配置。</p>}
+ <label htmlFor="license-token">粘贴完整授权码</label><textarea id="license-token" placeholder="YXLIC1.…" value={token} onChange={e=>setToken(e.target.value)} maxLength={16000}/><label>或导入授权文件<input type="file" accept=".yxlicense,.txt" onChange={e=>{const file=e.target.files?.[0];if(file){if(file.size>16000){setError('授权文件过大');return}void file.text().then(setToken).catch(()=>setError('文件读取失败'))}}}/></label><Button variant="primary" disabled={busy||!token.trim()||!data?.configured} onClick={()=>void activate()}>{busy?'正在本机验证…':'验证并激活'}</Button><p>运行依赖：本机 OpenSSL 3+（Ed25519）。验证在本机完成，无需授权服务器。错误授权不会覆盖已生效的授权，也不会删除项目。</p><Button onClick={()=>{sessionStorage.setItem('yx-read-only','1');navigate('/')}}>先查看已有工作与成果</Button>{data?.status==='valid'&&<Link className="button" to="/welcome">进入新手引导</Link>}</Card></div></div>
+}

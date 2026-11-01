@@ -45,6 +45,9 @@ class V2Application:
         from content_workbench.topics.scheduler import TopicScheduler, configure_schedule
         from content_workbench.topics.service import TopicService
         self.root = Path(root).resolve()
+        from content_workbench.licensing.service import LicenseService
+        self.license = LicenseService(self.root)
+        self.legacy_task_creator = legacy_task_creator
         self.workbench = Workbench(db_path, self.root)
         with self.workbench.conn() as conn:
             expand_schema(conn)
@@ -63,6 +66,7 @@ class V2Application:
         executors.update(ReviewExecutors(self.review).mapping())
         executors.update(extra_executors or {})
         self.worker = Worker(db_path, executors, self.root)
+        self.worker.before_execute = self.license.require_active
         self.topic_scheduler = TopicScheduler(db_path)
         self.account_scheduler = AccountScheduler(db_path)
         self.schedule_dispatcher = ScheduleDispatcher(self.schedule)
@@ -124,12 +128,15 @@ class V2Application:
             provided = handler.headers.get("X-Wechat-Ingest-Token", "")
             if not expected or not hmac.compare_digest(provided, expected):
                 raise DomainError("WECHAT_INGEST_UNAUTHORIZED", "微信入库凭据无效", 403, "auth", "在本机配置相同的 CONTENT_AGENT_WECHAT_TOKEN 后重试")
+            self.license.require_active()
             return "wechat_ingest"
         session = self.cookie(handler)
         if not session:
             raise DomainError("SESSION_REQUIRED", "本地会话已失效", 401, action="刷新首页建立新会话后重试")
         if write and not hmac.compare_digest(handler.headers.get("X-CSRF-Token", ""), self.csrf(session)):
             raise DomainError("CSRF_REQUIRED", "请求校验已失效", 403, action="刷新页面后重试")
+        if write and not handler.path.split("?", 1)[0].startswith("/api/v2/license"):
+            self.license.require_active()
         return session
 
     def response(self, handler, data, status=200):
@@ -139,6 +146,29 @@ class V2Application:
         try:
             self.authenticate(handler, method in ("POST", "PUT", "PATCH", "DELETE"))
             body = handler.read_json() if method in ("POST", "PUT", "PATCH") and path not in ("/api/v2/assets", "/api/review/uploads") else None
+            if path.startswith("/api/v2/license") and method == "POST" and not isinstance(body, dict):
+                raise DomainError("LICENSE_INPUT", "授权请求格式无效")
+            if path == "/api/v2/license" and method == "GET":
+                return self.response(handler, {**self.license.status(), "csrf_token": self.csrf(self.cookie(handler))})
+            if path == "/api/v2/license/activate" and method == "POST":
+                return self.response(handler, self.license.activate(body.get("token")))
+            if path == "/api/v2/license/onboarding" and method == "POST":
+                return self.response(handler, self.license.onboarding(body))
+            if path == "/api/v2/license/first-project" and method == "POST":
+                self.license.require_active()
+                with self.license.lock:
+                    state = self.license.read()
+                    project = state["onboarding"].get("projectId")
+                    if not project:
+                        if not self.legacy_task_creator:
+                            raise DomainError("PROJECT_UNAVAILABLE", "原视频任务服务尚未接通", 503)
+                        task = self.legacy_task_creator({"title": "AI 客服如何落地", "source_type": "manual",
+                            "content": "AI 客服落地，先别急着替换所有人工。第一步，整理客户最常问的十个问题，建立可靠的知识库。第二步，让 AI 先回答标准问题，遇到复杂问题转交人工，并保留工单。第三步，用真实反馈检查回答是否准确，持续更新知识。先从一个小场景开始，让 AI 成为团队的助手。",
+                            "publish_mode": "local_only", "review_mode": "human"})
+                        project = task["content_id"]
+                        state["onboarding"]["projectId"] = project
+                        self.license.save(state)
+                return self.response(handler, {"projectId": project})
             if path.startswith("/api/topics/"):
                 return self.topic_api.handle(handler, method, path, query, body)
             if path.startswith("/api/social/"):

@@ -74,6 +74,7 @@ class ExecutionContext:
 
 class Worker:
     def __init__(self, db_path=None, executors=None, root=None, poll_interval=0.25, allowed_kinds=None):
+        self.before_execute = None
         self.allowed_kinds = allowed_kinds
         self.store = JobStore(db_path)
         self.executors = executors or {}
@@ -106,6 +107,8 @@ class Worker:
     def execute(self, job):
         context = ExecutionContext(self, job)
         try:
+            if self.before_execute:
+                self.before_execute()
             executor = self.executors.get(job["kind"])
             if not executor:
                 raise DomainError("EXECUTOR_NOT_FOUND", "没有任务执行器：" + job["kind"], 500)
