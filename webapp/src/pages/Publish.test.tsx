@@ -1,7 +1,9 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import Publish from "./Publish";
+
+afterEach(cleanup);
 
 const target = { id: "target-1", platform: "douyin", platform_name: "抖音", status: "ready", payload: { title: "企业 AI 案例", description: "发布描述", tags: "#企业AI" }, preview: {}, error: null, payload_hash: "abc123" };
 const batch = { id: "batch-1", content_kind: "video", source_id: "20261029-001", source_file_id: 3, source_hash: "hash-1", status: "ready", targets: [target] };
@@ -25,6 +27,11 @@ vi.mock("@/AppContext", () => ({
 }));
 
 describe("Publication queue", () => {
+  it("does not silently select another video when a handoff is stale", async () => {
+    render(<MemoryRouter initialEntries={["/publish?kind=video&id=reviewitem_stale"]}><Publish /></MemoryRouter>);
+    await screen.findByText(/该交付尚未通过审核/);
+    expect(screen.queryByText("视频发布批次")).not.toBeInTheDocument();
+  });
   it("lists variant targets and shares preview metadata", async () => {
     render(<MemoryRouter><Publish /></MemoryRouter>);
     expect((await screen.findAllByText("企业 AI 案例")).length).toBeGreaterThan(0);

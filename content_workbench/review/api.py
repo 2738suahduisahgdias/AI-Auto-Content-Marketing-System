@@ -14,6 +14,9 @@ class ReviewAPI:
             data = self.service.bootstrap(query.get("batch_id", [None])[0])
             data["csrf_token"] = self.app.csrf(self.app.cookie(handler))
             return self.app.response(handler, data)
+        delivery = re.fullmatch(r"/api/review/yingxu/(\d{8}-\d{3})", path)
+        if method == "POST" and delivery:
+            return self.app.response(handler, self.service.receive_delivery(delivery.group(1)))
         if method == "POST" and path == "/api/review/batches":
             if body.get("upload"):
                 batch = self.service.create_upload_batch(body.get("rules") or {})
@@ -32,7 +35,7 @@ class ReviewAPI:
             return self.app.response(handler, self.service.add_upload(batch_id, filename, data), 201)
         match = re.fullmatch(r"/api/review/batches/([^/]+)/start", path)
         if method == "POST" and match:
-            return self.app.response(handler, self.service.start(match.group(1)), 202)
+            return self.app.response(handler, self.service.start(match.group(1), body.get("rules")), 202)
         match = re.fullmatch(r"/api/review/items/([^/]+)/decide", path)
         if method == "POST" and match:
             output = self.service.decide(match.group(1), body.get("decision"))

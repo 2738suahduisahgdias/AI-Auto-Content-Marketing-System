@@ -61,13 +61,16 @@ class JobStore:
         with self.conn(readonly=True) as conn:
             return [self.job_dict(row) for row in conn.execute("SELECT * FROM wb_jobs ORDER BY created_at DESC LIMIT ?", (min(limit, 200),))]
 
-    def lease(self, owner, lease_seconds=90):
+    def lease(self, owner, lease_seconds=90, kinds=None):
         with self.conn() as conn, immediate(conn):
             now = utcnow()
-            row = conn.execute("""SELECT * FROM wb_jobs WHERE
+            kind_clause = " AND kind IN ({})".format(",".join("?" for _ in kinds)) if kinds else ""
+            if kinds is not None and not kinds:
+                return None
+            row = conn.execute("""SELECT * FROM wb_jobs WHERE (
                 (status IN ('queued','retry_wait') AND available_at<=?)
                 OR (status IN ('leased','running','cancel_requested') AND lease_expires_at IS NOT NULL AND lease_expires_at<?)
-                ORDER BY priority DESC,created_at LIMIT 1""", (now, now)).fetchone()
+                )""" + kind_clause + " ORDER BY priority DESC,created_at LIMIT 1", (now, now, *(kinds or []))).fetchone()
             if not row:
                 return None
             if row["attempt_count"] >= row["max_attempts"]:

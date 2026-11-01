@@ -7,7 +7,10 @@ from content_workbench.storage.db import PROJECT_ROOT, connect, dumps, file_hash
 from .schemas import DEFAULT_RULES, VIDEO_EXTENSIONS, validate_rules
 
 
-class ReviewService:
+from .delivery import DeliveryReviewMixin
+
+
+class ReviewService(DeliveryReviewMixin):
     def __init__(self, db_path, root):
         self.db_path = str(db_path)
         self.root = Path(root).resolve()
@@ -20,6 +23,7 @@ class ReviewService:
     def ensure_schema(self):
         with self.conn() as conn:
             conn.executescript((PROJECT_ROOT / "migrations/004_review.sql").read_text())
+            self.ensure_delivery_schema(conn)
 
     def get_batch(self, batch_id):
         with self.conn(readonly=True) as conn:
@@ -34,6 +38,7 @@ class ReviewService:
             item["report"] = loads(item.pop("report_json"), {})
             item["ai_risk"] = loads(item.pop("ai_risk_json"), {})
             item["error"] = loads(item.pop("error_json"), None)
+            item["delivery"] = self.delivery_state(item["id"])
             batch["items"].append(item)
         batch["counts"] = self.counts(items)
         return batch
@@ -55,7 +60,7 @@ class ReviewService:
     def bootstrap(self, batch_id=None):
         batch = self.latest(batch_id)
         return {"batch": batch, "default_rules": DEFAULT_RULES,
-                "jobs": [job for job in self.jobs.list() if job["kind"].startswith("review.")][:30]}
+                "jobs": [job for job in self.jobs.list() if job["kind"].startswith("review.") and (not batch or job.get("aggregate_id") == batch["id"] or job.get("input", {}).get("item_id") in {item["id"] for item in batch["items"]})][:30]}
 
     def create_batch(self, folder, rules, allow_empty=False):
         rules = validate_rules(rules)
@@ -104,9 +109,22 @@ class ReviewService:
                          (new_id("reviewitem"), batch_id, str(path), file_hash(path), timestamp, timestamp))
         return self.get_batch(batch_id)
 
-    def start(self, batch_id):
+    def start(self, batch_id, rules=None):
         batch = self.get_batch(batch_id)
-        items = [item for item in batch["items"] if item["status"] in ("queued", "needs_review", "failed") and item["decision"] != "approved"]
+        if batch["status"] == "reviewing":
+            raise DomainError("REVIEW_ALREADY_RUNNING", "当前批次正在审核，请等待完成", 409)
+        for item in batch["items"]:
+            self.assert_delivery(self.delivery(item["id"]))
+        if rules is not None:
+            rules = validate_rules(rules)
+            if any(item["decision"] == "approved" for item in batch["items"]):
+                raise DomainError("REVIEW_ALREADY_APPROVED", "已批准批次不能直接改规则，请重新交付", 409)
+            with self.conn() as conn:
+                conn.execute("UPDATE review_batches SET rules_json=? WHERE id=?", (dumps(rules),batch_id))
+            batch["rules"] = rules
+        if getattr(self, "local_only", False) and batch["rules"].get("ai_risk"):
+            raise DomainError("DEMO_LOCAL_REVIEW_ONLY", "当前隔离 Demo 只执行本地技术预审，请关闭 AI 风险分析；真实模型需配置后另行启用", 409)
+        items = [item for item in batch["items"] if item["status"] in ("queued", "needs_review", "failed", "rejected") and item["decision"] != "approved"]
         if not items:
             raise DomainError("REVIEW_NOTHING_TO_SCAN", "没有需要机器预审的视频", 409, "batch_id", "上传新视频或修改规则后重新审核")
         with self.conn() as conn, immediate(conn):
@@ -124,7 +142,11 @@ class ReviewService:
             item = conn.execute("SELECT * FROM review_items WHERE id=?", (item_id,)).fetchone()
         if not item:
             raise DomainError("REVIEW_ITEM_NOT_FOUND", "审核视频不存在", 404, "item_id", "刷新审核批次", item_id)
+        binding = self.delivery(item_id)
+        self.assert_delivery(binding)
         report = loads(item["report_json"], {})
+        if binding and item["status"] == "reviewing":
+            raise DomainError("REVIEW_STILL_RUNNING", "预审尚未完成", 409)
         if not report:
             raise DomainError("REVIEW_REQUIRED", "必须先完成机器预审", 409, "item_id", "先运行机器预审再人工终审", item_id)
         if decision == "approved" and any(issue.get("severity") == "error" for issue in report.get("issues", [])):
@@ -135,14 +157,17 @@ class ReviewService:
             source = Path(item["candidate_path"] or item["source_path"]).resolve()
             if not source.is_file():
                 raise DomainError("REVIEW_CANDIDATE_MISSING", "审核候选文件不存在", 409, "item_id", "重新上传或转码后终审")
+            if binding and report.get("source", {}).get("sha256") != file_hash(source):
+                raise DomainError("REVIEW_REPORT_STALE", "报告对应文件已变更，请重新预审", 409)
             directory = Path(item["source_path"]).parent / "审核通过"
             directory.mkdir(exist_ok=True)
-            output_path = (directory / Path(item["source_path"]).name).resolve()
+            output_path = source if binding else (directory / Path(item["source_path"]).name).resolve()
             if output_path != source:
                 shutil.copy2(source, output_path)
             output = str(output_path)
         timestamp = utcnow()
         with self.conn() as conn, immediate(conn):
+            self.record_delivery_decision(conn, item_id, decision, output)
             conn.execute("UPDATE review_items SET decision=?,status=?,output_path=?,updated_at=? WHERE id=?",
                          (decision, status, output, timestamp, item_id))
             conn.execute("UPDATE review_batches SET status='completed',updated_at=? WHERE id=(SELECT batch_id FROM review_items WHERE id=?)",
@@ -165,10 +190,15 @@ class ReviewService:
             item = conn.execute("SELECT * FROM review_items WHERE id=?", (item_id,)).fetchone()
         if not item or item["decision"] != "approved" or not item["output_path"]:
             raise DomainError("REVIEW_APPROVAL_REQUIRED", "视频尚未人工审核通过", 409, "item_id", "先在审核中心完成人工终审", item_id)
+        binding = self.delivery(item_id)
+        task = self.assert_delivery(binding)
         path = Path(item["output_path"]).resolve()
         if not path.is_file():
             raise DomainError("REVIEW_OUTPUT_MISSING", "审核通过文件不存在", 409, "item_id", "重新审核并生成输出文件")
+        if binding and file_hash(path) != binding.get("output_sha256"):
+            raise DomainError("REVIEW_OUTPUT_CHANGED", "已审批成片发生变化，旧批次不能发布", 409)
         report = loads(item["report_json"], {})
-        return {"kind": "video", "source_id": item_id, "source_hash": file_hash(path), "title": path.stem,
-                "description": path.stem, "revision_id": item["source_sha256"], "video_path": str(path),
+        return {"delivery": binding, "preview_url": "/api/files/{}/media".format(binding["file_id"]) if binding and not item["candidate_path"] else None,
+                "kind": "video", "source_id": item_id, "source_hash": file_hash(path), "title": task["title"] if task else path.stem,
+                "description": (loads(task["source_json"], {}).get("yingxu", {}).get("snapshot", {}).get("manuscript", {}).get("text") or task["title"]) if task else path.stem, "revision_id": item["source_sha256"], "video_path": str(path),
                 "absolute_video_path": str(path), "review_report": report}

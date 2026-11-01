@@ -935,7 +935,7 @@ def handoff_yingxu(task, payload):
             raise ApiError(409, "当前文案、素材或声音已与成片不同，请重新渲染后交付")
         handoff = {"content_id": task["content_id"], "file_id": file_id, "file_sha256": file_sha256(path),
                    "revision": revision, "status": "requires_review", "stale": False}
-        if all(source.get("yingxu_handoff", {}).get(k) == v for k, v in handoff.items()):
+        if all(source.get("yingxu_handoff", {}).get(k) == v for k, v in handoff.items() if k != "status"):
             return current
         source["yingxu_handoff"] = {**handoff, "created_at": now()}
         update_task(conn, task["content_id"], source_json=json.dumps(source, ensure_ascii=False))
@@ -3082,7 +3082,11 @@ class Handler(BaseHTTPRequestHandler):
             if handoff:
                 with connect() as conn:
                     task = get_task(conn, handoff.group(1))
-                self.json_response(handoff_yingxu(task, self.read_json()))
+                delivered = handoff_yingxu(task, self.read_json())
+                V2.review.receive_delivery(task["content_id"])
+                with connect() as conn:
+                    delivered = get_task(conn, task["content_id"])
+                self.json_response(delivered)
                 return
             if path == "/api/tasks":
                 self.json_response(create_task(self.read_json()), 201)

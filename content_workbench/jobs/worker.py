@@ -73,7 +73,8 @@ class ExecutionContext:
 
 
 class Worker:
-    def __init__(self, db_path=None, executors=None, root=None, poll_interval=0.25):
+    def __init__(self, db_path=None, executors=None, root=None, poll_interval=0.25, allowed_kinds=None):
+        self.allowed_kinds = allowed_kinds
         self.store = JobStore(db_path)
         self.executors = executors or {}
         self.owner = "worker_" + uuid.uuid4().hex[:16]
@@ -96,7 +97,7 @@ class Worker:
 
     def run_forever(self):
         while not self.stop_event.is_set():
-            job = self.store.lease(self.owner)
+            job = self.store.lease(self.owner, kinds=self.allowed_kinds)
             if not job:
                 self.stop_event.wait(self.poll_interval)
                 continue

@@ -1,0 +1,22 @@
+import {cleanup,render,screen,waitFor,fireEvent} from "@testing-library/react";
+import {MemoryRouter} from "react-router-dom";
+import {afterEach,expect,it,vi} from "vitest";
+import Review from "./Review";
+import {api} from "@/lib/api";
+const rules={target_width:1080,target_height:1920,max_duration:180,black_min_duration:.5,silence_min_duration:1,check_ocr:false,ai_risk:false};
+vi.mock("@/AppContext",()=>({useApp:()=>({notify:vi.fn(),refresh:vi.fn()})}));
+vi.mock("@/lib/api",()=>({api:vi.fn(),jsonOptions:(method:string,body:unknown)=>({method,body:JSON.stringify(body)}),errorText:(e:Error)=>e.message,uploadOptions:vi.fn()}));
+afterEach(()=>{cleanup();vi.clearAllMocks()});
+it("loads exact linked batch and saves chosen rules to original preflight",async()=>{
+ const batch={id:"review_linked",status:"queued",rules,counts:{total:1},items:[{id:"reviewitem_linked",source_path:"/local/final.mp4",report:{},ai_risk:{},error:{},status:"queued",decision:"pending",delivery:{content_id:"20261101-009",file_id:107,revision:1,title:"客服落地",stale:false}}]};
+ vi.mocked(api).mockResolvedValue({batch,default_rules:rules,jobs:[]});
+ render(<MemoryRouter initialEntries={["/review?batch_id=review_linked"]}><Review/></MemoryRouter>);
+ await screen.findByText("映序成片已自动带入");
+ expect(api).toHaveBeenCalledWith("/api/review/bootstrap?batch_id=review_linked");
+ expect(screen.getByRole("button",{name:"人工通过",exact:true})).toBeDisabled();
+ expect(screen.getByRole("button",{name:"通过全部无阻断项"})).toBeDisabled();
+ expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+ fireEvent.change(screen.getByRole("spinbutton",{name:"最长时长（秒）"}),{target:{value:"120"}});
+ fireEvent.click(screen.getByRole("button",{name:"开始机器预审"}));
+ await waitFor(()=>expect(api).toHaveBeenCalledWith("/api/review/batches/review_linked/start",expect.objectContaining({body:JSON.stringify({rules:{...rules,max_duration:120}})})));
+});

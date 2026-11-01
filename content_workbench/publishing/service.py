@@ -53,6 +53,8 @@ class PublishingService:
                 file = conn.execute("SELECT * FROM files WHERE content_id=? AND kind='video' ORDER BY id DESC LIMIT 1", (source_id,)).fetchone()
             variant = conn.execute("SELECT * FROM video_variants WHERE content_id=? AND file_id=?",
                                    (source_id, file["id"] if file else None)).fetchone() if file else None
+        if task and "source_json" in task.keys() and loads(task["source_json"], {}).get("yingxu_handoff"):
+            raise DomainError("YINGXU_REVIEW_SOURCE_REQUIRED", "映序交付必须从对应的审核通过项进入发布", 409)
         if not task or not file or (variant and not variant["approved_at"]) or (not variant and task["state"] != "approved"):
             raise DomainError("PUBLISH_VIDEO_NOT_APPROVED", "选择的视频版本尚未完成人工批准", 409, "source_file_id", "先完成该版本的质检和人工最终审核", source_id)
         relative = file["relative_path"].replace("\\", "/")
@@ -221,6 +223,8 @@ class PublishingService:
             variants_by_task.setdefault(variant["content_id"], []).append(dict(variant))
         items = []
         for task in tasks:
+            if "source_json" in task.keys() and loads(task["source_json"], {}).get("yingxu_handoff"):
+                continue
             selected = variants_by_task.get(task["content_id"])
             if selected:
                 candidates = selected
@@ -254,6 +258,12 @@ class PublishingService:
                     "preview_url": "/api/files/{}/media".format(file_id),
                     "status": status, "batch": batch,
                 })
+        from content_workbench.review.service import ReviewService
+        for source in ReviewService(self.db_path, self.root).approved_sources():
+            batch_row = next((row for row in batches if row["source_id"] == source["source_id"] and row["content_kind"] == "video"), None)
+            batch = self.get_batch(batch_row["id"]) if batch_row else None
+            items.append({"id":source["source_id"],"title":source["title"],"body":source.get("description",source["title"]),
+                          "preview_url":source.get("preview_url"),"status":batch["status"] if batch else "draft","batch":batch,"delivery":source.get("delivery")})
         return {"items": items}
 
     def bootstrap(self, kind=None, source_id=None, source_file_id=None):
@@ -380,8 +390,10 @@ class PublishingService:
     def update_batch_status(self, batch_id):
         batch = self.get_batch(batch_id)
         statuses = [target["status"] for target in batch["targets"]]
-        if any(value == "publishing" or value == "preparing" for value in statuses):
+        if any(value == "publishing" for value in statuses):
             status = "publishing"
+        elif any(value == "preparing" for value in statuses):
+            status = "preparing"
         elif any(value == "unknown_remote" for value in statuses):
             status = "requires_action"
         elif statuses and all(value == "published" for value in statuses):
