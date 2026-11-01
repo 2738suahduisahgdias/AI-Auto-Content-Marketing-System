@@ -139,6 +139,9 @@ class PublishingExecutors:
     def prepare(self, job, context):
         batch, target = self.service.target(job["input"]["target_id"])
         source = self.service.assert_current(batch)
+        if source.get("article_images"):
+            raise DomainError("ARTICLE_IMAGES_PREFILL_PENDING", "当前平台适配器尚未验证正文配图上传，不能仅填文字后标记成功", 409,
+                              action="先下载图文包手动导入；自动配图预填接通后再重新预览")
         if target["status"] == "published":
             raise DomainError("PUBLISH_ALREADY_RECORDED", "该平台已经发布，不能重复预览执行", 409, "platform", "核对平台后台")
         platform = target["platform"]
@@ -156,6 +159,9 @@ class PublishingExecutors:
         if not batch.get("confirmed_at") or target["status"] != "publishing":
             raise DomainError("PUBLISH_CONFIRMATION_REQUIRED", "缺少有效的一键发布确认", 409, "confirmed_at", "先完成预览并由用户确认")
         source = self.service.assert_current(batch)
+        if source.get("article_images"):
+            raise DomainError("ARTICLE_IMAGES_PREFILL_PENDING", "当前平台适配器尚未验证正文配图上传，不能仅填文字后标记成功", 409,
+                              action="先下载图文包手动导入；自动配图预填接通后再重新预览")
         platform = target["platform"]
         payload = self.service.resolve_assets(target["payload"], platform, batch["content_kind"])
         result = self.run(context, "execute", platform, {"source": source, "payload": payload, "target_id": target["id"]})

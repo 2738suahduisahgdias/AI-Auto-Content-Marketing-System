@@ -146,6 +146,16 @@ class Workbench:
             if expected_version is not None and item["version"] != expected_version:
                 raise DomainError("VERSION_CONFLICT", "内容已被其他窗口修改", 409, "expected_version",
                                   "刷新后比较版本，再基于最新版本保存；不要覆盖他人的修改", item_id)
+            dependencies = list(dependencies or [])
+            if item["content_type"] == "article" and kind == "draft":
+                from content_workbench.articles.layout import picture_rows, image_file
+                for picture in picture_rows(payload):
+                    asset_id = picture.get("asset_id")
+                    if asset_id:
+                        asset = conn.execute("SELECT * FROM wb_assets WHERE id=?", (asset_id,)).fetchone()
+                        image_file(self, asset)
+                        if not any(dep.get("asset_id") == asset_id for dep in dependencies):
+                            dependencies.append({"asset_id": asset_id})
             active = loads(item["active_revisions_json"], {})
             parent = parent_id or active.get(kind)
             number = conn.execute("SELECT COALESCE(MAX(revision_no),0)+1 FROM wb_revisions WHERE item_id=? AND kind=?", (item_id, kind)).fetchone()[0]
@@ -245,6 +255,14 @@ class Workbench:
             raise DomainError("MANIFEST_CHANGED", "审批输入已经变化", 409, "manifest_hash", "重新检查当前输入后再审批", item_id)
         if decision not in ("approve", "reject"):
             raise DomainError("INVALID_DECISION", "审批决定无效", 422)
+        if kind == "article" and decision == "approve":
+            from content_workbench.articles.layout import picture_rows, image_file
+            revision = self.get_revision(revision_id)
+            with self.conn(readonly=True) as conn:
+                for picture in picture_rows(revision["payload"]):
+                    if picture.get("asset_id"):
+                        asset = conn.execute("SELECT * FROM wb_assets WHERE id=?", (picture["asset_id"],)).fetchone()
+                        image_file(self, asset)
         approval_id = new_id("apr")
         timestamp = utcnow()
         with self.conn() as conn, immediate(conn):
@@ -414,20 +432,21 @@ class Workbench:
         title = str(revision["payload"].get("title") or item["campaign"]["title"])
         if not text:
             raise DomainError("EMPTY_ARTICLE", "正文为空", 422, "text", "填写正文后重新审核")
-        safe_html = "<!doctype html><html lang=\"zh-CN\"><meta charset=\"utf-8\"><title>{}</title><article><h1>{}</h1>{}</article></html>".format(
-            html.escape(title), html.escape(title), "".join("<p>{}</p>".format(html.escape(line)) for line in text.splitlines() if line.strip()))
-        directory = self.root / "renders" / "exports" / item_id
+        directory = self.root / "renders" / "exports" / item_id / revision_id
         directory.mkdir(parents=True, exist_ok=True)
+        from content_workbench.articles.layout import build_delivery
+        markdown, safe_html, package, image_ids = build_delivery(self, revision["payload"], title, directory)
         markdown_path = directory / (revision_id + ".md")
         html_path = directory / (revision_id + ".html")
-        markdown_path.write_text("# {}\n\n{}".format(title, text), encoding="utf-8")
+        markdown_path.write_text(markdown, encoding="utf-8")
         html_path.write_text(safe_html, encoding="utf-8")
         markdown_asset = self.register_asset(markdown_path, {"kind": "article_markdown", "item_id": item_id}, "owned")
         html_asset = self.register_asset(html_path, {"kind": "article_html", "item_id": item_id}, "owned")
-        version = expected_version if expected_version is not None else self.get_item(item_id)["version"]
+        package_asset = self.register_asset(package, {"kind": "article_package", "item_id": item_id}, "owned")
+        version = expected_version if expected_version is not None else item["version"]
         export_revision = self.save_revision(item_id, "export", {"markdown_asset_id": markdown_asset, "html_asset_id": html_asset,
-                                                                  "source_revision_id": revision_id, "format": "markdown+safe_html"},
-                                             version, dependencies=[{"revision_id": revision_id}, {"asset_id": markdown_asset}, {"asset_id": html_asset}], created_by="export")
+                                                                  "package_asset_id": package_asset, "image_asset_ids": image_ids, "source_revision_id": revision_id, "format": "markdown+safe_html+package"},
+                                             version, dependencies=[{"revision_id": revision_id}, {"asset_id": markdown_asset}, {"asset_id": html_asset}, {"asset_id": package_asset}] + [{"asset_id": aid} for aid in image_ids], created_by="export")
         return self.get_item(item_id), export_revision
 
     def record_publication(self, item_id, revision_id, url, published_at=None, actor="local_user"):

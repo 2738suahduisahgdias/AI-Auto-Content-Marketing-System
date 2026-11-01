@@ -38,8 +38,19 @@ class PublishingService:
             if not revision_id or item["state"] not in ("approved", "exported"):
                 raise DomainError("PUBLISH_ARTICLE_NOT_APPROVED", "文章尚未完成人工审批", 409, "source_id", "先批准当前正文再创建发布批次", source_id)
             revision = self.workbench.get_revision(revision_id)
+            from content_workbench.articles.layout import picture_rows, image_file
+            images = []
+            for picture in picture_rows(revision["payload"]):
+                if not picture.get("asset_id"):
+                    continue
+                with self.conn(readonly=True) as conn:
+                    asset = conn.execute("SELECT * FROM wb_assets WHERE id=?", (picture["asset_id"],)).fetchone()
+                image_file(self.workbench, asset)
+                images.append({"asset_id": asset["id"], "sha256": asset["sha256"],
+                               "after_paragraph": picture.get("after_paragraph", 0), "description": picture.get("description", "")})
             return {"kind": kind, "source_id": source_id, "source_hash": item["manifest"]["hash"],
-                    "title": item["campaign"]["title"], "body": revision["payload"].get("text", ""), "revision_id": revision_id}
+                    "title": item["campaign"]["title"], "body": revision["payload"].get("text", ""),
+                    "article_images": images, "revision_id": revision_id}
         if kind != "video":
             raise DomainError("PUBLISH_KIND_INVALID", "发布类型仅支持文章或视频", 422, "content_kind", "选择文章或视频")
         if source_id.startswith("reviewitem_"):
