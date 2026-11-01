@@ -29,4 +29,17 @@ describe('原系统中的映序编辑器',()=>{
    await waitFor(()=>expect(renderVideo).toHaveBeenCalledWith(true,1));
  });
 
+ it('本地录音默认引用并写回同一任务文件 ID',async()=>{
+   const root=document.createElement('div');document.body.append(root);
+   root.innerHTML='<span id="crumb"></span><small id="saved"></small><div id="main"></div><div id="modal" hidden></div><div id="toast"></div><input id="upload" type="file">';
+   const change=vi.fn(),importLocal=vi.fn().mockResolvedValue({id:42,url:'/api/files/42/media',original_name:'voice.wav',media_info:{mime_type:'audio/wav',duration_seconds:8}});
+   dispose=mountYingxu(root,vi.fn(),vi.fn(),vi.fn(),{initial:{stage:0,rhythm:"旁白驱动",topics:[],workflowV3:true,authoringV1:true,shots:[],manuscript:{title:'录音',text:'原稿',versions:[]}},onChange:change,upload:vi.fn(),importLocal});
+   const button=within(root).getByText('上传旁白');
+   expect(button).toBeTruthy();fireEvent.click(button);
+   fireEvent.change(root.querySelector('#local-material-path')!,{target:{value:'/Volumes/media/voice.wav'}});
+   fireEvent.click(within(root).getByText('添加素材'));
+   await waitFor(()=>expect(importLocal).toHaveBeenCalledWith('/Volumes/media/voice.wav','audio',false,'audio/*'));
+   await waitFor(()=>expect(change.mock.lastCall?.[0].voiceFileId).toBe(42));
+ });
+
 });

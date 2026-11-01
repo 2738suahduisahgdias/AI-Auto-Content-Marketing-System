@@ -24,6 +24,7 @@ class ReviewExecutors:
                 continue
             context.progress("media_review:" + item["id"], None)
             try:
+                self.service.assert_delivery(self.service.delivery(item["id"]))
                 options = dict(batch["rules"])
                 check_ocr = options.pop("check_ocr", True)
                 options.pop("ai_risk", None)
@@ -52,8 +53,13 @@ class ReviewExecutors:
             raise DomainError("REVIEW_ITEM_NOT_FOUND", "审核视频不存在", 404, "item_id", "刷新审核批次")
         report = json.loads(item["report_json"])
         command = report["safe_transcode_candidate"]["command"]
-        work = Path(item["source_path"]).parent / ".审核工作"
-        work.mkdir(exist_ok=True)
+        binding = self.service.delivery(item_id)
+        self.service.assert_delivery(binding)
+        if binding:
+            current = str(self.service.delivery_path(binding))
+            command = [current if value in (item["source_path"], report.get("source", {}).get("path")) else value for value in command]
+        work = self.root / "review-work" / item_id if binding else Path(item["source_path"]).parent / ".审核工作"
+        work.mkdir(parents=True, exist_ok=True)
         candidate = work / (Path(item["source_path"]).stem + "-" + job.get("id", "manual-repair") + ".mp4")
         command = [str(candidate) if value == "media-review-output.mp4" else value for value in command]
         context.run_process(command, timeout=1800, stage="safe_transcode")

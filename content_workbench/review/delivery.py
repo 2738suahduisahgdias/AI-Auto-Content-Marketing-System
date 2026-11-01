@@ -1,5 +1,6 @@
 """Link Yingxu deliveries to existing review items; no separate review workflow."""
 from pathlib import Path
+from content_workbench.media.task_assets import resolve_task_asset
 from content_workbench.domain.errors import DomainError
 from content_workbench.storage.db import dumps, loads, file_hash, immediate, new_id, utcnow
 from .schemas import validate_rules
@@ -18,6 +19,13 @@ class DeliveryReviewMixin:
         with self.conn(readonly=True) as db:
             return self.delivery(item_id, db)
 
+    def delivery_path(self, binding):
+        with self.conn(readonly=True) as conn:
+            file = conn.execute("SELECT * FROM files WHERE id=? AND content_id=?", (binding["file_id"], binding["content_id"])).fetchone()
+        if not file:
+            raise DomainError("DELIVERY_FILE_CHANGED", "交付文件不存在", 409)
+        return resolve_task_asset(self.db_path, self.root, file)
+
     def assert_delivery(self, binding, conn=None):
         if not binding:
             return None
@@ -31,8 +39,8 @@ class DeliveryReviewMixin:
                 (("file_id", "file_id"), ("revision", "revision"), ("file_sha256", "source_sha256"))):
             raise DomainError("DELIVERY_STALE", "制作或交付版本已变化，请返回映序重新交付并审核", 409)
         file = conn.execute("SELECT * FROM files WHERE id=? AND content_id=? AND kind='video'", (binding["file_id"], binding["content_id"])).fetchone()
-        path = (self.root / file["relative_path"]).resolve() if file else None
-        if not path or self.root not in path.parents or not path.is_file() or file_hash(path) != binding["source_sha256"]:
+        path = resolve_task_asset(self.db_path, self.root, file) if file else None
+        if not path or not path.is_file() or file_hash(path) != binding["source_sha256"]:
             raise DomainError("DELIVERY_FILE_CHANGED", "交付成片缺失或已变更，请重新交付", 409)
         return dict(task)
 
@@ -53,7 +61,7 @@ class DeliveryReviewMixin:
                 batch_id, item_id = existing["batch_id"], existing["item_id"]
             else:
                 file = conn.execute("SELECT * FROM files WHERE id=?", (binding["file_id"],)).fetchone()
-                path = (self.root / file["relative_path"]).resolve()
+                path = resolve_task_asset(self.db_path, self.root, file)
                 snapshot = source.get("yingxu", {}).get("snapshot", {})
                 import re
                 size = re.search(r"(\d+)\s*[×x]\s*(\d+)", str(snapshot.get("format", "")))

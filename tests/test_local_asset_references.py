@@ -57,3 +57,24 @@ class LocalReferenceTest(unittest.TestCase):
         self.assertEqual(self.wb.import_local_asset(self.original, copy=True), asset_id)
         self.original.unlink()
         self.assertTrue(self.wb.resolve_asset_path(self.asset(asset_id)).is_file())
+
+    def test_copy_failure_cleans_partial_and_preserves_source(self):
+        from unittest import mock
+        from types import SimpleNamespace
+        original=self.original.read_bytes()
+        with mock.patch('content_workbench.domain.services.shutil.disk_usage',return_value=SimpleNamespace(free=0)):
+            with self.assertRaises(DomainError):self.wb.import_local_asset(self.original,copy=True)
+        def interrupted(source,target):
+            Path(target).write_bytes(b'partial')
+            raise OSError('disk disconnected')
+        with mock.patch('content_workbench.domain.services.shutil.copyfile',side_effect=interrupted):
+            with self.assertRaises(OSError):self.wb.import_local_asset(self.original,copy=True)
+        self.assertEqual(self.original.read_bytes(),original)
+        self.assertEqual(list(self.wb.root.rglob('*.pending')),[])
+
+    def test_corrupt_managed_copy_is_rebuilt(self):
+        asset_id=self.wb.import_local_asset(self.original,copy=True)
+        path=self.wb.resolve_asset_path(self.asset(asset_id))
+        path.write_bytes(b'broken')
+        self.assertEqual(self.wb.import_local_asset(self.original,copy=True),asset_id)
+        self.assertEqual(path.read_bytes(),self.original.read_bytes())

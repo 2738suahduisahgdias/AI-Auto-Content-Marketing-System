@@ -39,6 +39,8 @@ class ReviewService(DeliveryReviewMixin):
             item["ai_risk"] = loads(item.pop("ai_risk_json"), {})
             item["error"] = loads(item.pop("error_json"), None)
             item["delivery"] = self.delivery_state(item["id"])
+            if item["delivery"] and not item["delivery"]["stale"]:
+                item["source_path"] = str(self.delivery_path(item["delivery"]))
             batch["items"].append(item)
         batch["counts"] = self.counts(items)
         return batch
@@ -154,13 +156,14 @@ class ReviewService(DeliveryReviewMixin):
         status = decision
         output = item["output_path"]
         if decision == "approved":
-            source = Path(item["candidate_path"] or item["source_path"]).resolve()
+            source = Path(item["candidate_path"]).resolve() if item["candidate_path"] else (self.delivery_path(binding) if binding else Path(item["source_path"]).resolve())
             if not source.is_file():
                 raise DomainError("REVIEW_CANDIDATE_MISSING", "审核候选文件不存在", 409, "item_id", "重新上传或转码后终审")
             if binding and report.get("source", {}).get("sha256") != file_hash(source):
                 raise DomainError("REVIEW_REPORT_STALE", "报告对应文件已变更，请重新预审", 409)
             directory = Path(item["source_path"]).parent / "审核通过"
-            directory.mkdir(exist_ok=True)
+            if not binding:
+                directory.mkdir(exist_ok=True)
             output_path = source if binding else (directory / Path(item["source_path"]).name).resolve()
             if output_path != source:
                 shutil.copy2(source, output_path)
@@ -192,7 +195,7 @@ class ReviewService(DeliveryReviewMixin):
             raise DomainError("REVIEW_APPROVAL_REQUIRED", "视频尚未人工审核通过", 409, "item_id", "先在审核中心完成人工终审", item_id)
         binding = self.delivery(item_id)
         task = self.assert_delivery(binding)
-        path = Path(item["output_path"]).resolve()
+        path = self.delivery_path(binding) if binding and not item["candidate_path"] else Path(item["output_path"]).resolve()
         if not path.is_file():
             raise DomainError("REVIEW_OUTPUT_MISSING", "审核通过文件不存在", 409, "item_id", "重新审核并生成输出文件")
         if binding and file_hash(path) != binding.get("output_sha256"):

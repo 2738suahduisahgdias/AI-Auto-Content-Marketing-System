@@ -583,11 +583,65 @@ def task_dict(row, conn):
     return item
 
 
+def resolved_task_file(file, verify=True):
+    from content_workbench.media.task_assets import resolve_task_asset
+    from content_workbench.domain.errors import DomainError
+    try:
+        return resolve_task_asset(DB_PATH, ROOT, file, verify=verify)
+    except DomainError as error:
+        raise ApiError(409, str(error), "file", "到设置 → 本地媒体重新定位原素材，或重新导入正确文件")
+
+
+def import_yingxu_file(task, payload):
+    from content_workbench.domain.services import Workbench
+    kind = payload.get("kind", "asset")
+    if kind not in ("asset", "audio", "video") or type(payload.get("copy", False)) is not bool:
+        raise ApiError(400, "本地素材类型或复制选项无效")
+    source = Path(str(payload.get("path", ""))).expanduser().resolve()
+    if source.suffix.lower() not in UPLOADS[kind][1]:
+        raise ApiError(400, "当前入口不支持此素材格式")
+    from content_workbench.media.probe import probe
+    info = probe(source)
+    accept = payload.get("accept") or ("audio/*" if kind == "audio" else "video/*" if kind == "video" else "")
+    if accept and accept not in ("audio/*", "video/*", "image/*"):
+        raise ApiError(400, "素材用途无效")
+    if accept:
+        media_type = accept.split("/")[0]
+        if not info.get("mime_type", "").startswith(media_type + "/") or (media_type in ("audio", "video") and not any(stream.get("codec_type") == media_type for stream in info.get("streams", []))):
+            raise ApiError(400, "文件类型与当前素材用途不一致")
+    wb = Workbench(DB_PATH, ROOT)
+    asset_id = wb.import_local_asset(source, copy=payload.get("copy", False))
+    with wb.conn(readonly=True) as conn:
+        asset = dict(conn.execute("SELECT * FROM wb_assets WHERE id=?", (asset_id,)).fetchone())
+    info = json.loads(asset["media_info_json"])
+    info.update(wb_asset_id=asset_id, source_sha256=asset["sha256"])
+    with DB_LOCK, connect() as conn:
+        rows = conn.execute("SELECT * FROM files WHERE content_id=? AND kind=?", (task["content_id"],kind)).fetchall()
+        for row in rows:
+            if parse_json(row["media_info_json"], {}).get("wb_asset_id") == asset_id:
+                return file_dict(row)
+        relative = "linked-assets/" + asset_id + source.suffix.lower()
+        cursor = conn.execute("INSERT INTO files(content_id,kind,original_name,relative_path,size,media_info_json,created_at) VALUES (?,?,?,?,?,?,?)", (task["content_id"],kind,source.name,relative,asset["byte_size"],json.dumps(info),now()))
+        row = conn.execute("SELECT * FROM files WHERE id=?", (cursor.lastrowid,)).fetchone()
+        if kind == "video":
+            upsert_variant(conn, task, dict(row), file_path=wb.resolve_asset_path(asset,verify=True))
+            update_task(conn,task["content_id"],state="rendered",quality_json="{}",final_approved_at=None,published_at=None)
+        add_event(conn,task["content_id"],"关联本地素材",source.name + (" · 复制入素材库" if payload.get("copy") else " · 引用原文件"))
+        return file_dict(row)
+
+
 def file_dict(row):
     item = dict(row)
     item["media_info"] = parse_json(item.pop("media_info_json"), {})
     item["url"] = "/api/files/{}/media".format(item["id"])
     item["download_url"] = item["url"] + "?download=1"
+    if item["media_info"].get("wb_asset_id"):
+        try:
+            resolved_task_file(item, verify=False)
+            item["available"] = True
+        except ApiError as error:
+            item["available"] = False
+            item["problem"] = str(error)
     return item
 
 
@@ -603,6 +657,8 @@ def get_task_file(conn, content_id, file_id, kind):
 
 
 def task_file_path(row):
+    if (dict(row).get("media_info") or parse_json(dict(row).get("media_info_json"), {})).get("wb_asset_id"):
+        return resolved_task_file(row)
     path = (ROOT / row["relative_path"]).resolve()
     expected = ROOT / ("subtitles" if row["kind"] == "srt" else "voice") / row["content_id"]
     if expected.resolve() not in path.parents or not path.is_file():
@@ -824,6 +880,42 @@ def yingxu_script_candidate(task, payload):
     return {'candidate': generated['master'], 'revision': version}
 
 
+def yingxu_cache_info():
+    from content_workbench.media.render_cache import stats
+    directory = REMOTION_APP / "public-static" / "yingxu-assets"
+    protected = []
+    with connect() as conn:
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE name='wb_assets'").fetchone():
+            for row in conn.execute("SELECT source_json,storage_key FROM wb_assets"):
+                source = parse_json(row["source_json"], {})
+                protected.append(source.get("path") or str(ROOT / row["storage_key"]))
+        protected.extend(str(ROOT / row[0]) for row in conn.execute("SELECT relative_path FROM files"))
+    return {**stats(directory,protected), "limit_gb":int(ai_settings().get("yingxu_cache_limit_gb",20)), "path":str(directory)}, protected
+
+
+def manage_yingxu_cache(payload):
+    from content_workbench.media.render_cache import lease, clear
+    directory = REMOTION_APP / "public-static" / "yingxu-assets"
+    action = payload.get("action")
+    if action not in ("clear", "limit"):
+        raise ApiError(400, "缓存操作无效")
+    try:
+        with lease(directory):
+            if action == "limit":
+                limit = payload.get("limit_gb")
+                if type(limit) is not int or not 1 <= limit <= 1000:
+                    raise ApiError(400, "缓存上限需为 1～1000 GB 的整数")
+                write_ai_settings({"yingxu_cache_limit_gb":limit})
+                removed = 0
+            else:
+                _, protected = yingxu_cache_info()
+                removed = clear(directory,protected)
+            result, _ = yingxu_cache_info()
+            return {**result,"removed_bytes":removed}
+    except DomainError as error:
+        raise ApiError(error.status,error.message)
+
+
 def yingxu_render_props(task, preview=False, shot_index=None):
     snapshot = task.get("source", {}).get("yingxu", {}).get("snapshot", {})
     shots = snapshot.get("shots", [])
@@ -834,8 +926,8 @@ def yingxu_render_props(task, preview=False, shot_index=None):
         file = files.get(file_id)
         if not file:
             raise ApiError(400, "素材不属于当前任务，请重新上传并保存")
-        source = (ROOT / file["relative_path"]).resolve()
-        if ROOT.resolve() not in source.parents or not source.is_file() or source.suffix.lower() not in extensions:
+        source = resolved_task_file(file)
+        if not source.is_file() or source.suffix.lower() not in extensions:
             raise ApiError(400, "素材丢失或格式不支持，请重新定位素材")
         from content_workbench.storage.db import file_hash
         digest = file_hash(source)
@@ -847,6 +939,10 @@ def yingxu_render_props(task, preview=False, shot_index=None):
         directory.mkdir(parents=True, exist_ok=True)
         target = directory / name
         if not target.exists() or file_hash(target) != digest:
+            cache, _ = yingxu_cache_info()
+            growth = source.stat().st_size - (target.stat().st_size if target.is_file() else 0)
+            if cache["bytes"] + growth > cache["limit_gb"] * 1024 ** 3:
+                raise ApiError(409, "渲染缓存达到上限，请到设置 → 本地媒体清理缓存或调大容量")
             if shutil.disk_usage(directory).free < source.stat().st_size + 64 * 1024 ** 2:
                 raise ApiError(409, "素材缓存盘空间不足，请清理缓存或更换项目磁盘；原素材保持不变")
             temporary = target.with_name(target.name + "." + uuid.uuid4().hex + ".staging")
@@ -934,6 +1030,15 @@ YINGXU_RENDER_LOCK = threading.Lock()
 
 
 def render_yingxu(task, payload):
+    from content_workbench.media.render_cache import lease
+    try:
+        with lease(REMOTION_APP / "public-static" / "yingxu-assets"):
+            return _render_yingxu(task, payload)
+    except DomainError as error:
+        raise ApiError(error.status,error.message)
+
+
+def _render_yingxu(task, payload):
     if not YINGXU_RENDER_LOCK.acquire(blocking=False):
         raise ApiError(409, "已有本地渲染正在运行，请完成后重试")
     try:
@@ -977,8 +1082,8 @@ def handoff_yingxu(task, payload):
         file = next((f for f in current["files"] if f["id"] == file_id and f["kind"] == "video"), None)
         if not file:
             raise ApiError(400, "请选择本任务的真实成片文件", "file_id")
-        path = (ROOT / file["relative_path"]).resolve()
-        if ROOT not in path.parents or not path.is_file():
+        path = resolved_task_file(file)
+        if not path.is_file():
             raise ApiError(409, "成片文件缺失，请重新定位或上传")
         source = current.get("source", {})
         revision = source.get("yingxu", {}).get("revision", 0)
@@ -1478,8 +1583,8 @@ def task_action(task, payload):
                                    (payload.get("variant_id"), content_id)).fetchone() if payload.get("variant_id") else latest_variant(conn, content_id)
             if not variant:
                 raise ApiError(409, "没有可批准的视频版本", "variant_id", "先选择已提交人工审核的视频版本。")
-            file_row = conn.execute("SELECT relative_path FROM files WHERE id=?", (variant["file_id"],)).fetchone()
-            path = (ROOT / file_row["relative_path"]).resolve() if file_row else None
+            file_row = conn.execute("SELECT * FROM files WHERE id=?", (variant["file_id"],)).fetchone()
+            path = resolved_task_file(file_row) if file_row else None
             if not path or not path.is_file() or file_sha256(path) != variant["file_sha256"]:
                 raise ApiError(409, "视频文件与提交审核时不一致", "variant_id", "文件已变化，请重新质检和审核该版本。")
             conn.execute("UPDATE video_variants SET approved_at=?,updated_at=? WHERE id=?", (now(), now(), variant["id"]))
@@ -1953,6 +2058,8 @@ def parse_srt_captions(text):
 
 
 def asset_file_path(row):
+    if (dict(row).get("media_info") or parse_json(dict(row).get("media_info_json"), {})).get("wb_asset_id"):
+        return resolved_task_file(row)
     path = (ROOT / row["relative_path"]).resolve()
     expected = ROOT / "assets" / row["content_id"] / "source"
     if expected.resolve() not in path.parents or not path.is_file():
@@ -2122,8 +2229,8 @@ def generate_cover(task, payload):
                     raise ApiError(409, "还没有成片，无法抽帧", "file_id", "先生成或上传成片，或改用 AI 生成封面。")
                 with connect() as conn:
                     video_row = get_task_file(conn, content_id, latest["id"], "video")
-            video_path = (ROOT / video_row["relative_path"]).resolve()
-            if (ROOT / "renders" / content_id).resolve() not in video_path.parents or not video_path.is_file():
+            video_path = resolved_task_file(video_row)
+            if not video_path.is_file():
                 raise ApiError(404, "成片文件不存在或路径无效", "file_id", "重新生成成片后再抽帧，或改用 AI 生成封面。")
             media_info = parse_json(video_row["media_info_json"], {})
             duration = media_info.get("duration_seconds")
@@ -2833,34 +2940,40 @@ class Handler(BaseHTTPRequestHandler):
             row_file = next((item for item in task["files"] if item["id"] == variant["file_id"]), None)
             if not row_file:
                 continue
-            target = (ROOT / row_file["relative_path"]).resolve()
-            if (ROOT / "renders" / content_id).resolve() not in target.parents or not target.is_file():
-                continue
+            target = resolved_task_file(row_file)
             entries.append((target, "{}-{}".format(variant["template_id"], target.name)))
         if not entries:
             raise ApiError(404, "当前任务还没有可下载的成片版本")
-        buffer = io.BytesIO()
-        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-            for target, name in entries:
-                archive.write(target, name)
-        body = buffer.getvalue()
-        self.send_response(200)
-        self.send_header("Content-Type", "application/zip")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Content-Disposition", "attachment; filename=\"{}-videos.zip\"".format(content_id))
-        self.end_headers()
-        self.wfile.write(body)
+        directory = ROOT / "cache" / "exports"
+        directory.mkdir(parents=True, exist_ok=True)
+        required = sum(target.stat().st_size for target, _ in entries) + 64 * 1024 ** 2
+        if shutil.disk_usage(directory).free < required:
+            raise ApiError(409, "导出空间不足", "disk", "清理缓存或释放项目磁盘空间后重试；原素材不会删除")
+        # MP4 is already compressed. Keep ZIP on the project disk and stream it.
+        with tempfile.TemporaryFile(dir=directory, suffix=".zip") as buffer:
+            with zipfile.ZipFile(buffer, "w", zipfile.ZIP_STORED, allowZip64=True) as archive:
+                for index, (target, name) in enumerate(entries):
+                    archive.write(target, "{}-{}".format(index + 1, name))
+            size = buffer.tell()
+            buffer.seek(0)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/zip")
+            self.send_header("Content-Length", str(size))
+            self.send_header("Content-Disposition", "attachment; filename=\"{}-videos.zip\"".format(content_id))
+            self.end_headers()
+            shutil.copyfileobj(buffer, self.wfile, 1024 * 1024)
 
     def serve_media(self, file_id, download=False):
         with connect() as conn:
             row = conn.execute("SELECT * FROM files WHERE id=?", (file_id,)).fetchone()
         if not row:
             raise ApiError(404, "文件不存在")
-        path = (ROOT / row["relative_path"]).resolve()
+        linked = parse_json(row["media_info_json"], {}).get("wb_asset_id")
+        path = resolved_task_file(row) if linked else (ROOT / row["relative_path"]).resolve()
         expected = ROOT / ("subtitles" if row["kind"] == "srt" else {"audio": "voice", "asset": "assets", "video": "renders", "cover": "covers", "preview_video": "previews", "preview_cover": "previews"}[row["kind"]]) / row["content_id"]
         if row["kind"] != "srt" and row["kind"] == "asset":
             expected = expected / "source"
-        if expected.resolve() not in path.parents or not path.is_file():
+        if (not linked and expected.resolve() not in path.parents) or not path.is_file():
             raise ApiError(404, "文件不存在或路径无效")
         size = path.stat().st_size
         start, end = 0, size - 1
@@ -2918,7 +3031,9 @@ class Handler(BaseHTTPRequestHandler):
             self.authenticate_legacy(path)
             if V2 and V2.matches(path):
                 return V2.handle(self, "GET", path, parse_qs(parsed.query))
-            if path == "/api/ai/status":
+            if path == "/api/yingxu-cache":
+                self.json_response(yingxu_cache_info()[0])
+            elif path == "/api/ai/status":
                 self.json_response(get_ai_status())
             elif path == "/api/voices":
                 self.json_response(get_voices())
@@ -2998,6 +3113,9 @@ class Handler(BaseHTTPRequestHandler):
             self.authenticate_legacy(path)
             if V2 and V2.matches(path):
                 return V2.handle(self, "POST", path, parse_qs(urlsplit(self.path).query))
+            if path == "/api/yingxu-cache":
+                self.json_response(manage_yingxu_cache(self.read_json()))
+                return
             if path == "/api/ai/test":
                 self.json_response(test_ai_connection())
                 return
@@ -3127,6 +3245,16 @@ class Handler(BaseHTTPRequestHandler):
                 with connect() as conn:
                     task = get_task(conn, yingxu_render.group(1))
                 self.json_response(render_yingxu(task, self.read_json()))
+                return
+            local_import = re.fullmatch(r"/api/tasks/(\d{8}-\d{3})/yingxu-local-files", path)
+            if local_import:
+                with connect() as conn:
+                    task = get_task(conn, local_import.group(1))
+                try:
+                    result = import_yingxu_file(task, self.read_json())
+                except DomainError as error:
+                    raise ApiError(error.status, error.message, error.field, error.action, error.item)
+                self.json_response(result, 201)
                 return
             studio_upload = re.fullmatch(r"/api/tasks/(\d{8}-\d{3})/yingxu-files", path)
             if studio_upload:

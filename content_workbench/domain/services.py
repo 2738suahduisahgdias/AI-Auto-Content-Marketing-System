@@ -291,10 +291,17 @@ class Workbench:
         storage_key = "assets/v2/{}/{}{}".format(digest[:2], digest, suffix)
         target = (self.root / storage_key).resolve()
         target.parent.mkdir(parents=True, exist_ok=True)
-        if not target.exists():
+        if not target.exists() or target.stat().st_size != size or file_hash(target) != digest:
+            if shutil.disk_usage(target.parent).free < size + 64 * 1024 ** 2:
+                raise DomainError("ASSET_DISK_FULL", "素材复制空间不足", 409, "path", "释放项目磁盘空间，或使用引用方式")
             temporary = target.with_name("." + uuid.uuid4().hex + ".pending")
-            shutil.copyfile(path, temporary)
-            os.replace(temporary, target)
+            try:
+                shutil.copyfile(path, temporary)
+                if temporary.stat().st_size != size or file_hash(temporary) != digest:
+                    raise DomainError("ASSET_FILE_CHANGED", "复制过程中素材内容发生变化，请重试", 409)
+                os.replace(temporary, target)
+            finally:
+                temporary.unlink(missing_ok=True)
         if move and path != target:
             path.unlink(missing_ok=True)
         with self.conn() as conn, immediate(conn):

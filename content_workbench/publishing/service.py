@@ -79,8 +79,9 @@ class PublishingService:
         if not task or not file or (variant and not variant["approved_at"]) or (not variant and task["state"] != "approved"):
             raise DomainError("PUBLISH_VIDEO_NOT_APPROVED", "选择的视频版本尚未完成人工批准", 409, "source_file_id", "先完成该版本的质检和人工最终审核", source_id)
         relative = file["relative_path"].replace("\\", "/")
-        path = (self.root / relative).resolve()
-        if self.root not in path.parents or path.suffix.lower() != ".mp4" or not path.is_file():
+        from content_workbench.media.task_assets import resolve_task_asset
+        path = resolve_task_asset(self.db_path, self.root, file)
+        if path.suffix.lower() != ".mp4" or not path.is_file():
             raise DomainError("PUBLISH_VIDEO_MISSING", "已批准 MP4 不存在或路径无效", 409, "source_file_id", "重新上传并批准 MP4", source_id)
         digest = file_hash(path)
         if variant and digest != variant["file_sha256"]:
