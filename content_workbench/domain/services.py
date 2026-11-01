@@ -436,6 +436,16 @@ class Workbench:
         directory.mkdir(parents=True, exist_ok=True)
         from content_workbench.articles.layout import build_delivery
         markdown, safe_html, package, image_ids = build_delivery(self, revision["payload"], title, directory)
+        page_assets = []
+        plan = revision["payload"].get("creative_plan") or {}
+        if "分页" in str(plan.get("format", "")):
+            from content_workbench.articles.pages import generate_pages
+            import zipfile
+            page_files = generate_pages(self, revision["payload"], title, directory / "pages")
+            with zipfile.ZipFile(package, "a", compression=zipfile.ZIP_DEFLATED) as archive:
+                for page_file in page_files:
+                    archive.write(page_file, "pages/" + page_file.name)
+                    page_assets.append(self.register_asset(page_file, {"kind":"article_page", "item_id":item_id, "revision_id":revision_id}, "owned"))
         markdown_path = directory / (revision_id + ".md")
         html_path = directory / (revision_id + ".html")
         markdown_path.write_text(markdown, encoding="utf-8")
@@ -445,8 +455,8 @@ class Workbench:
         package_asset = self.register_asset(package, {"kind": "article_package", "item_id": item_id}, "owned")
         version = expected_version if expected_version is not None else item["version"]
         export_revision = self.save_revision(item_id, "export", {"markdown_asset_id": markdown_asset, "html_asset_id": html_asset,
-                                                                  "package_asset_id": package_asset, "image_asset_ids": image_ids, "source_revision_id": revision_id, "format": "markdown+safe_html+package"},
-                                             version, dependencies=[{"revision_id": revision_id}, {"asset_id": markdown_asset}, {"asset_id": html_asset}, {"asset_id": package_asset}] + [{"asset_id": aid} for aid in image_ids], created_by="export")
+                                                                  "package_asset_id": package_asset, "page_asset_ids": page_assets, "image_asset_ids": image_ids, "source_revision_id": revision_id, "format": "markdown+safe_html+package"},
+                                             version, dependencies=[{"revision_id": revision_id}, {"asset_id": markdown_asset}, {"asset_id": html_asset}, {"asset_id": package_asset}] + [{"asset_id": aid} for aid in image_ids + page_assets], created_by="export")
         return self.get_item(item_id), export_revision
 
     def record_publication(self, item_id, revision_id, url, published_at=None, actor="local_user"):

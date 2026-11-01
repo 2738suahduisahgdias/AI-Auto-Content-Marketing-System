@@ -119,7 +119,7 @@ class PublishingExecutors:
     def run(self, context, action, platform, payload=None):
         config = require_agent_enabled(self.service.db_path, "publish_agent")
         with tempfile.TemporaryDirectory(prefix="publishing-job-") as directory:
-            use_bridge = platform in ("wechat_channels", "wechat_official_account") and action in ("prepare", "execute")
+            use_bridge = action in ("prepare", "execute") and (platform in ("wechat_channels", "wechat_official_account") or (platform == "xiaohongshu" and payload and (payload.get("source", {}).get("article_images") or payload.get("source", {}).get("article_pages"))))
             worker = "webbridge_worker.py" if use_bridge else "browser_worker.py"
             python = sys.executable if use_bridge else browser_python(self.root)
             arguments = [python, str(PROJECT_ROOT / "content_workbench/publishing" / worker),
@@ -139,14 +139,13 @@ class PublishingExecutors:
     def prepare(self, job, context):
         batch, target = self.service.target(job["input"]["target_id"])
         source = self.service.assert_current(batch)
-        if source.get("article_images"):
-            raise DomainError("ARTICLE_IMAGES_PREFILL_PENDING", "当前平台适配器尚未验证正文配图上传，不能仅填文字后标记成功", 409,
-                              action="先下载图文包手动导入；自动配图预填接通后再重新预览")
         if target["status"] == "published":
             raise DomainError("PUBLISH_ALREADY_RECORDED", "该平台已经发布，不能重复预览执行", 409, "platform", "核对平台后台")
         platform = target["platform"]
         payload = self.service.resolve_assets(target["payload"], platform, batch["content_kind"])
         result = self.run(context, "prepare", platform, {"source": source, "payload": payload, "target_id": target["id"]})
+        if result.get("status") == "preview_ready" and (source.get("article_images") or source.get("article_pages")) and not result.get("article_images_verified"):
+            raise DomainError("ARTICLE_IMAGES_NOT_VERIFIED", "平台未回读确认配图，不能标记预填成功", 502)
         if result.get("status") == "preview_ready" and result.get("fields_verified"):
             self.service.set_target_result(target["id"], "ready", result, job_id=job["id"])
             return {"target_id": target["id"], "platform": platform, "status": "ready", "auto_published": False}
@@ -159,9 +158,6 @@ class PublishingExecutors:
         if not batch.get("confirmed_at") or target["status"] != "publishing":
             raise DomainError("PUBLISH_CONFIRMATION_REQUIRED", "缺少有效的一键发布确认", 409, "confirmed_at", "先完成预览并由用户确认")
         source = self.service.assert_current(batch)
-        if source.get("article_images"):
-            raise DomainError("ARTICLE_IMAGES_PREFILL_PENDING", "当前平台适配器尚未验证正文配图上传，不能仅填文字后标记成功", 409,
-                              action="先下载图文包手动导入；自动配图预填接通后再重新预览")
         platform = target["platform"]
         payload = self.service.resolve_assets(target["payload"], platform, batch["content_kind"])
         result = self.run(context, "execute", platform, {"source": source, "payload": payload, "target_id": target["id"]})

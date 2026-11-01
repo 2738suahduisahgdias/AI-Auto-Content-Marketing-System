@@ -2,6 +2,7 @@
 import base64
 import html
 import hashlib
+import json
 import re
 import zipfile
 from content_workbench.domain.errors import DomainError
@@ -44,6 +45,7 @@ def build_delivery(workbench, payload, title, directory):
     rows = picture_rows(payload)
     paragraphs = re.split(r'\n\s*\n', str(payload.get('text', '')).strip())
     images = {}
+    credits = {}
     total = 0
     for row in rows:
         asset_id = row.get('asset_id')
@@ -61,6 +63,9 @@ def build_delivery(workbench, payload, title, directory):
             raise DomainError('ASSET_CHANGED', '导出期间图片内容发生变化，请重新导入并审核', 409)
         suffix = {'image/png':'.png','image/jpeg':'.jpg','image/webp':'.webp'}[asset['mime_type']]
         images[asset_id] = (f'images/{asset_id}{suffix}', data, asset['mime_type'])
+        source = json.loads(asset['source_json'] or '{}')
+        if source.get('kind') == 'image_search':
+            credits[asset_id] = {key: source.get(key, '') for key in ('author', 'license', 'license_url', 'source_url', 'attribution')}
     html_parts, markdown_parts = [], [f'# {title}\n']
     def insert(position):
         for row in rows:
@@ -68,6 +73,9 @@ def build_delivery(workbench, payload, title, directory):
                 continue
             name, data, mime = images[row['asset_id']]
             caption = str(row.get('description') or '')
+            credit = credits.get(row['asset_id'])
+            if credit:
+                caption += ' ｜ 图片来源：' + ' · '.join(str(credit[key]) for key in ('author', 'license', 'source_url') if credit.get(key))
             uri = 'data:' + mime + ';base64,' + base64.b64encode(data).decode('ascii')
             html_parts.append('<figure><img src="{}" alt="{}"><figcaption>{}</figcaption></figure>'.format(uri, html.escape(caption, quote=True), html.escape(caption)))
             markdown_parts.append('![{}]({})\n'.format(html.escape(re.sub(r'[\[\]\\\r\n]', ' ', caption)), name))
@@ -80,6 +88,7 @@ def build_delivery(workbench, payload, title, directory):
     markdown = '\n'.join(markdown_parts)
     package = directory / 'article-package.zip'
     with zipfile.ZipFile(package, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr('image-credits.json', json.dumps(credits, ensure_ascii=False, indent=2))
         archive.writestr('article.md', markdown)
         archive.writestr('article.html', document)
         for name, data, _ in images.values():

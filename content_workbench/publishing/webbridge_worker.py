@@ -1,4 +1,5 @@
 import argparse
+import os
 import json
 import re
 import subprocess
@@ -16,13 +17,14 @@ SESSION = "publishing-live"
 
 
 class Bridge:
-    def __init__(self, endpoint="http://127.0.0.1:10086/command"):
+    def __init__(self, endpoint="http://127.0.0.1:10086/command", session=SESSION):
         self.endpoint = endpoint
+        self.session = session
 
     def call(self, action, args=None):
         request = urllib.request.Request(
             self.endpoint,
-            data=json.dumps({"action": action, "args": args or {}, "session": SESSION}).encode(),
+            data=json.dumps({"action": action, "args": args or {}, "session": self.session}).encode(),
             headers={"Content-Type": "application/json"},
         )
         with urllib.request.urlopen(request, timeout=45) as response:
@@ -108,7 +110,8 @@ class Bridge:
         return True
 
     def screenshot(self, target_id, status):
-        path = ROOT / "data/publishing-evidence" / "{}-{}.png".format(target_id, status)
+        path = Path(os.environ.get("CONTENT_AGENT_ROOT", str(ROOT))) / "data/publishing-evidence" / "{}-{}.png".format(target_id, status)
+        path.parent.mkdir(parents=True, exist_ok=True)
         result = self.call("screenshot", {"path": str(path)})
         return result.get("path")
 
@@ -339,6 +342,61 @@ def prepare_official_account(bridge, data, mode):
                          {"title": payload["title"], "body_length": len(payload["body"]), "transport": "webbridge"})
 
 
+def prepare_xhs_images(bridge, data, mode):
+    payload, source = data['payload'], data['source']
+    unsupported = unsupported_payload_field('xiaohongshu', 'article', payload,
+        {'title','body','description','tags','template_name'})
+    if unsupported:
+        return unsupported
+    images = source.get('article_pages') or source.get('article_images') or []
+    if not 1 <= len(images) <= 18:
+        return bridge.error('小红书','images','当前图文上传支持 1～18 张图片','调整分页数量后重新导出')
+    description = payload.get('description') or source.get('title','') if source.get('article_pages') else payload.get('body') or source.get('body','')
+    description += ('\n' + payload['tags']) if payload.get('tags') else ''
+    if len(description)>1000 or len(payload.get('title',''))>20:
+        return bridge.error('小红书','description','图文标题需不超过 20 字，正文含话题不超过 1000 字','长文章请先导出分页图，再填写简短描述')
+    expected=len(images)
+    def readback():
+        return bridge.evaluate("""(()=>{const title=document.querySelector('input[placeholder="填写标题会有更多赞哦"]');
+        const body=document.querySelector('div.tiptap.ProseMirror');const images=Array.from(document.querySelectorAll('img.img.preview'));
+        const publish=document.querySelector('xhs-publish-btn[submit-text="发布"]');
+        return {title:title?.value||'',body:body?.innerText||'',count:images.length,
+        loaded:images.every(i=>i.complete&&i.naturalWidth>0),ready:!!publish&&publish.getAttribute('submit-disabled')!=='true'&&publish.getAttribute('submit-loading')!=='true'};})()""")
+    def matches(value):
+        return bool(value and value.get('title')==payload.get('title') and re.sub(r'\s+', ' ', value.get('body','')).strip()==re.sub(r'\s+', ' ', description).strip()
+                    and value.get('count')==expected and value.get('loaded') and value.get('ready'))
+    if mode=='execute':
+        if not matches(readback()):return bridge.error('小红书','images','发布前图文状态已变化','重新预填并人工检查')
+        return execute_bridge(bridge,'xiaohongshu',data['target_id'],'发布')
+    bridge.call('navigate', {'url':'https://creator.xiaohongshu.com/publish/publish?source=official', 'newTab':True, 'group_title':'发布预览验证'})
+    text=json.dumps(bridge.snapshot().get('tree',[]),ensure_ascii=False)
+    if '手机号登录' in text or '扫码登录' in text:
+        return {'status':'login_required','error':'请在 Chrome 中登录小红书创作者后台'}
+    bridge.wait_for_text('上传图文', timeout=25)
+    opened = bridge.click_text('上传图文')
+    if not opened:
+        opened = bridge.evaluate("(()=>{const tabs=Array.from(document.querySelectorAll('.creator-tab .title'));const tab=tabs.find(e=>e.textContent.trim()==='上传图文'&&e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0);if(!tab)return false;tab.click();return true;})()")
+    if not opened:
+        return bridge.error('小红书','images','未找到上传图文入口','检查当前后台页面')
+    bridge.call('upload',{'selector':'input[type=file]','files':[entry['absolute_path'] for entry in images]})
+    deadline=time.monotonic()+90
+    while time.monotonic()<deadline:
+        value=readback()
+        if value and value.get('count')==expected and value.get('loaded'):break
+        time.sleep(.5)
+    else:return bridge.error('小红书','images','图片未全部加载完成','检查网络和图片数量，未执行发布')
+    fill(bridge,'input[placeholder="填写标题会有更多赞哦"]',payload['title'])
+    fill(bridge,'div.tiptap.ProseMirror',description)
+    deadline=time.monotonic()+15
+    while time.monotonic()<deadline:
+        if matches(readback()):
+            return bridge.result(data['target_id'],'preview_ready',{'title','body','images'},
+                {'article_images_verified':True,'image_count':expected,'image_asset_ids':[i['asset_id'] for i in images],
+                 'transport':'webbridge','auto_published':False})
+        time.sleep(.5)
+    return bridge.error('小红书','images','图文数量、文字或发布就绪状态回读不一致','检查图文编辑器，不会自动发布')
+
+
 def execute_bridge(bridge, platform, target_id, label):
     if not bridge.click_text(label):
         return bridge.error(platform, "publish_button", "未找到最终发表按钮，未执行发表", "检查平台预览是否仍就绪")
@@ -366,16 +424,21 @@ def execute_bridge(bridge, platform, target_id, label):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--action", choices=("prepare", "execute"), required=True)
-    parser.add_argument("--platform", choices=("wechat_channels", "wechat_official_account"), required=True)
+    parser.add_argument("--platform", choices=("wechat_channels", "wechat_official_account", "xiaohongshu"), required=True)
     parser.add_argument("--payload-file", required=True)
     args = parser.parse_args()
     data = json.loads(Path(args.payload_file).read_text(encoding="utf-8"))
-    bridge = Bridge()
+    bridge = Bridge(session="publishing-" + str(data.get("target_id", "preview")))
     try:
-        if args.platform == "wechat_channels":
+        if args.platform == "xiaohongshu":
+            result = prepare_xhs_images(bridge, data, args.action)
+        elif args.platform == "wechat_channels":
             result = prepare_channels(bridge, data, args.action)
         else:
-            result = prepare_official_account(bridge, data, args.action)
+            if data.get("source", {}).get("article_images") or data.get("source", {}).get("article_pages"):
+                result = {"status":"error", "error":"公众号配图尚未完成现场验证，已停止自动预填，避免漏图", "action":"使用本地导出图文进行人工验证"}
+            else:
+                result = prepare_official_account(bridge, data, args.action)
     except Exception as error:
         message = str(error)[:800]
         action = "先关闭 Chrome 中未完成的文件选择窗口，再检查 WebBridge 和登录状态后重试" if "page load timeout" in message else "确认 Chrome、Kimi WebBridge 和平台登录状态后重试"

@@ -11,6 +11,22 @@ class ArticleAPI:
 
     def handle(self, handler, method, path, body):
         body = body or {}
+        from content_workbench.articles.images import search_images, adopt_image, image_config
+        if path == "/api/articles/image-provider":
+            if method == "GET":
+                return self.app.response(handler, image_config(self.workbench.root, public=True))
+        if method == "POST" and path == "/api/articles/images/search":
+            return self.app.response(handler, search_images(body.get("query")))
+        if method == "POST" and path == "/api/articles/images/adopt":
+            return self.app.response(handler, adopt_image(self.workbench, body.get("title")))
+        if method == "POST" and path == "/api/articles/images/generate":
+            prompt = str(body.get("prompt") or "").strip()
+            if not 1 <= len(prompt) <= 8000:
+                raise DomainError("IMAGE_PROMPT_REQUIRED", "生图提示词需为 1～8000 字", 422)
+            if not image_config(self.workbench.root, public=True)["configured"]:
+                raise DomainError("CODEX_NOT_FOUND", "请安装并登录本机 Codex CLI，无需 API Key", 409)
+            return self.app.response(handler, self.jobs.enqueue("article.image", {"prompt":prompt},
+                idempotency_key=handler.headers.get("Idempotency-Key"), max_attempts=1), 202)
         if method == "GET" and path == "/api/articles/bootstrap":
             return self.app.response(handler, {"items": self.workbench.list_items("article"), "jobs": [job for job in self.jobs.list() if job["kind"].startswith("article.")][:20],
                                                "csrf_token": self.app.csrf(self.app.cookie(handler))})

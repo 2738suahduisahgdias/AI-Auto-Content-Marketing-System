@@ -25,6 +25,7 @@ class LocalExecutors:
             "voice.clone": self.clone,
             "audio.transcribe": self.transcribe,
             "article.export": self.export,
+            "article.image": self.generate_image,
             "video.render": self.render,
         }
 
@@ -179,6 +180,10 @@ class LocalExecutors:
             subtitle = self.workbench.register_asset(output, {"kind": "faster_whisper", "model": model, "source_audio_asset_id": asset_id}, "owned")
         return self.save_asset_result(job, subtitle, "subtitle", source_audio=asset_id,
                                       metadata={"provider": "faster_whisper", "model": model})
+
+    def generate_image(self, job, context):
+        from content_workbench.articles.images import generate_image
+        return generate_image(self.workbench, job, context)
 
     def export(self, job, context):
         context.progress("article_export", 0.4)

@@ -11,14 +11,24 @@ if app.ROOT.resolve() not in app.DB_PATH.resolve().parents:
 from content_workbench.api.v2 import V2Application
 app.init_db()
 app.V2=V2Application(app.DB_PATH,app.ROOT,app.create_task,{"video.produce":app.produce_video_task,"video.preview":app.produce_visual_preview})
-# Original article jobs and local review run here. Publishing executors remain disabled until platform validation.
+# Local article/review jobs and guarded Xiaohongshu prefill run here. Public publishing remains disabled.
 from content_workbench.jobs.worker import Worker
 from content_workbench.review.executors import ReviewExecutors
 app.V2.review.local_only=True
 local_executors=ReviewExecutors(app.V2.review).mapping()
-for kind in ("article.outline","article.draft","article.export"):
+for kind in ("article.outline","article.draft","article.export","article.image"):
     local_executors[kind]=app.V2.worker.executors[kind]
-review_worker=Worker(app.DB_PATH,local_executors,app.ROOT,allowed_kinds=["review.scan","review.repair","article.export","article.outline","article.draft"])
+def prepare_validated_platform(job, context):
+    from content_workbench.domain.errors import DomainError
+    from content_workbench.publishing.executors import PublishingExecutors
+    from content_workbench.publishing.service import PublishingService
+    service=PublishingService(app.DB_PATH,app.ROOT)
+    _,target=service.target(job["input"]["target_id"])
+    if target["platform"]!="xiaohongshu":
+        raise DomainError("PLATFORM_ACCEPTANCE_PENDING","该平台尚待现场验收；预填未执行",409)
+    return PublishingExecutors(service).prepare(job,context)
+local_executors["publish.prepare"]=prepare_validated_platform
+review_worker=Worker(app.DB_PATH,local_executors,app.ROOT,allowed_kinds=["publish.prepare","review.scan","review.repair","article.export","article.outline","article.draft","article.image"])
 review_worker.before_execute=app.V2.license.require_active
 review_worker.start()
 app.V2.overview_worker=review_worker

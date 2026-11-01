@@ -57,13 +57,13 @@ class ArticleImagesTest(unittest.TestCase):
         source=service.source('article',self.item['id'])
         self.assertEqual(source['article_images'][0]['asset_id'],self.asset)
         fake=Mock(root=self.wb.root)
-        fake.target.return_value=({}, {'status':'draft'})
+        fake.target.return_value=({'content_kind':'article'}, {'id':'target','platform':'xiaohongshu','payload':{},'status':'draft'})
         fake.assert_current=Mock(return_value=source)
-        executor=PublishingExecutors(fake);executor.run=Mock()
+        executor=PublishingExecutors(fake);executor.run=Mock(return_value={'status':'preview_ready','fields_verified':['title','body']})
         with self.assertRaises(DomainError) as caught:
             executor.prepare({'input':{'target_id':'target'}},Mock())
-        self.assertEqual(caught.exception.code,'ARTICLE_IMAGES_PREFILL_PENDING')
-        executor.run.assert_not_called()
+        self.assertEqual(caught.exception.code,'ARTICLE_IMAGES_NOT_VERIFIED')
+        executor.run.assert_called_once()
 
     def test_export_cannot_activate_after_concurrent_edit(self):
         from unittest.mock import patch
@@ -83,3 +83,14 @@ class ArticleImagesTest(unittest.TestCase):
         self.path.write_text('replaced image')
         with self.assertRaises(DomainError) as caught:self.approve(revision)
         self.assertEqual(caught.exception.code,'ASSET_CHANGED')
+
+    def test_search_attribution_survives_delivery(self):
+        self.asset=self.wb.register_asset(self.path,{'kind':'image_search','author':'Author <name>','license':'CC BY 4.0','source_url':'https://commons.wikimedia.org/wiki/File:test.png'},'research_only')
+        revision=self.save();self.approve(revision)
+        _,export=self.wb.export_article(self.item['id'],revision)
+        payload=self.wb.get_revision(export)['payload']
+        with self.wb.conn(readonly=True) as conn:asset=conn.execute('SELECT * FROM wb_assets WHERE id=?',(payload['package_asset_id'],)).fetchone()
+        with zipfile.ZipFile(self.wb.resolve_asset_path(asset)) as archive:
+            self.assertIn('CC BY 4.0',archive.read('article.html').decode())
+            self.assertIn('Author &lt;name&gt;',archive.read('article.html').decode())
+            self.assertIn('source_url',archive.read('image-credits.json').decode())

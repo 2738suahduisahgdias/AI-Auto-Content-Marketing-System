@@ -1,4 +1,4 @@
-import ArticleCreativePlan, {defaultCreativePlan, type CreativePlan} from "@/components/ArticleCreativePlan";
+import ArticleCreativePlan, {normalizeCreativePlan, type CreativePlan} from "@/components/ArticleCreativePlan";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Check, Download, FilePlus2, Plus, Send, Sparkles } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -48,7 +48,7 @@ export default function Articles() {
   const [brief, setBrief] = useState(String(selected?.campaign.brief?.text || ""));
   const [outlineText, setOutlineText] = useState(String(outline?.payload.text || ""));
   const [draftText, setDraftText] = useState(String(draft?.payload.text || ""));
-  const [creativePlan,setCreativePlan]=useState<CreativePlan>(draft?.payload.creative_plan || outline?.payload.creative_plan || defaultCreativePlan());
+  const [creativePlan,setCreativePlan]=useState<CreativePlan>(normalizeCreativePlan(draft?.payload.creative_plan || outline?.payload.creative_plan));
   const [busy, setBusy] = useState("");
   const [workspace, setWorkspace] = useState<"write" | "images" | "delivery">("write");
   const [createOpen, setCreateOpen] = useState(false);
@@ -61,7 +61,7 @@ export default function Articles() {
     setOutlineText(String(outline?.payload.text || ""));
     setDraftText(String(draft?.payload.text || ""));
     if (loadedRevision.split(":")[0] !== (selected?.id || "none") || loadedRevision.split(":")[2] !== (draft?.id || "none")) {
-      setCreativePlan(draft?.payload.creative_plan || outline?.payload.creative_plan || defaultCreativePlan());
+      setCreativePlan(normalizeCreativePlan(draft?.payload.creative_plan || outline?.payload.creative_plan));
     }
   }
 
@@ -120,7 +120,7 @@ export default function Articles() {
   const currentStep = exported ? 5 : selected?.state === "approved" ? 5 : draft ? 4 : outline ? 3 : 2;
   const exportPayload = exported?.payload || {};
   const canEdit = Boolean(selected) && !hasActiveJob;
-  const dirty = Boolean(selected) && (JSON.stringify(creativePlan)!==JSON.stringify(draft?.payload.creative_plan || outline?.payload.creative_plan || defaultCreativePlan()) || outlineText !== String(outline?.payload.text || '') || draftText !== String(draft?.payload.text || '') || brief !== String(selected?.campaign.brief?.text || ''));
+  const dirty = Boolean(selected) && (JSON.stringify(creativePlan)!==JSON.stringify(normalizeCreativePlan(draft?.payload.creative_plan || outline?.payload.creative_plan)) || outlineText !== String(outline?.payload.text || '') || draftText !== String(draft?.payload.text || '') || brief !== String(selected?.campaign.brief?.text || ''));
   const leave = (path:string) => { if(dirty && !window.confirm('有未保存的文案或写作要求。取消可返回编辑器保存；确定将放弃这些修改并离开。')) return; setSwitchOpen(false); navigate(path); };
   useEffect(()=>{
     if(!dirty)return;
@@ -172,7 +172,7 @@ export default function Articles() {
           {workspace === "delivery" && !["approved", "exported", "published"].includes(selected.state) && <p className="article-review-note">当前正文尚未批准。请在“写文案”中保存并审核正文，再导出或交给发布 Agent。</p>}
           {workspace === "delivery" && ["approved", "exported", "published"].includes(selected.state) && <Card className="article-card article-delivery">
             <div className="article-card-head"><div><h3>交付文档</h3><p>这里只提供实际生成的文档；平台预览与公开发布统一在发布中心完成。</p></div><Link className="button button-small" to={`/publish?kind=article&id=${encodeURIComponent(selected.id)}`}>前往发布中心</Link></div>
-            {exported ? <div className="article-export"><div><strong>Markdown + 安全 HTML</strong><p>{exported.id} · 文件由后端真实生成</p></div><div className="button-row">{exportPayload.package_asset_id && <a className="button button-small" href={`/api/v2/assets/${exportPayload.package_asset_id}/content?download=1`}><Download size={13}/>下载图文包</a>}{exportPayload.markdown_asset_id ? <a className="button button-small" href={`/api/v2/assets/${exportPayload.markdown_asset_id}/content?download=1`}><Download size={13} />下载 Markdown</a> : <Button size="small" disabled title="导出修订缺少 Markdown 资产，请重新导出">Markdown 不可用</Button>}{exportPayload.html_asset_id ? <a className="button button-small" href={`/api/v2/assets/${exportPayload.html_asset_id}/content?download=1`}><Download size={13} />下载 HTML</a> : <Button size="small" disabled title="导出修订缺少 HTML 资产，请重新导出">HTML 不可用</Button>}</div></div> : <Empty title="尚未导出交付文档" description="导出当前已批准正文后，这里会显示真实 Markdown 和 HTML 下载文件。" />}
+            {exported ? <div className="article-export"><div><strong>Markdown + 安全 HTML</strong><p>{exported.id} · 文件由后端真实生成</p></div><div className="button-row">{Array.isArray(exportPayload.page_asset_ids) && exportPayload.page_asset_ids.map((assetId:string,index:number)=><a className="button button-small" key={assetId} href={`/api/v2/assets/${assetId}/content?download=1`}>第 {index+1} 页 PNG</a>)}{exportPayload.package_asset_id && <a className="button button-small" href={`/api/v2/assets/${exportPayload.package_asset_id}/content?download=1`}><Download size={13}/>下载图文包</a>}{exportPayload.markdown_asset_id ? <a className="button button-small" href={`/api/v2/assets/${exportPayload.markdown_asset_id}/content?download=1`}><Download size={13} />下载 Markdown</a> : <Button size="small" disabled title="导出修订缺少 Markdown 资产，请重新导出">Markdown 不可用</Button>}{exportPayload.html_asset_id ? <a className="button button-small" href={`/api/v2/assets/${exportPayload.html_asset_id}/content?download=1`}><Download size={13} />下载 HTML</a> : <Button size="small" disabled title="导出修订缺少 HTML 资产，请重新导出">HTML 不可用</Button>}</div></div> : <Empty title="尚未导出交付文档" description="导出当前已批准正文后，这里会显示真实 Markdown 和 HTML 下载文件。" />}
           </Card>}
         </>}
       </main>

@@ -45,12 +45,22 @@ class PublishingService:
                     continue
                 with self.conn(readonly=True) as conn:
                     asset = conn.execute("SELECT * FROM wb_assets WHERE id=?", (picture["asset_id"],)).fetchone()
-                image_file(self.workbench, asset)
-                images.append({"asset_id": asset["id"], "sha256": asset["sha256"],
+                image_path = image_file(self.workbench, asset)
+                images.append({"asset_id": asset["id"], "sha256": asset["sha256"], "absolute_path": str(image_path),
                                "after_paragraph": picture.get("after_paragraph", 0), "description": picture.get("description", "")})
+            pages = []
+            export_id = item["active_revisions"].get("export")
+            if export_id:
+                exported = self.workbench.get_revision(export_id)["payload"]
+                if exported.get("source_revision_id") == revision_id:
+                    for asset_id in exported.get("page_asset_ids", []):
+                        with self.conn(readonly=True) as conn:
+                            asset = conn.execute("SELECT * FROM wb_assets WHERE id=?", (asset_id,)).fetchone()
+                        path = image_file(self.workbench, asset)
+                        pages.append({"asset_id":asset_id,"sha256":asset["sha256"],"absolute_path":str(path)})
             return {"kind": kind, "source_id": source_id, "source_hash": item["manifest"]["hash"],
                     "title": item["campaign"]["title"], "body": revision["payload"].get("text", ""),
-                    "article_images": images, "revision_id": revision_id}
+                    "article_images": images, "article_pages": pages, "revision_id": revision_id}
         if kind != "video":
             raise DomainError("PUBLISH_KIND_INVALID", "发布类型仅支持文章或视频", 422, "content_kind", "选择文章或视频")
         if source_id.startswith("reviewitem_"):
