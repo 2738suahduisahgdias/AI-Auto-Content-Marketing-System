@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, errorText } from "@/lib/api";
+import {draftPersistenceErrors} from "@/lib/contentDraft";
 import type { AppResources } from "@/lib/types";
 
 interface AppContextValue {
@@ -22,6 +23,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setNotice({ text, error });
     window.setTimeout(() => setNotice(current => current?.text === text ? null : current), error ? 12000 : 4000);
   }, []);
+  useEffect(()=>{const changed=()=>{const errors=draftPersistenceErrors();if(errors.length)notify(errors[0],true)};window.addEventListener('yingxu:draft-status',changed);return()=>window.removeEventListener('yingxu:draft-status',changed)},[notify]);
   const refresh = useCallback(async () => {
     try {
       const [core, topics, agents, accounts, articles, knowledge] = await Promise.all([

@@ -1,7 +1,19 @@
 import ts from 'typescript';
 import {readFileSync} from 'node:fs';
 const file=process.argv[2];const source=readFileSync(file,'utf8');
-const tree=ts.createSourceFile(file,source,ts.ScriptTarget.ES2020,true,ts.ScriptKind.TSX);
+const options={noLib:true,noResolve:true,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2020};
+const host=ts.createCompilerHost(options);const original=host.getSourceFile;
+host.getSourceFile=(name,...args)=>name===file?ts.createSourceFile(file,source,options.target,true,ts.ScriptKind.TSX):original(name,...args);
+const program=ts.createProgram([file],options,host);const tree=program.getSourceFile(file);const checker=program.getTypeChecker();
+const globals=new Set(['Math','String','Number','Boolean','Array','JSON','undefined','NaN','Infinity','parseFloat','parseInt','isFinite']);
+function isReference(n){
+ const p=n.parent;
+ if(ts.isPropertyAccessExpression(p)&&p.name===n)return false;
+ if((ts.isPropertyAssignment(p)||ts.isMethodDeclaration(p)||ts.isPropertyDeclaration(p)||ts.isPropertySignature(p)||ts.isJsxAttribute(p))&&p.name===n)return false;
+ if((ts.isBindingElement(p)&&p.propertyName===n)||ts.isImportSpecifier(p)||ts.isImportClause(p)||ts.isNamespaceImport(p))return false;
+ if((ts.isJsxOpeningElement(p)||ts.isJsxClosingElement(p)||ts.isJsxSelfClosingElement(p))&&p.tagName===n&&tags.has(n.text))return false;
+ return true;
+}
 const allowed=new Set(['AbsoluteFill','useCurrentFrame','useVideoConfig','interpolate','spring','Easing']);
 const forbidden=new Set(['window','document','globalThis','global','process','fetch','XMLHttpRequest','WebSocket','Worker','eval','Function','require','navigator','location','localStorage','sessionStorage','indexedDB','constructor','prototype','__proto__','setTimeout','setInterval','requestAnimationFrame','Date','crypto','useEffect','useLayoutEffect','useState','dangerouslySetInnerHTML','innerHTML','createElement']);
 const tags=new Set(['div','span','p','strong','b','em','section','h1','h2','h3','svg','g','path','rect','circle','line','polyline','polygon','ellipse','text','tspan','defs','linearGradient','stop','clipPath']);
@@ -10,6 +22,13 @@ function declarations(n){if(ts.isFunctionDeclaration(n)&&n.name)components.add(n
 declarations(tree);
 const errors=[];let exported=false;
 function inspect(n){
+ if(ts.isTypeNode(n))return;
+ if(n.kind===ts.SyntaxKind.ThisKeyword||ts.isWithStatement(n)||ts.isComputedPropertyName(n)||ts.isJsxSpreadAttribute(n))errors.push('禁止隐式全局、计算属性和 JSX 属性展开');
+ if(ts.isIdentifier(n)&&isReference(n)&&!globals.has(n.text)){
+  const symbol=checker.getSymbolAtLocation(n);
+  if(!symbol?.declarations?.some(d=>d.getSourceFile()===tree))errors.push('不允许的全局引用 '+n.text);
+ }
+
  if(ts.isIdentifier(n)&&forbidden.has(n.text))errors.push('禁止使用 '+n.text);
  if(ts.isImportDeclaration(n)){
   if(!ts.isStringLiteral(n.moduleSpecifier)||!['react','remotion'].includes(n.moduleSpecifier.text))errors.push('只允许 react / remotion 导入');

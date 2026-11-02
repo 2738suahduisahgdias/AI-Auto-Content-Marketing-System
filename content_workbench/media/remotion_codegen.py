@@ -8,7 +8,7 @@ from pathlib import Path
 from content_workbench.domain.errors import DomainError
 from content_workbench.storage.db import PROJECT_ROOT
 
-GENERATOR_VERSION = 'yingxu-scene-code-v1'
+GENERATOR_VERSION = 'yingxu-scene-code-v2'
 SKILLS = PROJECT_ROOT / 'skills/remotion/remotion-best-practices'
 
 
@@ -68,7 +68,7 @@ def prepare_scene_code(task, appearance, runtime, root, generate, validate):
         code = code_path.read_text(encoding='utf-8')
         if hashlib.sha256(code.encode()).hexdigest() != manifest.get('code_sha256'):
             raise DomainError('REMOTION_CODE_CHANGED', '已保存的动画代码被外部修改，未自动覆盖', 409,
-                              'code', '保留当前修改，核对项目 generated/remotion 中的代码后再操作')
+                              'code', '保留当前修改，核对项目 assets/remotion-code 中的代码后再操作')
         validate(code_path)
     else:
         # Incomplete generations are never accepted as a cache hit.

@@ -135,10 +135,14 @@ def main():
         from content_workbench.storage.workspace_selection import select_workspace as select
         from content_workbench.storage.db import connect
         from content_workbench.domain.errors import DomainError
-        with connect(app.DB_PATH) as conn:
-            if conn.execute("SELECT 1 FROM wb_jobs WHERE status IN ('queued','leased','running','retry_wait','cancel_requested') LIMIT 1").fetchone():
-                raise app.ApiError(409, '仍有任务进行中，请等待完成或取消后再切换')
-        try: result = select(root, destination, pointer)
+        from content_workbench.storage.activity import ACTIVITY
+        from content_workbench.storage.db import immediate
+        def prepare():
+            with connect(app.DB_PATH) as conn, immediate(conn):
+                if conn.execute("SELECT 1 FROM wb_jobs WHERE status IN ('queued','leased','running','retry_wait','cancel_requested') LIMIT 1").fetchone():
+                    raise DomainError('WORKSPACE_BUSY', '仍有后台任务进行中，请等待完成或取消后再切换', 409)
+                return select(root, destination, pointer)
+        try: result = ACTIVITY.switch(prepare)
         except DomainError as error: raise app.ApiError(error.status, error.message)
         next_workspace.append(result['path'])
         threading.Timer(1, server.shutdown).start()

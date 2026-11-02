@@ -128,6 +128,8 @@ def restore_workspace(package,destination):
                             if values[position]!=row[position+1]:
                                 values[columns.index(hash_column)]=payload_hash(json.loads(values[position]))
                     if values!=list(row[1:]):conn.execute('UPDATE "'+table+'" SET '+','.join('"'+c+'"=?' for c in columns)+' WHERE rowid=?',values+[row[0]])
+            if 'wb_workspace_identity' in tables:
+                conn.execute('UPDATE wb_workspace_identity SET uuid=? WHERE id=1',(uuid.uuid4().hex,))
             if 'wb_jobs' in tables:
                 conn.execute("UPDATE wb_jobs SET status='cancelled',stage='restored_requires_retry',lease_owner=NULL,lease_expires_at=NULL,fencing_token=fencing_token+1,error_json=? WHERE status IN ('queued','leased','running','retry_wait','cancel_requested','blocked')",(json.dumps({'code':'WORKSPACE_RESTORED','message':'工作区已迁移，请检查连接后手动重试任务'}),))
             if conn.execute('PRAGMA integrity_check').fetchone()[0]!='ok' or conn.execute('PRAGMA foreign_key_check').fetchall():fail('恢复数据库校验失败')

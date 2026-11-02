@@ -2348,6 +2348,12 @@ def generate_cover(task, payload):
 
 
 def run_remotion_render(props, output, timeout=1800, composition_id="TalkingHead", on_progress=None, scale=1, entry=None):
+    from content_workbench.media.render_cache import lease
+    with lease(REMOTION_APP / 'public-static/yingxu-assets'):
+        return _run_remotion_render(props, output, timeout, composition_id, on_progress, scale, entry)
+
+
+def _run_remotion_render(props, output, timeout=1800, composition_id="TalkingHead", on_progress=None, scale=1, entry=None):
     output = Path(output).resolve()
     node = shutil.which("node")
     if not node or not (REMOTION_APP / "package.json").is_file():
@@ -2911,6 +2917,24 @@ def edit_subtitles(task, payload):
 class Handler(BaseHTTPRequestHandler):
     server_version = "ContentWorkflow/1.0"
 
+    def _mutating_request(self, action):
+        from content_workbench.storage.activity import ACTIVITY
+        try:
+            if urlsplit(self.path).path == '/api/workspace/select':
+                return action()
+            with ACTIVITY.operation():
+                return action()
+        except DomainError as error:
+            converted = ApiError(error.status, error.message, error.field, error.action)
+            converted.code = error.code
+            self.error_response(converted)
+
+    def do_POST(self):
+        return self._mutating_request(self._do_POST)
+
+    def do_PUT(self):
+        return self._mutating_request(self._do_PUT)
+
     def log_message(self, fmt, *args):
         print("{} {}".format(self.address_string(), fmt % args), flush=True)
 
@@ -3206,7 +3230,7 @@ class Handler(BaseHTTPRequestHandler):
             print("GET error:", repr(error), flush=True)
             self.error_response(error)
 
-    def do_POST(self):
+    def _do_POST(self):
         try:
             path = urlsplit(self.path).path
             self.authenticate_legacy(path)
@@ -3442,7 +3466,7 @@ class Handler(BaseHTTPRequestHandler):
             print("POST error:", repr(error), flush=True)
             self.error_response(error)
 
-    def do_PUT(self):
+    def _do_PUT(self):
         try:
             path = urlsplit(self.path).path
             self.authenticate_legacy(path)

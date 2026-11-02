@@ -113,6 +113,16 @@ class Worker:
                 self.stop_event.wait(max(2, self.poll_interval))
 
     def execute(self, job):
+        from content_workbench.storage.activity import ACTIVITY
+        try:
+            with ACTIVITY.operation():
+                return self._execute(job)
+        except DomainError as error:
+            if error.code != 'WORKSPACE_SWITCHING': raise
+            # Keep the lease recoverable in the old workspace; do not start external work.
+            return
+
+    def _execute(self, job):
         context = ExecutionContext(self, job)
         try:
             if self.before_execute:

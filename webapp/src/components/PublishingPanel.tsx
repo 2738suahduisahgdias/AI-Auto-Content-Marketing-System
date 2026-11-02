@@ -1,4 +1,4 @@
-import {useContentDraft} from "@/lib/contentDraft";
+import {useContentDraft,hasContentDraft} from "@/lib/contentDraft";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink, LoaderCircle, LogIn, RotateCcw, Save, Send, ShieldAlert, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -102,7 +102,7 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
       setForms(current => Object.fromEntries(platforms.map(platform => {
         const target = data.batch?.targets.find(item => item.platform === platform);
         const fallback = targetDefaults(currentSource, platform, fieldsFor(platform), target);
-        return [platform, (dirty.current.has(platform) || localStorage.getItem(`yingxu:content-draft:v1:publishing:${kind}:${sourceId}:${sourceFileId||0}:forms`)) && current[platform] ? current[platform] : fallback];
+        return [platform, (dirty.current.has(platform) || hasContentDraft(`publishing:${kind}:${sourceId}:${sourceFileId||0}:forms`)) && current[platform] ? current[platform] : fallback];
       })));
       setLoadError("");
     } catch (error) {

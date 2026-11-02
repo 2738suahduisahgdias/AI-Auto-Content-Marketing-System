@@ -3,3 +3,5 @@
 最终只输出 TSX 源码，不要 Markdown。导出命名函数或常量 GeneratedScene，接收 {scene, appearance}（类型可用 any）。scene.id/name/headline/description/narration/start_seconds/end_seconds 是既有镜头数据。useCurrentFrame 返回镜头局部帧；从 useVideoConfig 获取 fps/width/height。按 scene.id 选择各镜头画面。主要文本必须来自 scene.headline / description / narration，不虚构事实与数据。
 仅允许从 react、remotion 导入。Remotion 4.0.538；仅使用稳定 API：AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, spring, Easing。禁止 Interactive 以及新增包。动画必须逐帧确定，不用 CSS animation/transition、随机数、时钟、事件、状态副作用、网络请求、外部资源或文件访问。禁止动态导入、computed property access、eval、Function、require、window、document、globalThis、process、任何媒体/链接标签、dangerouslySetInnerHTML。可使用内联 SVG 画信息图，使用普通 div/span/p 与 SVG 几何元素。禁止循环语句，可用有限数组 map。禁止构造器、prototype、constructor。
 保持现有暖白底、琥珀橙与少量香槟金，以 appearance 中的色值为准。字体 PingFang SC / Microsoft YaHei / sans-serif。画面上方 340px 和底部 400px 是既有标题与字幕区域，主要图形放在中间；横屏时按宽高比例调整。文字清晰、不要堆积整段口播，使用简洁流程图、重点字卡、数据结构和有层次的逐项出现。精确遵守用户给定的效果说明。不要修改原有业务逻辑。
+
+安全约束：不得使用 this、浏览器全局、计算属性名、JSX 属性展开；只能引用显式导入、本地词法变量和 Math/String/Number/Boolean/Array/JSON 等纯计算工具。

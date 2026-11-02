@@ -81,6 +81,8 @@ class V2Application:
         self.review_api = ReviewAPI(self, self.review)
         self.schedule_api = ScheduleAPI(self, self.schedule)
         self.agent_api = AgentAPI(self, db_path)
+        from content_workbench.storage.drafts import DraftStore
+        self.drafts = DraftStore(db_path)
         self.secret = secrets.token_bytes(32)
         self.sessions = set()
         # Cookies are shared across localhost ports: isolate each workspace.
@@ -152,6 +154,10 @@ class V2Application:
             body = handler.read_json() if method in ("POST", "PUT", "PATCH") and path not in ("/api/v2/assets", "/api/review/uploads") else None
             if path.startswith("/api/v2/license") and method == "POST" and not isinstance(body, dict):
                 raise DomainError("LICENSE_INPUT", "授权请求格式无效")
+            if path == '/api/v2/content-drafts' and method == 'GET':
+                return self.response(handler, self.drafts.bootstrap())
+            if path == '/api/v2/content-drafts' and method == 'PUT':
+                return self.response(handler, self.drafts.save(body or {}))
             if path == "/api/v2/runtime-readiness" and method == "GET":
                 from content_workbench.readiness import runtime_readiness
                 return self.response(handler, runtime_readiness(self))

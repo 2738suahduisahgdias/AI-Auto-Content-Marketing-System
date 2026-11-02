@@ -17,6 +17,7 @@ class ClientTests(unittest.TestCase):
         def send(*a): self.inbox.ingest.assert_called_once(); return {}
         self.transport.side_effect=send
         self.c.process(self.msg)
+        self.c.flush_acks()
         self.assertEqual(self.inbox.ingest.call_args.args[0]['msgid'],'weixin:bot:7522849335951112840')
     def test_failure_never_acknowledges_or_advances(self):
         self.transport.return_value={'msgs':[self.msg],'get_updates_buf':'after'}
@@ -52,3 +53,22 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(self.c.state,{})
         self.inbox.ingest.assert_not_called()
         self.assertNotIn('secret',self.c.path.read_text())
+
+    def test_failed_receipt_does_not_block_second_message_or_cursor(self):
+        second={**self.msg,'message_id':2}
+        cursors=[]
+        def request(base,endpoint,body=None,token=''):
+            if endpoint.endswith('getupdates'):
+                cursors.append(body['get_updates_buf'])
+                return {'msgs':[self.msg,second] if len(cursors)==1 else [],'get_updates_buf':'after'}
+            raise ValueError('receipt rejected')
+        self.c.request=request
+        self.c.run_once()
+        self.assertEqual(self.inbox.ingest.call_count,2)
+        self.assertEqual(self.c.state['cursor'],'after')
+        restarted=WechatClient(self.tmp.name,self.inbox,request)
+        for _ in range(5):restarted.run_once()
+        self.assertEqual(cursors,['before']+['after']*5)
+        self.assertEqual(restarted.state['pending_acks'],{})
+        self.assertEqual(restarted.state['failed_receipts'],2)
+        self.assertIn('不影响接收',restarted.status()['error'])

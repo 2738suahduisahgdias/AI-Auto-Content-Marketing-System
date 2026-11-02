@@ -31,6 +31,7 @@ export class ApiError extends Error {
 }
 
 export async function api<T = any>(path: string, options: RequestInit = {}, recovered = false): Promise<T> {
+  if(path==='/api/workspace/select')await (await import('./contentDraft')).flushContentDrafts();
   const method = (options.method || "GET").toUpperCase();
   const headers = new Headers(options.headers);
   if (method !== "GET") {

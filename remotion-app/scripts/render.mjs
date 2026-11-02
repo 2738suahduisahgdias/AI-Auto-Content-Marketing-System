@@ -1,9 +1,11 @@
 import {bundle} from '@remotion/bundler';
-import {renderMedia, renderStill, selectComposition} from '@remotion/renderer';
+import {renderMedia, renderStill, selectComposition, openBrowser} from '@remotion/renderer';
 import {createHash} from 'node:crypto';
 import {existsSync} from 'node:fs';
-import {cp, mkdir, readFile, readdir} from 'node:fs/promises';
+import {mkdir, readFile, readdir} from 'node:fs/promises';
 import path from 'node:path';
+import {isolateRenderBrowser} from './render-isolation.mjs';
+import {prepareRenderAssets} from './render-assets.mjs';
 
 const root = process.cwd();
 const args = process.argv.slice(2);
@@ -32,48 +34,34 @@ const walk = async directory => {
 
 const sourceFiles = [...await walk(path.join(root, 'src')), ...(entry===path.join(root,'src/index.ts')?[]:await walk(path.dirname(entry))), path.join(root, 'remotion.config.ts'), path.join(root, 'package-lock.json')].sort();
 const hash = createHash('sha256');
-hash.update(entry);
+hash.update('selective-assets-v2').update(entry);
 for (const file of sourceFiles) hash.update(file).update(await readFile(file));
 const bundleDir = path.join(root, 'out', 'bundle-cache', hash.digest('hex').slice(0, 20));
 const bundleExists = existsSync(path.join(bundleDir, 'index.html'));
+const emptyPublic = path.join(root, 'out', 'empty-public');
+await mkdir(emptyPublic, {recursive:true});
 const serveUrl = bundleExists ? bundleDir : await bundle({
   entryPoint: entry,
   outDir: bundleDir,
-  publicDir: path.join(root, 'public-static'),
+  publicDir: emptyPublic,
   enableCaching: true,
   onProgress: progress => console.log(JSON.stringify({stage: 'bundle', progress})),
 });
 
-// Migrated task media can be added after a compiled bundle is cached.
-const yingxuAssets = path.join(root, 'public-static', 'yingxu-assets');
-if (existsSync(yingxuAssets)) await cp(yingxuAssets, path.join(bundleDir, 'public', 'yingxu-assets'), {recursive: true});
-
-// Copy only files referenced by this render, never every historical task video.
+// The bundle contains code only. Link/copy exactly the assets referenced by this render.
 const props = JSON.parse(await readFile(propsPath, 'utf8'));
-const referenced = new Set();
-const inspect = value => {
-  if (typeof value === 'string' && value.startsWith('assets/')) referenced.add(value);
-  else if (Array.isArray(value)) value.forEach(inspect);
-  else if (value && typeof value === 'object') Object.values(value).forEach(inspect);
-};
-inspect(props);
-for (const relative of referenced) {
-  const source = path.resolve(root, 'public', relative);
-  const base = path.resolve(root, 'public', 'assets') + path.sep;
-  if (!source.startsWith(base)) throw new Error('Invalid render media path');
-  const destination = path.resolve(bundleDir, 'public', relative);
-  await mkdir(path.dirname(destination), {recursive: true});
-  await cp(source, destination);
-}
+await prepareRenderAssets(root, bundleDir, props);
 
-const composition = await selectComposition({serveUrl, id: compositionId, inputProps: props, timeoutInMilliseconds: 120000});
+const browser = isolateRenderBrowser(await openBrowser('chrome'));
+try {
+const composition = await selectComposition({puppeteerInstance:browser,serveUrl, id: compositionId, inputProps: props, timeoutInMilliseconds: 120000});
 await mkdir(path.dirname(output), {recursive: true});
 if (output.endsWith('.png')) {
-  await renderStill({composition, serveUrl, output, inputProps: props, frame: Math.min(45, composition.durationInFrames - 1), scale});
+  await renderStill({puppeteerInstance:browser,composition, serveUrl, output, inputProps: props, frame: Math.min(45, composition.durationInFrames - 1), scale});
   console.log(JSON.stringify({stage: 'completed', bundle_reused: bundleExists, bundle_dir: bundleDir, output, kind: 'still'}));
-  process.exit(0);
-}
+} else {
 await renderMedia({
+  puppeteerInstance:browser,
   composition,
   serveUrl,
   timeoutInMilliseconds: 120000,
@@ -86,3 +74,6 @@ await renderMedia({
   onProgress: progress => console.log(JSON.stringify({stage: 'render', progress: progress.progress})),
 });
 console.log(JSON.stringify({stage: 'completed', bundle_reused: bundleExists, bundle_dir: bundleDir, output}));
+
+}
+} finally {await browser.close({silent:true});}

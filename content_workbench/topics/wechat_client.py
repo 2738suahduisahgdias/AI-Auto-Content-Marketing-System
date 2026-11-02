@@ -99,20 +99,42 @@ class WechatClient:
             'sender_id':self.state['owner'],'source':'local_clawbot','message_type':'text' if text else 'unknown',
             'text':text,'raw_payload':{'items':msg.get('item_list',[])}})
         if not record.get('id') or record.get('ingest_status') != 'saved': raise ValueError('入库未确认')
-        if msg.get('context_token'):
-            self.request(self.state['base'],'ilink/bot/sendmessage',{'msg':{
-                'from_user_id':'','to_user_id':self.state['owner'],'client_id':'yingxu-ack-'+mid,
-                'message_type':2,'message_state':2,'context_token':msg['context_token'],
-                'item_list':[{'type':1,'text_item':{'text':'已保存到待分类' if text else '已保存消息信息，附件尚未下载'}}]}},self.state['token'])
         if created: self.state['received'] = self.state.get('received',0)+1
+        if msg.get('context_token'):
+            pending = self.state.setdefault('pending_acks', {})
+            if mid not in pending and len(pending)>=256:
+                self.state['failed_receipts']=self.state.get('failed_receipts',0)+1
+                return
+            pending.setdefault(mid, {'context':msg['context_token'], 'text':'已保存到待分类' if text else '已保存消息信息，附件尚未下载', 'attempts':0})
+
+    def flush_acks(self):
+        # Receipt delivery is best-effort; it must never roll back durable ingestion.
+        pending = self.state.setdefault('pending_acks', {})
+        failed = self.state.get('failed_receipts', 0)
+        for mid, ack in list(pending.items())[:8]:
+            try:
+                self.request(self.state['base'],'ilink/bot/sendmessage',{'msg':{
+                    'from_user_id':'','to_user_id':self.state['owner'],'client_id':'yingxu-ack-'+mid,
+                    'message_type':2,'message_state':2,'context_token':ack['context'],
+                    'item_list':[{'type':1,'text_item':{'text':ack['text']}}]}},self.state['token'])
+                del pending[mid]
+            except Exception:
+                ack['attempts'] += 1
+                if ack['attempts'] >= 3:
+                    del pending[mid]
+                    failed += 1
+                break  # One unavailable reply endpoint must not delay the next receive poll.
+        self.state['failed_receipts'] = failed
+        self.save()
+        self.error = '内容已入库；部分微信保存回执发送失败，不影响接收后续消息。' if pending or failed else ''
 
     def run_once(self):
         data = self.request(self.state['base'],'ilink/bot/getupdates',{'get_updates_buf':self.state.get('cursor','')},self.state['token'])
         for msg in data.get('msgs',[]): self.process(msg)
-        # Commit cursor only after all messages are persisted and replies succeed.
+        # Persist the ingestion cursor and outbox before attempting replies.
         self.state['cursor'] = data.get('get_updates_buf',self.state.get('cursor',''))
         self.save()
-        self.error = ''
+        self.flush_acks()
 
     def start(self):
         if not self.state.get('token') or (self.thread and self.thread.is_alive()): return

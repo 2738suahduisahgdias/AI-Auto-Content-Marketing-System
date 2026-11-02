@@ -63,9 +63,12 @@ class LocalDesktopFlows(unittest.TestCase):
   job=JobStore(app.DB_PATH).enqueue('article.draft',{},'migration-test')
   wb=Workbench(app.DB_PATH,self.root);article=wb.create_item('article','wechat_official_account','保留文章',{})
   revision=wb.save_revision(article['id'],'draft',{'text':'完整保留的文章正文'},article['version'])
+  from content_workbench.storage.drafts import DraftStore
+  drafts=DraftStore(app.DB_PATH);drafts.save({'key':'article:new:title','data':'迁移草稿','expected_revision':0});identity=drafts.bootstrap()['workspace_id']
   before=file_hash(self.clip);export_workspace(app.DB_PATH,self.root,package)
   self.clip.rename(self.base/'offline-original.mp4')
   restore_workspace(package,destination)
+  restored_drafts=DraftStore(destination/'data/content-agent.db').bootstrap();self.assertEqual(restored_drafts['drafts'][0]['data'],'迁移草稿');self.assertNotEqual(restored_drafts['workspace_id'],identity)
   with mock.patch.object(app,'ROOT',destination),mock.patch.object(app,'DB_PATH',destination/'data/content-agent.db'):
    with app.connect() as c:task=app.get_task(c,self.task['content_id'])
    self.assertEqual(task['source']['yingxu']['revision'],1)

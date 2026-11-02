@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
 ''')
 subprocess.run(['/usr/bin/clang','-Os',str(launcher_source),'-o',str(launcher)],check=True)
 shutil.copyfile(repo/'desktop/assets/Workbench.icns',contents/'Resources/Workbench.icns')
-with (contents/'Info.plist').open('wb') as f:plistlib.dump({'CFBundleExecutable':'launcher','CFBundleIconFile':'Workbench.icns','CFBundleIdentifier':'com.yingxu.workbench','CFBundleName':'映序工作台','CFBundleVersion':'0.1.3.2','CFBundleShortVersionString':'0.1.3.2','NSAppleEventsUsageDescription':'用于找到并唤起已有的 Chrome 工作台标签，避免重复打开页面。','CFBundlePackageType':'APPL','LSMinimumSystemVersion':subprocess.check_output(['sw_vers','-productVersion'],text=True).strip().split('.')[0]+'.0'},f)
+with (contents/'Info.plist').open('wb') as f:plistlib.dump({'CFBundleExecutable':'launcher','CFBundleIconFile':'Workbench.icns','CFBundleIdentifier':'com.yingxu.workbench','CFBundleName':'映序工作台','CFBundleVersion':'0.1.3.3','CFBundleShortVersionString':'0.1.3.3','NSAppleEventsUsageDescription':'用于找到并唤起已有的 Chrome 工作台标签，避免重复打开页面。','CFBundlePackageType':'APPL','LSMinimumSystemVersion':subprocess.check_output(['sw_vers','-productVersion'],text=True).strip().split('.')[0]+'.0'},f)
 subprocess.run(['codesign','--force','--deep','--sign','-',str(app)],check=True)
 volume=out/'volume';volume.mkdir(exist_ok=True)
 clone(app,volume/app.name)

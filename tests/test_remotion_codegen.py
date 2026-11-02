@@ -46,6 +46,6 @@ class RemotionCodegenCase(unittest.TestCase):
   self.assertEqual(model.call_count,2);self.assertEqual(list(self.root.glob('assets/remotion-code/**/manifest.json')),[])
  def test_validator_rejects_network_and_dynamic_import_but_accepts_scene(self):
   directory=PROJECT_ROOT/'remotion-app';script=directory/'scripts/validate-generated.mjs';path=self.root/'test.tsx'
-  for code,valid in [(CODE,True),(CODE+'\nfetch("https://example.com");',False),(CODE+'\nimport("node:fs");',False),(CODE+'\nwhile(true){}',False)]:
+  for code,valid in [(CODE,True),(CODE+'\nfetch("https://example.com");',False),(CODE+'\nimport("node:fs");',False),(CODE+'\nwhile(true){}',False),(CODE+"\nconst {['fe'+'tch']:send}=self;send('ht'+'tps://example.invalid/');",False),(CODE+'\nconst x=()=>this;',False)]:
    path.write_text(code);r=subprocess.run(['node',str(script),str(path)],cwd=directory,capture_output=True,text=True)
    self.assertEqual(r.returncode==0,valid,r.stderr)

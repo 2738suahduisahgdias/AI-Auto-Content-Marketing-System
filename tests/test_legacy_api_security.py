@@ -79,6 +79,23 @@ class LegacyAPISecurityCase(unittest.TestCase):
         self.assertEqual(200, status)
         self.assertEqual(1, len(bootstrap["tasks"]))
 
+    def test_drafts_are_saved_with_csrf_and_restored_after_service_restart(self):
+        browser=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+        browser.open(self.base+'/').close()
+        _,bootstrap=self.request(browser,'/api/topics/bootstrap')
+        status,first=self.request(browser,'/api/v2/content-drafts')
+        self.assertEqual(status,200)
+        body={'key':'article:new:title','data':'跨端口持久化内容','expected_revision':0}
+        status,_=self.request(browser,'/api/v2/content-drafts','PUT',body)
+        self.assertEqual(status,403)
+        status,_=self.request(browser,'/api/v2/content-drafts','PUT',body,{'X-CSRF-Token':bootstrap['csrf_token']})
+        self.assertEqual(status,200)
+        app.V2.stop();app.V2=V2Application(app.DB_PATH,app.ROOT,app.create_task)
+        browser.open(self.base+'/').close()
+        status,restored=self.request(browser,'/api/v2/content-drafts')
+        self.assertEqual(status,200);self.assertEqual(restored['workspace_id'],first['workspace_id'])
+        self.assertEqual(restored['drafts'][0]['data'],body['data'])
+
 
 if __name__ == "__main__":
     unittest.main()
