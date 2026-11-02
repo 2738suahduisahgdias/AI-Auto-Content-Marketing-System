@@ -8,7 +8,7 @@ from pathlib import Path
 from content_workbench.domain.errors import DomainError
 from content_workbench.storage.db import PROJECT_ROOT
 
-GENERATOR_VERSION = 'yingxu-scene-code-v2'
+GENERATOR_VERSION = 'yingxu-scene-code-v4'
 SKILLS = PROJECT_ROOT / 'skills/remotion/remotion-best-practices'
 
 
@@ -48,15 +48,15 @@ registerRoot(Root);
 def prepare_scene_code(task, appearance, runtime, root, generate, validate):
     snapshot = task.get('source', {}).get('yingxu', {}).get('snapshot', {})
     shots = snapshot.get('shots') or []
-    code_shots = [{'id': str(index), 'shot': {key: shot[key] for key in ('title','label','text','desc','duration','visual','motion','effect','template') if key in shot}} for index, shot in enumerate(shots)
+    code_shots = [{'id': str(index), 'shot': {key: shot[key] for key in ('title','label','text','desc','duration','visual','motion','effect','template','purpose','emphasis','sound_effect','layout','action','cue','sound','criteria') if key in shot}} for index, shot in enumerate(shots)
                   if shot.get('source') == 'Remotion 代码' and not shot.get('fileId')]
     if not code_shots:
         return None
     docs, lock = skill_documents()
     request = {'contract': GENERATOR_VERSION, 'runtime_remotion': '4.0.538',
                'title': (snapshot.get('manuscript') or {}).get('title', task.get('title', '')),
-               'format': snapshot.get('format'), 'appearance': appearance, 'shots': code_shots,
-               'creative_brief': {key: snapshot[key] for key in ('template','reference','brand','brief') if key in snapshot},
+               'format': snapshot.get('format'), 'output_geometry': {'width':1920 if '横屏' in str(snapshot.get('format','')) else 1080,'height':1080 if '横屏' in str(snapshot.get('format','')) else 1920}, 'appearance': appearance, 'shots': code_shots,
+               'creative_brief': {key: snapshot[key] for key in ('template','reference','brand','brief','scene','audience','goal','structure','effectName','effectPrompt','directorPlan') if key in snapshot},
                'skill_commit': lock['commit'], 'skill_documents': docs}
     serialized = json.dumps(request, ensure_ascii=False, sort_keys=True)
     fingerprint = hashlib.sha256(serialized.encode()).hexdigest()

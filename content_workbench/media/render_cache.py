@@ -11,12 +11,14 @@ _leases = threading.local()
 NAME = re.compile(r'^[0-9a-f]{64}\.[a-z0-9]+(?:\.[0-9a-f]{32}\.staging)?$')
 
 @contextmanager
-def lease(directory):
+def lease(directory, allow_reentry=True):
     directory = Path(directory)
     directory.parent.mkdir(parents=True, exist_ok=True)
     key = str((directory.parent / '.yingxu-cache.lock').resolve())
     held = getattr(_leases, 'held', {})
     if key in held:
+        if not allow_reentry:
+            raise DomainError('RENDER_CACHE_BUSY', '正在渲染或整理缓存，请完成后重试', 409)
         held[key] += 1
         try: yield
         finally: held[key] -= 1

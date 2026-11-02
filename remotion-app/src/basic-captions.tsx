@@ -65,7 +65,7 @@ const BasicCaptionsContent: React.FC<BasicCaptionsProps> = ({
 						fontSize: 42,
 						fontWeight: 400,
 						lineHeight: 1.35,
-						maxWidth: 860,
+						maxWidth: Math.max(100, width - 40),
 						padding: '14px 22px',
 						textAlign: 'center',
 						textWrap: 'balance',

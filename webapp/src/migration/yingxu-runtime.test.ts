@@ -59,3 +59,35 @@ it('all video stages remain clickable without eval under strict CSP',async()=>{
  expect(blocked).not.toHaveBeenCalled();
  } finally {blocked.mockRestore()}
 });
+
+it('uses a real whole-video directing proposal and preserves original shots until adopted',async()=>{
+ const root=document.createElement('div');document.body.append(root);root.innerHTML='<span id="crumb"></span><small id="saved"></small><div id="main"></div><div id="modal" hidden></div><div id="toast"></div><input id="upload" type="file">';
+ const candidate={palette:{background:'#111111',text:'#EEEEEE',accent:'#D7B56D'},shots:[{title:'第一幕',text:'第一句。',purpose:'提出问题',desc:'曲线下降',motion:'绘制曲线',duration:3,source:'Remotion 代码'},{title:'第二幕',text:'第二句。',purpose:'解释机制',desc:'路径重连',motion:'线条接续',duration:3,source:'Remotion 代码'}],duration_seconds:6,style_summary:'黑白线条',timing_note:'前后递进',duration_source:'uploaded_narration'};
+ const planVideo=vi.fn().mockResolvedValue({candidate,input_hash:'real-input'}),change=vi.fn();
+ dispose=mountYingxu(root,vi.fn(),vi.fn(),vi.fn(),{initial:{stage:0,workflowV3:true,authoringV1:true,topics:[],shots:[{title:'旧分镜',text:'旧段落',duration:30,source:'Remotion 代码'}],manuscript:{title:'知识讲解',text:'第一句。\n\n第二句。',versions:[]}},onChange:change,upload:vi.fn(),planVideo});
+ fireEvent.click(within(root).getByRole('button',{name:'AI 生成视频方案 →'}));
+ await waitFor(()=>expect(within(root).getByText('整片编导方案 · 尚未采用')).toBeTruthy());
+ expect(planVideo).toHaveBeenCalledTimes(1);expect(change.mock.lastCall?.[0].shots[0].title).toBe('旧分镜');
+ fireEvent.click(within(root).getByText('采用此方案（原分镜保留历史）'));
+ expect(change.mock.lastCall?.[0].directorPlan.palette).toEqual(candidate.palette);expect(change.mock.lastCall?.[0].shots).toHaveLength(2);expect(change.mock.lastCall?.[0].storyboardHistory[0].shots[0].title).toBe('旧分镜');
+ expect(change.mock.lastCall?.[0].shots.map((s:any)=>s.text).join('')).toBe('第一句。第二句。');
+});
+
+it('renders a real sample into the sample player without a fake arrangement confirmation',async()=>{
+ const root=document.createElement('div');document.body.append(root);root.innerHTML='<span id="crumb"></span><small id="saved"></small><div id="main"></div><div id="modal" hidden></div><div id="toast"></div><input id="upload" type="file">';
+ const renderVideo=vi.fn().mockResolvedValue({id:9,url:'/api/files/9/media',original_name:'real-preview.mp4',media_info:{yingxu_preview:true}});
+ dispose=mountYingxu(root,vi.fn(),vi.fn(),vi.fn(),{initial:{stage:2,workflowV3:true,authoringV1:true,topics:[],shots:[{title:'代码画面',text:'讲解',duration:6,source:'Remotion 代码'}],manuscript:{title:'视频',text:'讲解',versions:[]}},onChange:vi.fn(),upload:vi.fn(),renderVideo});
+ expect(within(root).queryByText('确认编排，继续分段制作')).toBeNull();
+ fireEvent.click(within(root).getByRole('button',{name:'渲染前 6 秒样片'}));
+ await waitFor(()=>expect(root.querySelector('video[aria-label="真实渲染样片"]')?.getAttribute('src')).toBe('/api/files/9/media'));
+ expect(renderVideo).toHaveBeenCalledWith(true,undefined);
+});
+
+
+it('checks a real code film against narration duration without demo missing-asset or 30-second warnings',()=>{
+ const root=document.createElement('div');document.body.append(root);root.innerHTML='<span id="crumb"></span><small id="saved"></small><div id="main"></div><div id="modal" hidden></div><div id="toast"></div><input id="upload" type="file">';
+ dispose=mountYingxu(root,vi.fn(),vi.fn(),vi.fn(),{initial:{stage:3,reviewed:true,workflowV3:true,authoringV1:true,topics:[],voiceFileId:1,voiceDuration:147,rhythm:'旁白驱动',nativeFinal:{id:10,url:'/api/files/10/media',stale:false},shots:[{title:'代码画面',text:'完整原稿',duration:147,source:'Remotion 代码',status:'待制作'}],manuscript:{title:'视频',text:'完整原稿',versions:[]}},onChange:vi.fn(),upload:vi.fn()});
+ expect(within(root).getByText('真实成片已生成 · 1 个代码镜头')).toBeTruthy();
+ expect(within(root).getByText('147 秒 / 旁白实际时长 147 秒')).toBeTruthy();
+ expect(root.textContent).not.toContain('目标 30 秒');expect(root.textContent).not.toContain('个分镜待准备');expect(root.textContent).not.toContain('未配置录音');
+});

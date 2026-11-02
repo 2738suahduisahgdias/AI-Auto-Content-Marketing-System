@@ -20,7 +20,7 @@ class RemotionCodegenCase(unittest.TestCase):
  def test_official_skill_is_present_and_actual_documents_are_sent_to_generation(self):
   generate=Mock(return_value=CODE)
   result=prepare_scene_code(self.task,{},self.runtime,self.root,generate,Mock())
-  request=json.loads(generate.call_args[0][0]);self.assertEqual(request['skill_documents'][0]['path'],'SKILL.md')
+  request=json.loads(generate.call_args[0][0]);self.assertEqual(request['skill_documents'][0]['path'],'SKILL.md');self.assertEqual(request['output_geometry'],{'width':1080,'height':1920})
   self.assertIn('name: remotion-best-practices',request['skill_documents'][0]['content'])
   self.assertTrue(any('useCurrentFrame' in doc['content'] for doc in request['skill_documents']))
   self.assertEqual(len(result['skill_commit']),40);self.assertTrue(Path(result['entry']).is_file())
@@ -46,6 +46,6 @@ class RemotionCodegenCase(unittest.TestCase):
   self.assertEqual(model.call_count,2);self.assertEqual(list(self.root.glob('assets/remotion-code/**/manifest.json')),[])
  def test_validator_rejects_network_and_dynamic_import_but_accepts_scene(self):
   directory=PROJECT_ROOT/'remotion-app';script=directory/'scripts/validate-generated.mjs';path=self.root/'test.tsx'
-  for code,valid in [(CODE,True),(CODE+'\nfetch("https://example.com");',False),(CODE+'\nimport("node:fs");',False),(CODE+'\nwhile(true){}',False),(CODE+"\nconst {['fe'+'tch']:send}=self;send('ht'+'tps://example.invalid/');",False),(CODE+'\nconst x=()=>this;',False)]:
+  for code,valid in [(CODE,True),(CODE.replace('<div>{scene.headline}</div>','<div>{scene.headline}<br/>下一行</div>'),True),(CODE+'\nfetch("https://example.com");',False),(CODE+'\nimport("node:fs");',False),(CODE+'\nwhile(true){}',False),(CODE+"\nconst {['fe'+'tch']:send}=self;send('ht'+'tps://example.invalid/');",False),(CODE+'\nconst x=()=>this;',False)]:
    path.write_text(code);r=subprocess.run(['node',str(script),str(path)],cwd=directory,capture_output=True,text=True)
    self.assertEqual(r.returncode==0,valid,r.stderr)

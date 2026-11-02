@@ -51,6 +51,7 @@ export type TalkingHeadProps = {
   durationSeconds: number;
   appearance?: Partial<TalkingHeadAppearance>;
   preview?: boolean;
+  presentationMode?: "legacy" | "project";
   sceneRenderer?: React.ComponentType<{scene: TalkingHeadScene; appearance: TalkingHeadAppearance}>;
   storyboard?: {schema_version: string; engine_version: string; seed: number};
 };
@@ -82,8 +83,9 @@ export const VideoComposition: React.FC<TalkingHeadProps> = ({
   captions,
   appearance,
   sceneRenderer,
+  presentationMode = "legacy",
 }) => {
-  const {fps} = useVideoConfig();
+  const {fps, width, height} = useVideoConfig();
   const theme = {...defaultAppearance, ...appearance};
   return (
     <div style={{position: "absolute", inset: 0, background: theme.background}}>
@@ -97,12 +99,13 @@ export const VideoComposition: React.FC<TalkingHeadProps> = ({
           durationInFrames={Math.max(1, Math.round((scene.end_seconds - scene.start_seconds) * fps))}
           premountFor={fps}
         >
+          {(presentationMode === "project" || (sceneRenderer && !scene.media)) ? <SceneLayer scene={scene} appearance={theme} renderer={sceneRenderer}/> :
           <SceneFade durationSeconds={scene.end_seconds - scene.start_seconds}>
             <SceneLayer scene={scene} appearance={theme} renderer={sceneRenderer} />
-          </SceneFade>
+          </SceneFade>}
         </Sequence>
       ))}
-      <div
+      {presentationMode !== "project" && !sceneRenderer && <div
         style={{
           position: "absolute",
           top: 86,
@@ -121,10 +124,10 @@ export const VideoComposition: React.FC<TalkingHeadProps> = ({
         <div style={{fontSize: 44, fontWeight: 700, lineHeight: 1.35, textWrap: "balance", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden"}}>
           {title}
         </div>
-      </div>
+      </div>}
       <BasicCaptions
-        width={900}
-        style={{position: "absolute", bottom: 150, translate: "90px 0px"}}
+        width={Math.min(width - 80, 1200)}
+        style={{position: "absolute", bottom: Math.round(height * 0.06), left:"50%", transform:"translateX(-50%)"}}
         captions={captions}
         captionBackground={theme.captionBackground}
         captionColor={theme.captionColor}

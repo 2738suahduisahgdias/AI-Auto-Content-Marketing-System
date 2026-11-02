@@ -16,7 +16,7 @@ function isReference(n){
 }
 const allowed=new Set(['AbsoluteFill','useCurrentFrame','useVideoConfig','interpolate','spring','Easing']);
 const forbidden=new Set(['window','document','globalThis','global','process','fetch','XMLHttpRequest','WebSocket','Worker','eval','Function','require','navigator','location','localStorage','sessionStorage','indexedDB','constructor','prototype','__proto__','setTimeout','setInterval','requestAnimationFrame','Date','crypto','useEffect','useLayoutEffect','useState','dangerouslySetInnerHTML','innerHTML','createElement']);
-const tags=new Set(['div','span','p','strong','b','em','section','h1','h2','h3','svg','g','path','rect','circle','line','polyline','polygon','ellipse','text','tspan','defs','linearGradient','stop','clipPath']);
+const tags=new Set(['div','span','p','br','strong','b','em','section','h1','h2','h3','svg','g','path','rect','circle','line','polyline','polygon','ellipse','text','tspan','defs','linearGradient','stop','clipPath']);
 const components=new Set(['React.Fragment']);
 function declarations(n){if(ts.isFunctionDeclaration(n)&&n.name)components.add(n.name.text);if(ts.isVariableDeclaration(n)&&n.initializer&&(ts.isArrowFunction(n.initializer)||ts.isFunctionExpression(n.initializer)))components.add(n.name.getText(tree));ts.forEachChild(n,declarations)}
 declarations(tree);

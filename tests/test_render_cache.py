@@ -41,7 +41,7 @@ class RenderCacheTest(unittest.TestCase):
             self.assertIn('正在渲染或整理缓存', child.stderr)
             with self.assertRaises(app.ApiError):app.manage_yingxu_cache({'action':'clear'})
             with self.assertRaises(DomainError):
-                with lease(self.directory):pass
+                with lease(self.directory, allow_reentry=False):pass
         self.assertEqual(app.manage_yingxu_cache({'action':'limit','limit_gb':3})['limit_gb'],3)
         for invalid in [0,1001,True,1.2,'2']:
             with self.assertRaises(app.ApiError):app.manage_yingxu_cache({'action':'limit','limit_gb':invalid})

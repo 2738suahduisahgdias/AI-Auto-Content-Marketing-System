@@ -74,3 +74,37 @@ class RecordedTimelineCase(unittest.TestCase):
             with self.assertRaises(app.ApiError):app.render_yingxu(self.task,{'revision':1,'preview':False})
         with app.connect() as conn:
             self.assertEqual(conn.execute("SELECT count(*) FROM files WHERE content_id=? AND kind='video'",(self.task['content_id'],)).fetchone()[0],0)
+
+    def test_navigation_autosave_does_not_discard_completed_render(self):
+        import app,shutil
+        def render(props,output,**kwargs):
+            subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i','color=c=blue:s=160x240:d=8','-f','lavfi','-i','sine=frequency=440:duration=8','-c:v','libx264','-c:a','aac','-shortest',str(output)],check=True)
+            app.save_yingxu(self.task,{'revision':1,'snapshot':{**self.snapshot,'stage':3,'sampleReady':True}})
+        with mock.patch.object(app,'run_remotion_render',side_effect=render),mock.patch.object(app,'prepare_yingxu_remotion_code',return_value=None):
+            result=app.render_yingxu(self.task,{'revision':1,'preview':False})
+        self.assertFalse(result['media_info']['yingxu_stale'])
+        self.assertEqual(result['kind'],'video')
+
+    def test_real_visual_change_preserves_old_result_as_history(self):
+        import app
+        def render(props,output,**kwargs):
+            subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i','color=c=blue:s=160x240:d=8','-f','lavfi','-i','sine=frequency=440:duration=8','-c:v','libx264','-c:a','aac','-shortest',str(output)],check=True)
+            app.save_yingxu(self.task,{'revision':1,'snapshot':{**self.snapshot,'effectPrompt':'换成黑白线条动画'}})
+        with mock.patch.object(app,'run_remotion_render',side_effect=render),mock.patch.object(app,'prepare_yingxu_remotion_code',return_value=None):
+            result=app.render_yingxu(self.task,{'revision':1,'preview':False})
+        self.assertTrue(result['media_info']['yingxu_stale'])
+        with self.assertRaises(app.ApiError):app.handoff_yingxu(self.task,{'revision':2,'file_id':result['id']})
+
+
+class CreativeSignatureCase(unittest.TestCase):
+    def test_layout_and_director_timing_changes_are_creative_but_ui_selection_is_not(self):
+        import copy, app
+        base={'shots':[{'source':'Remotion 代码','text':'原稿','duration':3,'layout':'纵向'}],'directorPlan':{'timing_note':'缓慢展开'}}
+        original=app.yingxu_content_signature(base)
+        ui=copy.deepcopy(base);ui['selected']=[0];ui['shots'][0]['status']='已制作'
+        self.assertEqual(app.yingxu_content_signature(ui),original)
+        for field in ('layout','visual','effect','template','label'):
+            changed=copy.deepcopy(base);changed['shots'][0][field]='新要求'
+            self.assertNotEqual(app.yingxu_content_signature(changed),original)
+        changed=copy.deepcopy(base);changed['directorPlan']['timing_note']='快速递进'
+        self.assertNotEqual(app.yingxu_content_signature(changed),original)

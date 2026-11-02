@@ -830,13 +830,16 @@ def create_task(payload):
 
 def yingxu_content_signature(snapshot):
     manuscript = snapshot.get('manuscript', {})
-    keys = ('title', 'text', 'desc', 'duration', 'source', 'fileId', 'referenceFileId')
+    keys = ('title', 'text', 'desc', 'duration', 'source', 'fileId', 'referenceFileId','purpose','motion','action','emphasis','cue','sound','sound_effect','criteria','label','visual','effect','template','layout')
     return payload_hash({
         'manuscript': {key: manuscript.get(key, '') for key in ('title', 'text')},
         'shots': [{key: shot.get(key) for key in keys} for shot in snapshot.get('shots', [])],
         'format': snapshot.get('format') or '1080 × 1920 · 竖屏',
         'rhythm': snapshot.get('rhythm') or '音乐驱动 · 无旁白',
+        'captionsEnabled':snapshot.get('captionsEnabled',True),
         'voiceFileId': snapshot.get('voiceFileId'), 'bgmFileId': snapshot.get('bgmFileId'),
+        'visual':{key:snapshot.get(key) for key in ('scene','audience','goal','structure','effectName','effectPrompt','brand','reference','template','brief')},
+        'director_style':{key:(snapshot.get('directorPlan') or {}).get(key) for key in ('style_summary','palette','timing_note')},
     })
 
 
@@ -928,7 +931,7 @@ def manage_yingxu_cache(payload):
     if action not in ("clear", "limit"):
         raise ApiError(400, "缓存操作无效")
     try:
-        with lease(directory):
+        with lease(directory, allow_reentry=False):
             if action == "limit":
                 limit = payload.get("limit_gb")
                 if type(limit) is not int or not 1 <= limit <= 1000:
@@ -948,6 +951,26 @@ def task_proxy(source):
     from content_workbench.media.proxy import prepare
     info, _ = yingxu_cache_info()
     return prepare(source, Path(info["path"]), max(0, info["limit_gb"]*1024**3-info["bytes"]))
+
+
+def readable_yingxu_captions(captions):
+    result=[]
+    for caption in captions:
+        text=caption['text'].strip()
+        if not text:continue
+        parts=[]
+        for sentence in re.findall(r'[^。！？!?\n]+[。！？!?]?|[。！？!?]',text):
+            while len(sentence)>24:
+                cut=max(sentence.rfind('，',8,24),sentence.rfind(' ',8,24))
+                cut=cut+1 if cut>=8 else 24
+                parts.append(sentence[:cut]);sentence=sentence[cut:]
+            if sentence.strip():parts.append(sentence)
+        weight=sum(len(part) for part in parts);cursor=caption['startMs']
+        for i,part in enumerate(parts):
+            end=caption['endMs'] if i==len(parts)-1 else cursor+(caption['endMs']-caption['startMs'])*len(part)/weight
+            result.append({**caption,'text':part.strip(),'startMs':round(cursor),'endMs':round(end)})
+            cursor=end
+    return result
 
 
 def yingxu_render_props(task, preview=False, shot_index=None):
@@ -1043,13 +1066,17 @@ def yingxu_render_props(task, preview=False, shot_index=None):
     if elapsed > 3600:
         raise ApiError(400, "当前本地渲染单次支持一小时以内视频")
     props = {"title": snapshot.get("manuscript", {}).get("title", task["title"]), "scenes": scenes,
-             "captions": captions, "durationSeconds": min(10, elapsed) if preview else elapsed,
+             "presentationMode":"project", "captions": captions, "durationSeconds": min(10, elapsed) if preview else elapsed,
              "outputWidth": 1920 if str(snapshot.get("format", "")).startswith("1920") else 1080,
              "outputHeight": 1080 if str(snapshot.get("format", "")).startswith("1920") else 1920,
              "appearance": {"background": "#faf8f4", "sceneBackground": "#fffaf2", "textColor": "#29231c", "accentColor": "#c26918", "titleBackground": "#fffdf8", "sceneLabelBackground": "#fff1df", "captionBackground": "#392b20", "captionColor": "#ffffff", "variant": "enterprise"}}
+    palette=(snapshot.get('directorPlan') or {}).get('palette') or {}
+    if all(isinstance(palette.get(k),str) and re.fullmatch(r'#[0-9A-Fa-f]{6}',palette[k]) for k in ('background','text','accent')):
+        props['appearance'].update(background=palette['background'],sceneBackground=palette['background'],textColor=palette['text'],accentColor=palette['accent'],captionBackground=palette['background']+'E6',captionColor=palette['text'])
     for key, field in (("voiceFileId", "audio"), ("bgmFileId", "backgroundMusic")):
         if snapshot.get(key) and (key != "voiceFileId" or snapshot.get("rhythm") == "旁白驱动"):
             props[field], _ = media(snapshot[key], {".mp3", ".wav", ".m4a"})
+    props['captions']=readable_yingxu_captions(captions)
     if shot_index is not None:
         if not preview or type(shot_index) is not int or not 0 <= shot_index < len(scenes):
             raise ApiError(400, "选镜预览需要有效的分镜序号，不能用于全片导出")
@@ -1058,12 +1085,13 @@ def yingxu_render_props(task, preview=False, shot_index=None):
         length = min(10, scene["end_seconds"] - start)
         scene.update(start_seconds=0, end_seconds=length)
         props["scenes"] = [scene]
-        props["captions"] = [{**captions[shot_index], "startMs":0, "endMs":round(length * 1000)}]
+        props["captions"] = [{**c,"startMs":max(0,c["startMs"]-round(start*1000)),"endMs":min(round(length*1000),c["endMs"]-round(start*1000))} for c in props["captions"] if c["endMs"]>round(start*1000) and c["startMs"]<round((start+length)*1000)]
         props["durationSeconds"] = length
         props["previewSourceStartSeconds"] = start
         for key, segment_key in (("audio", "audioSegments"), ("backgroundMusic", "backgroundMusicSegments")):
             if props.get(key):
                 props[segment_key] = [{"src":props[key], "start_seconds":start, "end_seconds":start+length, "timeline_start_seconds":0}]
+    if snapshot.get('captionsEnabled') is False:props['captions']=[]
     return props
 
 
@@ -1077,6 +1105,27 @@ def render_yingxu(task, payload):
             return _render_yingxu(task, payload)
     except DomainError as error:
         raise ApiError(error.status,error.message)
+
+
+def yingxu_director_candidate(task, payload):
+    from content_workbench.media.yingxu_director import generate_plan
+    from content_workbench.providers.text import CodexCLIProvider, KimiCLIProvider
+    revision=task.get('source',{}).get('yingxu',{}).get('revision',0)
+    if payload.get('revision') != revision:raise ApiError(409,'项目已更新，请保存后重新规划')
+    config=agent_runtime('asset_planning_agent')
+    class Context:
+        def run_process(self, arguments, timeout, stage, cwd):
+            return run_process(arguments,timeout,MAX_CLI_OUTPUT,'Remotion编导',cwd)
+    def generate(prompt):
+        provider=KimiCLIProvider(ROOT) if config['engine']=='kimi_cli' else CodexCLIProvider()
+        return provider.complete_text(prompt,Context(),PROJECT_ROOT/'agents/remotion-director-agent.md',timeout=config['timeout_seconds'],stage='remotion_director')
+    with DB_LOCK:
+        if task['content_id'] in GENERATING:raise ApiError(409,'当前项目已有生成任务，请等待完成')
+        GENERATING.add(task['content_id'])
+    try:return generate_plan(task,generate)
+    except DomainError as error:raise ApiError(error.status,error.message)
+    finally:
+        with DB_LOCK:GENERATING.discard(task['content_id'])
 
 
 def prepare_yingxu_remotion_code(task, props):
@@ -1130,15 +1179,14 @@ def _render_yingxu(task, payload):
                 raise ApiError(502, "已配置声音但成片缺少音轨，结果未入库")
             with DB_LOCK, connect() as conn:
                 current = get_task(conn, task["content_id"])
-                if current.get("source", {}).get("yingxu", {}).get("revision") != version:
-                    raise ApiError(409, "渲染期间制作版本变化，请按最新版本重试")
+                stale = yingxu_content_signature(current.get('source',{}).get('yingxu',{}).get('snapshot',{})) != yingxu_content_signature(task.get('source',{}).get('yingxu',{}).get('snapshot',{}))
                 result = upload_file(current, "asset" if preview else "video", "yingxu-{}-v{}.mp4".format("preview" if preview else "final", version), output, studio=True)
             with DB_LOCK, connect() as conn:
-                result['media_info'].update({'yingxu_revision': version, 'yingxu_render_hash': payload_hash(props), 'yingxu_preview': preview})
+                result['media_info'].update({'yingxu_input_signature':yingxu_content_signature(task.get('source',{}).get('yingxu',{}).get('snapshot',{})),'yingxu_revision': version, 'yingxu_render_hash': payload_hash(props), 'yingxu_preview': preview,'yingxu_stale':stale})
                 if code:
                     result['media_info']['remotion_codegen'] = {key: value for key, value in code.items() if key != 'entry'}
                 conn.execute("UPDATE files SET media_info_json=? WHERE id=?", (json.dumps(result['media_info']), result['id']))
-                add_event(conn, task["content_id"], "映序本地渲染完成", "制作版本 {} · 文件 #{} · {}".format(version, result["id"], "样片" if preview else "成片"))
+                add_event(conn, task["content_id"], "映序本地渲染完成", "制作版本 {} · 文件 #{} · {}{}".format(version, result["id"], "样片" if preview else "成片", " · 输入已变化，保存为历史版本" if stale else ""))
             return result
         finally:
             output.unlink(missing_ok=True)
@@ -1160,6 +1208,13 @@ def handoff_yingxu(task, payload):
         revision = source.get("yingxu", {}).get("revision", 0)
         if payload.get("revision") != revision:
             raise ApiError(409, "制作版本已变化，请刷新后提交")
+        metadata=file.get('media_info',{})
+        signature=metadata.get('yingxu_input_signature')
+        if not signature and metadata.get('yingxu_revision'):
+            saved=conn.execute("SELECT payload_json FROM stage_revisions WHERE content_id=? AND stage='yingxu' AND revision_no=?",(task['content_id'],metadata['yingxu_revision'])).fetchone()
+            if saved:signature=yingxu_content_signature(json.loads(saved[0]))
+        if signature and signature!=yingxu_content_signature(source.get('yingxu',{}).get('snapshot',{})):
+            raise ApiError(409,'视觉要求、动作或文案已变化，请按当前方案重新渲染后交付')
         rendered_hash = file.get('media_info', {}).get('yingxu_render_hash')
         if rendered_hash and rendered_hash != payload_hash(yingxu_render_props(current)):
             raise ApiError(409, "当前文案、素材或声音已与成片不同，请重新渲染后交付")
@@ -2272,7 +2327,7 @@ def prepare_render_assets(task, mode, platform):
         raise ApiError(409, "已授权场景中没有可渲染的视频或图片", "asset_plan",
                        "至少关联一个 MP4/MOV/WebM 视频或 PNG/JPEG/WebP 图片；其他文件请改作授权凭证，或选择全部 Remotion。")
     props = {"title": render_card_text(task["title"], "企业 AI 落地实战", 42), "audio": render_media_url(audio["id"]),
-             "captions": captions, "durationSeconds": duration,
+             "presentationMode":"project", "captions": captions, "durationSeconds": duration,
              "scenes": [{key: value for key, value in scene.items() if not key.startswith("_")} for scene in scenes]}
     return build_storyboard(props, task["content_id"]), scenes, duration
 
@@ -3416,6 +3471,11 @@ class Handler(BaseHTTPRequestHandler):
                     task = get_task(conn, studio_upload.group(1))
                 body = (self.rfile, length)
                 self.json_response(upload_file(task, query.get("kind", ["asset"])[0], query.get("filename", [""])[0], body, studio=True), 201)
+                return
+            director = re.fullmatch(r"/api/tasks/(\d{8}-\d{3})/yingxu-director-candidate", path)
+            if director:
+                with connect() as conn: task = get_task(conn,director.group(1))
+                self.json_response(yingxu_director_candidate(task,self.read_json()))
                 return
             handoff = re.fullmatch(r"/api/tasks/(\d{8}-\d{3})/yingxu-handoff", path)
             if handoff:
