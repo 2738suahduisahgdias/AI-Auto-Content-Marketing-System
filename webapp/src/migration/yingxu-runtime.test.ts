@@ -67,7 +67,7 @@ it('uses a real whole-video directing proposal and preserves original shots unti
  dispose=mountYingxu(root,vi.fn(),vi.fn(),vi.fn(),{initial:{stage:0,workflowV3:true,authoringV1:true,topics:[],shots:[{title:'旧分镜',text:'旧段落',duration:30,source:'Remotion 代码'}],manuscript:{title:'知识讲解',text:'第一句。\n\n第二句。',versions:[]}},onChange:change,upload:vi.fn(),planVideo});
  fireEvent.click(within(root).getByRole('button',{name:'AI 生成视频方案 →'}));
  await waitFor(()=>expect(within(root).getByText('整片编导方案 · 尚未采用')).toBeTruthy());
- expect(planVideo).toHaveBeenCalledTimes(1);expect(change.mock.lastCall?.[0].shots[0].title).toBe('旧分镜');
+ expect(planVideo).toHaveBeenCalledTimes(1);expect(change.mock.lastCall?.[0].reference).toBe('');expect(change.mock.lastCall?.[0].shots[0].title).toBe('旧分镜');
  fireEvent.click(within(root).getByText('采用此方案（原分镜保留历史）'));
  expect(change.mock.lastCall?.[0].directorPlan.palette).toEqual(candidate.palette);expect(change.mock.lastCall?.[0].shots).toHaveLength(2);expect(change.mock.lastCall?.[0].storyboardHistory[0].shots[0].title).toBe('旧分镜');
  expect(change.mock.lastCall?.[0].shots.map((s:any)=>s.text).join('')).toBe('第一句。第二句。');
