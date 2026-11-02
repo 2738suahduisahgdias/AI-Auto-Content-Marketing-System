@@ -37,6 +37,7 @@ class SetupCase(unittest.TestCase):
             accounts.save_snapshot("douyin", {"account_name": "测试"}, [])
             data = setup_status(db)
             self.assertFalse(data["first_run"])
+            self.assertFalse(next(item for item in data["platforms"] if item["platform"] == "douyin")["verified"])
             self.assertEqual("snapshot", next(item for item in data["platforms"] if item["platform"] == "douyin")["status"])
             self.assertEqual("not_verified", next(item for item in data["platforms"] if item["platform"] == "wechat_channels")["status"])
 

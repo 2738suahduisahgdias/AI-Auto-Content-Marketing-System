@@ -91,6 +91,10 @@ class ReviewService(DeliveryReviewMixin):
         return self.create_batch(folder, rules, allow_empty=True)
 
     def add_upload(self, batch_id, filename, data):
+        import io
+        return self.add_upload_stream(batch_id, filename, io.BytesIO(data), len(data))
+
+    def add_upload_stream(self, batch_id, filename, stream, length):
         batch = self.get_batch(batch_id)
         expected = (self.root / "data/review-uploads").resolve()
         folder = Path(batch["source_folder"]).resolve()
@@ -99,12 +103,13 @@ class ReviewService(DeliveryReviewMixin):
         name = Path(filename or "").name
         if not name or Path(name).suffix.lower() not in VIDEO_EXTENSIONS:
             raise DomainError("REVIEW_UPLOAD_TYPE_INVALID", "仅支持 MP4、MOV、WebM 或 MKV", 422, "filename", "选择有效视频文件")
-        if not data or len(data) > 2 * 1024 ** 3:
+        if length <= 0 or length > 2 * 1024 ** 3:
             raise DomainError("REVIEW_FILE_TOO_LARGE", "视频为空或超过 2GB", 413, "file", "选择不超过 2GB 的视频")
-        path = (folder / name).resolve()
+        path = (folder / (new_id("upload") + "-" + name)).resolve()
         if folder not in path.parents:
             raise DomainError("REVIEW_UPLOAD_PATH_INVALID", "上传文件名无效", 422, "filename", "只提供文件名")
-        path.write_bytes(data)
+        from content_workbench.storage.uploads import stream_upload
+        stream_upload(stream, length, path)
         timestamp = utcnow()
         with self.conn() as conn, immediate(conn):
             conn.execute("INSERT INTO review_items VALUES (?,?,?,?,'queued','pending','{}','{}',NULL,NULL,NULL,?,?)",

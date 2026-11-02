@@ -1,7 +1,7 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PublishingPanel } from "./PublishingPanel";
 
 const { apiMock, notifyMock, publishKnowledge } = vi.hoisted(() => {
@@ -63,6 +63,8 @@ const generatedJob = {
   result: { platforms: { wechat_official_account: { title: "生成后的公众号标题", body: "生成后的正文", author: "刘量", summary: "生成后的摘要" } } },
 };
 
+afterEach(async()=>{await act(async()=>{cleanup()})});
+
 describe("PublishingPanel", () => {
   beforeEach(() => {
     cleanup();
@@ -89,25 +91,25 @@ describe("PublishingPanel", () => {
     render(<MemoryRouter><PublishingPanel kind="article" source={{ id: "article-1", title: "原始标题", body: "原始正文" }} /></MemoryRouter>);
     const generate = await screen.findByRole("button", { name: "发布 Agent 生成选中平台字段" });
     await waitFor(() => expect(apiMock).toHaveBeenCalledWith(expect.stringContaining("/api/publishing/bootstrap")));
-    expect(screen.getByRole("checkbox", { name: /声明原创/ })).not.toBeChecked();
-    expect(screen.getByRole("checkbox", { name: /开启留言/ })).toBeChecked();
+    expect(screen.queryByRole("checkbox", { name: /声明原创/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: /开启留言/ })).not.toBeInTheDocument();
     await user.click(generate);
     expect(await screen.findByDisplayValue("生成后的公众号标题")).toBeInTheDocument();
     expect(screen.getByDisplayValue("生成后的正文")).toBeInTheDocument();
     expect(screen.getByText("1 个平台未保存")).toBeInTheDocument();
-    expect(notifyMock).toHaveBeenCalledWith("发布字段已回填，尚未保存或发布；请逐平台检查后保存批次");
+    expect(notifyMock).toHaveBeenCalledWith("发布字段已回填并自动保存本机草稿；请检查后保存正式批次，不会自动发布");
     expect(apiMock).not.toHaveBeenCalledWith(expect.stringContaining("/confirm"), expect.anything());
-    await user.click(screen.getByRole("checkbox", { name: /声明原创/ }));
-    await user.click(screen.getByRole("checkbox", { name: /开启留言/ }));
     await user.click(screen.getByRole("button", { name: "保存文章批次" }));
     await waitFor(() => expect(apiMock).toHaveBeenCalledWith("/api/publishing/batches", expect.anything()));
     const call = apiMock.mock.calls.find(([path]) => path === "/api/publishing/batches");
     if (!call) throw new Error("没有保存发布批次");
     const request = JSON.parse(call[1].body);
     const official = request.targets.find((target: any) => target.platform === "wechat_official_account");
-    expect(official.payload.original).toBe(true);
-    expect(official.payload.comments_enabled).toBe(false);
+    expect(official.payload.original).toBeUndefined();
+    expect(official.payload.comments_enabled).toBeUndefined();
+    expect(official.payload.manual_transfer).toBe(true);
     expect(official.payload.title).toBe("生成后的公众号标题");
+    await waitFor(()=>expect(screen.getByRole("button",{name:"保存文章批次"})).toBeEnabled());
   });
 
   it("renders independent video fields and limits for each platform", async () => {
@@ -116,18 +118,39 @@ describe("PublishingPanel", () => {
     expect(screen.getByText("作品标题（必填） · 最多 30 字")).toBeInTheDocument();
     expect(screen.getByText("笔记标题（必填） · 最多 20 字")).toBeInTheDocument();
     expect(screen.getByText("短标题（必填） · 最多 16 字")).toBeInTheDocument();
-    expect(screen.getByText("1 小时、16GB")).toBeInTheDocument();
-    expect(screen.getByText("竖版封面（3:4）")).toBeInTheDocument();
-    expect(screen.getByText("链接")).toBeInTheDocument();
-    expect(screen.getAllByText("仅保存，预览需接入").length).toBeGreaterThan(0);
+    expect(screen.queryByText("1 小时、16GB")).not.toBeInTheDocument();
+    expect(screen.queryByText("竖版封面（3:4）")).not.toBeInTheDocument();
+    expect(screen.queryByText("链接")).not.toBeInTheDocument();
+
     expect(screen.queryByText(/最多 300 字/)).not.toBeInTheDocument();
     expect(screen.queryByText(/最多 5000 字/)).not.toBeInTheDocument();
   });
   it("blocks public confirmation when the runtime executor is disabled", async () => {
     apiMock.mockResolvedValue({execution_enabled:false,field_jobs:[],batch:{id:"batch",source_hash:"hash",targets:[{id:"target",platform:"xiaohongshu",status:"ready",payload:{title:"验收",body:"正文"}}]}});
     render(<MemoryRouter><PublishingPanel kind="article" source={{id:"article-1",title:"验收",body:"正文"}} /></MemoryRouter>);
-    await waitFor(()=>expect(screen.getByRole("button",{name:/确认公开发布/})).toHaveAttribute("title","当前环境未启用自动公开发布，请在平台后台人工确认"));
-    expect(screen.getByRole("button",{name:/确认公开发布/})).toBeDisabled();
+    await screen.findByRole("button",{name:"一键同步到后台"});
+    expect(screen.queryByRole("button",{name:/确认公开发布/})).not.toBeInTheDocument();
+
   });
 
+  it("saves before syncing and excludes restricted WeChat targets", async () => {
+    const user = userEvent.setup();
+    apiMock.mockImplementation((path:string)=>Promise.resolve(path.includes("bootstrap") ? {batch:null,field_jobs:[]} : {id:"batch-1",targets:[]}));
+    render(<MemoryRouter><PublishingPanel kind="article" source={{id:"article-1",title:"测试",body:"正文"}} /></MemoryRouter>);
+    await user.click(await screen.findByRole("button",{name:"一键同步到后台"}));
+    await waitFor(()=>expect(apiMock).toHaveBeenCalledWith("/api/publishing/batches/batch-1/prepare",expect.anything()));
+    const calls=apiMock.mock.calls;
+    expect(calls.findIndex(c=>c[0]==="/api/publishing/batches")).toBeLessThan(calls.findIndex(c=>c[0].endsWith("/prepare")));
+    expect(JSON.parse(calls.find(c=>c[0].endsWith("/prepare"))![1].body).platforms).toEqual(["xiaohongshu"]);
+    expect(screen.getAllByRole("button",{name:"复制发布内容"})).toHaveLength(2);
+    await waitFor(()=>expect(screen.getByRole("button",{name:"一键同步到后台"})).toBeEnabled());
+  });
+
+});
+
+it("显示旧结构嵌套错误中的具体原因与处理建议",async()=>{
+ apiMock.mockResolvedValue({field_jobs:[],batch:{id:"failure",source_hash:"hash",targets:[{id:"t1",platform:"douyin",status:"failed",payload:{title:"验收",description:"正文"},error:{error:{code:"UPLOAD_NOT_READY",message:"平台仍在处理上传视频",action:"处理完成后重试续填"}}}]}});
+ render(<MemoryRouter><PublishingPanel kind="video" source={{id:"video-1",title:"验收",body:"正文"}}/></MemoryRouter>);
+ expect(await screen.findByText(/平台仍在处理上传视频/)).toBeInTheDocument();
+ expect(screen.getByText(/处理完成后重试续填/)).toBeInTheDocument();
 });

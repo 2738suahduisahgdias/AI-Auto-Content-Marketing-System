@@ -9,7 +9,7 @@ version: 1.0.0
 收到微信私聊后，只调用一次项目桥接脚本：
 
 ```bash
-/Volumes/EXTERNAL_USB/kimi/content-agent/workers/wechat_inbox_bridge.py '{"msgid":"真实消息ID","message_type":"text","text":"原始文本","original_url":"可选链接"}'
+/Volumes/EXTERNAL_USB/映序开发/2026-11-01/work/content-system-review/workers/wechat_inbox_bridge.py '{"msgid":"真实消息ID","message_type":"text","text":"原始文本","original_url":"可选链接"}'
 ```
 
 ## 规则

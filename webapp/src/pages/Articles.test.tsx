@@ -43,16 +43,34 @@ describe("Articles delivery and pagination", () => {
   });
 });
 
-it("filters titles and protects unsaved text on return",()=>{
- const {container}=renderArticles();
- fireEvent.change(container.querySelector('.article-draft-editor')!,{target:{value:'未保存正文'}});
+it("restores automatic drafts after refresh without forcing a save confirmation",()=>{
+ const first=renderArticles('/articles/article-1');
+ fireEvent.change(first.container.querySelector('.article-draft-editor')!,{target:{value:'自动保存正文'}});
+ first.unmount();
+ const second=renderArticles('/articles/article-1');
+ expect(second.container.querySelector('.article-draft-editor')).toHaveValue('自动保存正文');
  const confirm=vi.spyOn(window,'confirm').mockReturnValue(false);
  fireEvent.click(screen.getByRole('button',{name:'← 返回文章列表'}));
- expect(confirm).toHaveBeenCalled();
- expect(container.querySelector('.article-draft-editor')).toHaveValue('未保存正文');
- confirm.mockReturnValue(true);
- fireEvent.click(screen.getByRole('button',{name:'← 返回文章列表'}));
+ expect(confirm).not.toHaveBeenCalled();
  fireEvent.change(screen.getByRole('textbox',{name:'搜索文章'}),{target:{value:'文章 11'}});
  expect(screen.getByText('文章 11')).toBeInTheDocument();
  expect(screen.queryByText('文章 0')).not.toBeInTheDocument();
+});
+
+it("does not block sidebar links or refresh after automatic draft save",()=>{
+ const view=renderArticles('/articles/article-1');
+ fireEvent.change(view.container.querySelector('.article-draft-editor')!,{target:{value:'已自动保存的改动'}});
+ const confirm=vi.spyOn(window,'confirm').mockReturnValue(false);
+ const unload=new Event('beforeunload',{cancelable:true});window.dispatchEvent(unload);
+ expect(unload.defaultPrevented).toBe(false);
+ fireEvent.click(screen.getByRole('link',{name:'从选题中心选择主题'}));
+ expect(confirm).not.toHaveBeenCalled();
+});
+
+it("offers one formal save action instead of duplicate body save buttons",()=>{
+ renderArticles('/articles/article-1');
+ expect(screen.getAllByRole('button',{name:'保存正式版本'})).toHaveLength(1);
+ expect(screen.queryByRole('button',{name:'保存正文'})).not.toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:'保存大纲'})).not.toBeInTheDocument();
+ expect(screen.getByRole('button',{name:'确认大纲，用于生成正文'})).toBeInTheDocument();
 });

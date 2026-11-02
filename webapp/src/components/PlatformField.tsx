@@ -3,6 +3,7 @@ import type { Json } from "@/lib/types";
 
 interface Props {
   definition: Json;
+  compact?: boolean;
   value: unknown;
   disabled: boolean;
   active: boolean;
@@ -13,11 +14,11 @@ interface Props {
   onUpload: (file?: File) => void;
 }
 
-export function PlatformField({ definition, value, disabled, active, assetName, error, sourceId, onChange, onUpload }: Props) {
+export function PlatformField({ compact = false, definition, value, disabled, active, assetName, error, sourceId, onChange, onUpload }: Props) {
   const name = definition.name as string;
   const maximum = definition.max_length as number | null;
   const label = `${definition.label}${definition.required ? "（必填）" : ""}${maximum ? ` · 最多 ${maximum} 字` : ""}`;
-  const meta = <div className="platform-field-meta"><Badge tone={definition.sync_status === "connected" ? "green" : "orange"}>{definition.sync_status === "connected" ? "已接入写入" : "仅保存，预览需接入"}</Badge>{definition.verification === "unverified" && <Badge tone="orange">限制待账号核验</Badge>}{definition.description && <p>{definition.description}</p>}{!active && <p>需先满足 {definition.depends_on?.field} = {String(definition.depends_on?.equals)}</p>}{error && <p className="platform-field-error" role="alert">{error}</p>}</div>;
+  const meta = compact ? (error ? <p className="platform-field-error" role="alert">{error}</p> : null) : <div className="platform-field-meta"><Badge tone={definition.sync_status === "connected" ? "green" : "orange"}>{definition.sync_status === "connected" ? "已接入写入" : "仅保存，预览需接入"}</Badge>{definition.verification === "unverified" && <Badge tone="orange">限制待账号核验</Badge>}{definition.description && <p>{definition.description}</p>}{!active && <p>需先满足 {definition.depends_on?.field} = {String(definition.depends_on?.equals)}</p>}{error && <p className="platform-field-error" role="alert">{error}</p>}</div>;
   if (definition.control === "source") {
     return <div className="platform-source-field"><strong>{definition.label}</strong><span>{sourceId}</span>{meta}</div>;
   }

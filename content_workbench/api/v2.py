@@ -61,11 +61,12 @@ class V2Application:
         executors = LocalExecutors(self.workbench).mapping()
         executors.update(TopicExecutors(self.topics).mapping())
         executors.update(SocialExecutors(self.social, self.topics).mapping())
-        executors.update(AccountExecutors(self.accounts).mapping())
+        executors.update({key: value for key, value in AccountExecutors(self.accounts).mapping().items()
+                          if key not in ("accounts.sync", "accounts.daily", "accounts.recommend")})
         executors.update(PublishingExecutors(self.publishing).mapping())
         executors.update(ReviewExecutors(self.review).mapping())
         executors.update(extra_executors or {})
-        self.worker = Worker(db_path, executors, self.root)
+        self.worker = Worker(db_path, executors, self.root, allowed_kinds=list(executors))
         self.worker.before_execute = self.license.require_active
         self.topic_scheduler = TopicScheduler(db_path)
         self.account_scheduler = AccountScheduler(db_path)
@@ -82,16 +83,19 @@ class V2Application:
         self.agent_api = AgentAPI(self, db_path)
         self.secret = secrets.token_bytes(32)
         self.sessions = set()
+        # Cookies are shared across localhost ports: isolate each workspace.
+        self.cookie_name = "wb_session_" + hashlib.sha256(str(Path(db_path).resolve()).encode()).hexdigest()[:16]
         configure_schedule(db_path, self.topics.settings())
-        configure_account_schedule(db_path)
+        configure_account_schedule(db_path, enabled=False)
 
     def start(self):
+        self.topic_api.wechat_client.start()
         self.worker.start()
         self.topic_scheduler.start()
-        self.account_scheduler.start()
         self.schedule_dispatcher.start()
 
     def stop(self):
+        self.topic_api.wechat_client.stop()
         self.schedule_dispatcher.stop()
         self.topic_scheduler.stop()
         self.account_scheduler.stop()
@@ -103,7 +107,7 @@ class V2Application:
 
     def cookie(self, handler):
         parsed = SimpleCookie(handler.headers.get("Cookie", ""))
-        morsel = parsed.get("wb_session")
+        morsel = parsed.get(self.cookie_name)
         return morsel.value if morsel and morsel.value in self.sessions else None
 
     def session_header(self, handler):
@@ -111,7 +115,7 @@ class V2Application:
             return None
         value = secrets.token_urlsafe(32)
         self.sessions.add(value)
-        return "wb_session={}; HttpOnly; SameSite=Strict; Path=/".format(value)
+        return "{}={}; HttpOnly; SameSite=Strict; Path=/".format(self.cookie_name, value)
 
     def csrf(self, session):
         return hmac.new(self.secret, session.encode("ascii"), hashlib.sha256).hexdigest()
@@ -299,12 +303,12 @@ class V2Application:
                 length = int(handler.headers.get("Content-Length", "0"))
                 if length <= 0 or length > 500 * 1024 * 1024:
                     raise DomainError("INVALID_UPLOAD_SIZE", "文件为空或超过 500MB", 413, "file", "选择非空且小于 500MB 的文件")
-                data = handler.rfile.read(length)
-                if len(data) != length:
-                    raise DomainError("INCOMPLETE_UPLOAD", "文件上传不完整", 400)
-                with tempfile.TemporaryDirectory(prefix="v2-upload-") as directory:
+                from content_workbench.storage.uploads import stream_upload
+                upload_tmp = self.root / "cache" / "uploads"
+                upload_tmp.mkdir(parents=True, exist_ok=True)
+                with tempfile.TemporaryDirectory(prefix="v2-upload-", dir=upload_tmp) as directory:
                     path_value = Path(directory) / filename
-                    path_value.write_bytes(data)
+                    stream_upload(handler.rfile, length, path_value)
                     asset_id = self.workbench.register_asset(path_value, {"filename": filename, "purpose": query.get("purpose", ["research"])[0]},
                                                               query.get("rights", ["research_only"])[0])
                 with self.workbench.conn(readonly=True) as conn:

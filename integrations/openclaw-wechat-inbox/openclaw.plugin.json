@@ -1,0 +1,11 @@
+{
+  "id": "yingxu-wechat-inbox",
+  "name": "Yingxu local WeChat inbox",
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false
+  }
+}

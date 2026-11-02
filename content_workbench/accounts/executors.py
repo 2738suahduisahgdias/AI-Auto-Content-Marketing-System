@@ -32,8 +32,7 @@ class AccountExecutors:
         result = self.platform(context, actions[platform], platform + "_login")
         if not result.get("login_verified"):
             return result
-        snapshot = self.sync(job, context)
-        return {**result, "sync": snapshot, "refresh": "all_account_data"}
+        return {**result, "refresh": "login_only"}
 
     def platform(self, context, action, stage, **kwargs):
         result = run_existing_browser(action, **kwargs)
@@ -164,6 +163,8 @@ class AccountExecutors:
             details = "；".join(str(value) for value in result["accounts"].values())
             raise DomainError("ACCOUNTS_EMPTY", "四个平台均未采集到有效账号数据：" + details, 409, "browser",
                               "检查登录和后台页面结构；空结果不会覆盖最近有效快照")
+        result["status"] = "partial" if result["errors"] else "succeeded"
+        result["successful_platforms"] = sorted(collected)
         return result
 
     def recommend(self, job, context):
@@ -174,7 +175,7 @@ class AccountExecutors:
         helper = TopicExecutors(self.topics)
         prompt = json.dumps({"operation": "账号日报分析，输出事实、推断、下一步实验和今日推荐，不得编造指标或稳定规律",
                              "accounts": data["accounts"], "agent_supplement": config["prompt"]}, ensure_ascii=False)
-        candidates = helper.kimi_json(context, "douyin-topic-agent", prompt, config["timeout_seconds"])
+        candidates = helper.kimi_json(context, "douyin-topic-agent", prompt, config["timeout_seconds"], engine=config["engine"])
         ids = self.topics.save_candidates("account_analysis", candidates)
         return {"candidates": len(ids), "candidate_ids": ids}
 

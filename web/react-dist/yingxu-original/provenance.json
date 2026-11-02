@@ -1,0 +1,13 @@
+{
+  "site_version": 13,
+  "commit": "6e3c24ac18d4f7b94d1ec054f7b280923836b7d2",
+  "files": {
+    "index.html": "036f85368a0d278020d2af610ca24043fbbbd884184cfbb965c3e89db6a2196a",
+    "style.css": "85558412c56215c3417a8c6406d4d51af1fb4987b8fdfc379d1ece7ae3b3447d",
+    "app.js": "0a7931d62c1471460f16a1e5953f28d1cee15e555a4c2b62edf6640c86dba02c",
+    "assets/scene-1.jpg": "a7b308dd4c1471eec8dff5365f42be4ba24fc08fa8d762e60eeb99e10cb0cc30",
+    "assets/scene-0.jpg": "8464c96cbd6ef31b977516f261ee991404ec08b6b64ad0678bad759ffed0849b",
+    "assets/scene-2.jpg": "4e434bbeb656056abe4145cc38c48472ee4f3ec95f45c0fac7b30d0886ad4d0b",
+    "assets/scene-3.jpg": "07b8b773128e128ee5f7271706dca8d132c430125fad44927dca277b44eeb3a6"
+  }
+}

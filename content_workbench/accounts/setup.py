@@ -1,4 +1,5 @@
 import os
+import importlib.util
 import platform
 import shutil
 import sys
@@ -23,19 +24,21 @@ def dependency(name, installed, required, action):
 
 
 def setup_status(db_path):
-    root = PROJECT_ROOT
+    root = Path(db_path).resolve().parent.parent
+    resources = Path(getattr(sys, "_MEIPASS", PROJECT_ROOT))
     system = platform.system()
     chrome = next((path for path in chrome_candidates() if path.is_file()), None)
     chrome = chrome or shutil.which("google-chrome") or shutil.which("chrome") or shutil.which("chromium")
     dependencies = [
         dependency("Python 3.9+", sys.version_info >= (3, 9), True, "安装 Python 3.9 或更高版本，并加入 PATH"),
-        dependency("Node.js 与 npm", shutil.which("node") and shutil.which("npm"), True, "安装 Node.js 20 LTS 或兼容版本"),
+        dependency("Node.js 视频运行时", shutil.which("node"), True, "安装 Node.js 20 LTS 或兼容版本"),
         dependency("FFmpeg / FFprobe", shutil.which("ffmpeg") and shutil.which("ffprobe"), True, "安装 FFmpeg 并将 ffmpeg、ffprobe 加入 PATH"),
         dependency("Chrome", chrome, True, "安装 Google Chrome；采集和平台登录使用本机浏览器"),
-        dependency("Playwright 隔离环境", (root / ".venv-topics/bin/python").is_file() or (root / ".venv-topics/Scripts/python.exe").is_file(), True, "运行项目提供的安装脚本"),
-        dependency("Remotion 依赖", (root / "remotion-app/node_modules").is_dir(), False, "在 remotion-app 执行 npm ci；仅视频渲染需要"),
-        dependency("前端生产构建", (root / "web/react-dist/index.html").is_file(), True, "在 webapp 执行 npm ci && npm run build"),
-        dependency("Kimi CLI（可选）", shutil.which("kimi"), False, "需要 AI 生成时安装并登录 Kimi CLI，不复制凭据"),
+        dependency("Playwright 隔离环境", importlib.util.find_spec("playwright") is not None or (root / ".venv-topics/bin/python").is_file() or (root / ".venv-topics/Scripts/python.exe").is_file(), True, "运行项目提供的安装脚本"),
+        dependency("Remotion 依赖", (resources / "remotion-app/node_modules").is_dir(), False, "在 remotion-app 执行 npm ci；仅视频渲染需要"),
+        dependency("前端生产构建", (resources / "web/react-dist/index.html").is_file(), True, "在 webapp 执行 npm ci && npm run build"),
+        dependency("Codex CLI（可选）", shutil.which("codex"), False, "选择 Codex 的 Agent 需要安装并登录 Codex CLI"),
+        dependency("Kimi CLI（可选）", shutil.which("kimi"), False, "选择 Kimi 的 Agent 需要安装并登录 Kimi CLI"),
     ]
     with connect(db_path, readonly=True) as conn:
         tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
@@ -50,10 +53,10 @@ def setup_status(db_path):
     for key, name in (("douyin", "抖音"), ("xiaohongshu", "小红书"), ("wechat_channels", "视频号"), ("wechat_official_account", "公众号")):
         status = "published" if key in published else "snapshot" if key in snapshots else "not_verified"
         platforms.append({"platform": key, "name": name, "status": status,
-                          "verified": status != "not_verified",
-                          "action": "已有真实发布证据" if status == "published" else "已有账号快照，可继续核验登录" if status == "snapshot" else "打开登录窗口，本人完成扫码后重新检查"})
+                          "verified": False, "historical_evidence": status,
+                          "action": "历史记录不代表当前登录；打开平台窗口核对当前账号，发布准备时验证登录与上传"})
     return {"os": system, "os_name": "macOS" if system == "Darwin" else "Windows" if system == "Windows" else system,
-            "python_version": platform.python_version(), "local_url": "http://127.0.0.1:8765/",
+            "python_version": platform.python_version(), "local_url": os.environ.get("CONTENT_AGENT_MEDIA_BASE_URL", "http://127.0.0.1:8765") + "/demo/",
             "dependencies": dependencies, "platforms": platforms,
             "first_run": not snapshots and not published,
             "core_ready": all(item["installed"] for item in dependencies if item["required"]),

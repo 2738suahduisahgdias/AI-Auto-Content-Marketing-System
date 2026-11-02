@@ -5,6 +5,7 @@ import re
 import subprocess
 import sys
 import time
+import uuid
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -67,6 +68,13 @@ class Bridge:
         try:
             self.call("navigate", {"url": url, "newTab": True, "group_title": "发布预览验证"})
         except RuntimeError as error:
+            if "No tab with given id" in str(error):
+                # The extension session may outlive its Chrome tab. Navigation is
+                # safe to retry with a fresh session; never replay publish actions.
+                self.session = SESSION + "-" + uuid.uuid4().hex[:12]
+                self.call("navigate", {"url": url, "newTab": True, "group_title": "工作台采集与预览"})
+                time.sleep(3)
+                return
             if "timeout" not in str(error).lower():
                 raise
             self.call("find_tab", {"url": url})
@@ -342,6 +350,73 @@ def prepare_official_account(bridge, data, mode):
                          {"title": payload["title"], "body_length": len(payload["body"]), "transport": "webbridge"})
 
 
+def prepare_chrome_video(bridge, data, platform, mode):
+    """Use the existing signed-in Chrome; never opens a separate login profile."""
+    if mode != "prepare":
+        return bridge.error(platform, "publish", "该连接器仅支持上传预填", "请人工审核后在平台发布")
+    source, payload = data["source"], data["payload"]
+    unsupported = unsupported_payload_field(platform, "video", payload, {"title", "description", "tags"})
+    if unsupported:
+        return unsupported
+    # A retry for this target may already have uploaded the correct video.
+    # Only inspect the tab bound to this target session; never search arbitrary tabs.
+    try:
+        existing = bridge.snapshot()
+    except (RuntimeError, urllib.error.HTTPError):
+        existing = {}
+    existing_url = existing.get("url", "") if isinstance(existing, dict) else ""
+    editor_path = "creator.douyin.com/creator-micro/content/post/video" if platform == "douyin" else "creator.xiaohongshu.com/publish/publish"
+    if editor_path in existing_url:
+        resume_probe = """(()=>{const title=document.querySelector('input[placeholder*=标题],textarea[placeholder*=标题]');
+          const body=document.querySelector('div[contenteditable=true],textarea[placeholder*=正文],textarea[placeholder*=描述]');
+          return {title:!!title,body:!!body,titleValue:title?.value||'',bodyValue:body?.innerText||body?.value||'',
+          durations:Array.from(document.querySelectorAll('video')).map(v=>Number.isFinite(v.duration)?v.duration:null),text:document.body.innerText};})()"""
+        expected = media_duration(source["absolute_video_path"])
+        state = bridge.evaluate(resume_probe) or {}
+        if state.get("title") and state.get("body") and any(isinstance(v,(int,float)) and abs(v-expected)<1 for v in state.get("durations",[])) and "取消上传" not in state.get("text", ""):
+            return complete_chrome_video(bridge, data, platform, payload, expected, resume_probe)
+    url = "https://creator.douyin.com/creator-micro/content/upload" if platform == "douyin" else "https://creator.xiaohongshu.com/publish/publish?source=official"
+    bridge.call("navigate", {"url": url, "newTab": True, "group_title": "发布预览验证"})
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        page = bridge.evaluate("(()=>({text:document.body.innerText,file:!!document.querySelector('input[type=file]')}))()") or {}
+        if any(word in page.get("text", "") for word in ("扫码登录", "手机号登录", "验证码登录")):
+            return {"status": "login_required", "error": "请在 Chrome 中登录创作者后台", "action": "扫码后重试上传预填"}
+        if page.get("file"):
+            break
+        time.sleep(.5)
+    else:
+        return bridge.error(platform, "video_path", "未找到视频上传入口", "检查 Chrome 中的平台登录状态")
+    bridge.call("upload", {"selector": "input[type=file]", "files": [source["absolute_video_path"]]})
+    expected = media_duration(source["absolute_video_path"])
+    probe = """(()=>{const title=document.querySelector('input[placeholder*=标题],textarea[placeholder*=标题]');
+      const body=document.querySelector('div[contenteditable=true],textarea[placeholder*=正文],textarea[placeholder*=描述]');
+      const videos=Array.from(document.querySelectorAll('video'));return {title:!!title,body:!!body,
+      titleValue:title?.value||'',bodyValue:body?.innerText||body?.value||'',
+      durations:videos.map(v=>Number.isFinite(v.duration)?v.duration:null),text:document.body.innerText};})()"""
+    deadline = time.monotonic() + 180
+    while time.monotonic() < deadline:
+        state = bridge.evaluate(probe) or {}
+        if state.get("title") and state.get("body") and any(isinstance(v, (int, float)) and abs(v-expected)<1 for v in state.get("durations", [])) and not any(t in state.get("text", "") for t in ("取消上传", "上传过程中请不要删除")):
+            break
+        time.sleep(1)
+    else:
+        return bridge.error(platform, "video_path", "未回读到本次视频时长或编辑器尚未就绪", "等待平台处理完成后重试；同一目标会优先继续填写已上传视频，不会自动发布")
+    return complete_chrome_video(bridge, data, platform, payload, expected, probe)
+
+
+def complete_chrome_video(bridge, data, platform, payload, expected, probe):
+    description = payload["description"] + ("\n" + payload["tags"] if payload.get("tags") else "")
+    fill(bridge, 'input[placeholder*=标题],textarea[placeholder*=标题]', payload["title"])
+    fill(bridge, 'div[contenteditable=true],textarea[placeholder*=正文],textarea[placeholder*=描述]', description)
+    state = bridge.evaluate(probe) or {}
+    normalize = lambda text: re.sub(r"\s+", " ", str(text).replace("\u200b", "").replace("\r", "").replace("\n", "")).strip()
+    if normalize(state.get("titleValue")) != normalize(payload["title"]) or normalize(state.get("bodyValue")) != normalize(description):
+        return bridge.error(platform, "description", "标题或正文读回不一致", "检查平台编辑器，不会自动发布")
+    fields = {"video", "title", "description"} | ({"tags"} if payload.get("tags") else set())
+    return bridge.result(data["target_id"], "preview_ready", fields, {"transport": "webbridge", "video_duration": expected, "auto_published": False})
+
+
 def prepare_xhs_images(bridge, data, mode):
     payload, source = data['payload'], data['source']
     unsupported = unsupported_payload_field('xiaohongshu', 'article', payload,
@@ -424,13 +499,15 @@ def execute_bridge(bridge, platform, target_id, label):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--action", choices=("prepare", "execute"), required=True)
-    parser.add_argument("--platform", choices=("wechat_channels", "wechat_official_account", "xiaohongshu"), required=True)
+    parser.add_argument("--platform", choices=("wechat_channels", "wechat_official_account", "xiaohongshu", "douyin"), required=True)
     parser.add_argument("--payload-file", required=True)
     args = parser.parse_args()
     data = json.loads(Path(args.payload_file).read_text(encoding="utf-8"))
     bridge = Bridge(session="publishing-" + str(data.get("target_id", "preview")))
     try:
-        if args.platform == "xiaohongshu":
+        if args.platform == "douyin" or (args.platform == "xiaohongshu" and data.get("source", {}).get("absolute_video_path")):
+            result = prepare_chrome_video(bridge, data, args.platform, args.action)
+        elif args.platform == "xiaohongshu":
             result = prepare_xhs_images(bridge, data, args.action)
         elif args.platform == "wechat_channels":
             result = prepare_channels(bridge, data, args.action)

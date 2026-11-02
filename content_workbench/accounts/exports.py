@@ -89,13 +89,15 @@ def trend(path):
 
 
 def read_xls(path):
-    python = PROJECT_ROOT / ".venv-accounts/Scripts/python.exe" if (PROJECT_ROOT / ".venv-accounts/Scripts/python.exe").is_file() \
-        else PROJECT_ROOT / ".venv-accounts/bin/python"
-    process = subprocess.run([str(python), str(PROJECT_ROOT / "workers/xls_reader.py"), str(path)],
-                             capture_output=True, text=True, timeout=60)
-    if process.returncode:
-        raise ValueError("XLS 读取失败：" + (process.stderr or "无法解析文件")[:300])
-    return json.loads(process.stdout)
+    try:
+        import xlrd
+    except ImportError:
+        raise ValueError("缺少 XLS 解析依赖 xlrd，请安装完整版客户端")
+    book = xlrd.open_workbook(str(path))
+    sheet = book.sheet_by_index(0)
+    first = sheet.row_values(0) if sheet.nrows else []
+    headers = [str(first[i]).strip() or "column_{}".format(i + 1) for i in range(sheet.ncols)]
+    return [dict(zip(headers, sheet.row_values(i))) for i in range(1, sheet.nrows)]
 
 
 def export_date(value):

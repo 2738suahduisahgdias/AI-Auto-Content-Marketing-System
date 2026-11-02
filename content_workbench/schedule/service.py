@@ -358,28 +358,16 @@ class ScheduleService:
                                           (item["schedule_id"], day)).fetchone()[0]
             if dispatched >= item["daily_limit"]:
                 continue
-            job = self.jobs.enqueue("publish.execute", {"target_id": item["target_id"]}, item["target_id"],
-                                    "dispatch", scope="publish.schedule:" + item["id"], max_attempts=1,
-                                    resource_key="browser", available_at=item["scheduled_for"])
-            linked = False
             with self.conn() as conn, immediate(conn):
-                current = conn.execute("""SELECT q.job_id FROM publish_queue q JOIN publish_schedules s ON s.id=q.schedule_id
-                    WHERE q.id=? AND q.status='queued' AND q.scheduled_for<=? AND s.status='active'""",
-                    (item["id"], timestamp)).fetchone()
-                if current and current["job_id"] in (None, job["id"]):
-                    dispatched = conn.execute("SELECT COUNT(*) FROM publish_queue WHERE schedule_id=? AND dispatch_day=?",
-                                              (item["schedule_id"], day)).fetchone()[0]
-                    if dispatched < item["daily_limit"]:
-                        changed = conn.execute("""UPDATE publish_queue SET job_id=?,dispatched_at=?,dispatch_day=?,updated_at=?
-                            WHERE id=? AND status='queued' AND job_id IS NULL""",
-                            (job["id"], timestamp, day, utcnow(), item["id"]))
-                        linked = changed.rowcount == 1 or current["job_id"] == job["id"]
-            if not linked:
-                with self.conn() as conn, immediate(conn):
-                    conn.execute("""UPDATE wb_jobs SET status='cancelled',stage='cancelled',updated_at=?
-                        WHERE id=? AND idempotency_scope=? AND status IN ('queued','retry_wait')""",
-                        (utcnow(), job["id"], "publish.schedule:" + item["id"]))
-                continue
+                current = conn.execute("SELECT q.job_id FROM publish_queue q JOIN publish_schedules s ON s.id=q.schedule_id WHERE q.id=? AND q.status='queued' AND q.scheduled_for<=? AND s.status='active'", (item["id"],timestamp)).fetchone()
+                if not current or current["job_id"]:
+                    continue
+                dispatched = conn.execute("SELECT COUNT(*) FROM publish_queue WHERE schedule_id=? AND dispatch_day=?", (item["schedule_id"],day)).fetchone()[0]
+                if dispatched >= item["daily_limit"]:
+                    continue
+                job = self.jobs.enqueue("publish.execute", {"target_id":item["target_id"]}, item["target_id"], "dispatch", scope="publish.schedule:"+item["id"], max_attempts=1, resource_key="browser", available_at=item["scheduled_for"], connection=conn)
+                conn.execute("UPDATE publish_queue SET job_id=?,dispatched_at=?,dispatch_day=?,updated_at=? WHERE id=?", (job["id"],timestamp,day,utcnow(),item["id"]))
+                conn.execute("UPDATE publish_targets SET job_id=? WHERE id=?", (job["id"],item["target_id"]))
             current_job = self.jobs.get(job["id"])
             if current_job["status"] in ("queued", "retry_wait"):
                 result.append(current_job)

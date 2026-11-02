@@ -1,0 +1,20 @@
+import {afterEach,expect,it,vi} from 'vitest';
+import {cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react';
+import RuntimeReadiness from './RuntimeReadiness';
+import {api} from '../lib/api';
+vi.mock('../lib/api',()=>({api:vi.fn(),errorText:(e:Error)=>e.message}));
+afterEach(()=>{cleanup();vi.clearAllMocks()});
+it('关键能力状态直接可见，详细依赖按按钮展开，并保留重新检查',async()=>{
+ vi.mocked(api).mockResolvedValue({checked_at:'2026-11-02T08:00:00Z',worker_running:true,boundary:'本地检查范围',capabilities:[{name:'文案生成',status:'blocked',missing_dependencies:['codex_cli'],inactive_executors:[],note:'请先登录模型'}]});
+ render(<RuntimeReadiness/>);
+ expect(screen.getByRole('heading',{name:'环境检测与能力状态'})).toBeVisible();
+ await screen.findByText('1 项能力有阻塞');
+ expect(screen.getByText('执行进程在线')).toBeVisible();
+ expect(screen.getByRole('button',{name:'查看检查详情'})).toHaveAttribute('aria-expanded','false');
+ expect(screen.getByText('缺少依赖：Codex CLI')).not.toBeVisible();
+ fireEvent.click(screen.getByRole('button',{name:'查看检查详情'}));
+ expect(screen.getByText('缺少依赖：Codex CLI')).toBeVisible();
+ expect(screen.getByRole('button',{name:'收起检查详情'})).toHaveAttribute('aria-expanded','true');
+ fireEvent.click(screen.getByRole('button',{name:'重新检查本机'}));
+ await waitFor(()=>expect(api).toHaveBeenCalledTimes(2));
+});

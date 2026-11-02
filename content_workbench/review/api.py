@@ -29,10 +29,8 @@ class ReviewAPI:
             length = int(handler.headers.get("Content-Length", "0"))
             if length <= 0 or length > 2 * 1024 ** 3:
                 raise DomainError("REVIEW_FILE_TOO_LARGE", "视频为空或超过 2GB", 413, "file", "选择不超过 2GB 的视频")
-            data = handler.rfile.read(length)
-            if len(data) != length:
-                raise DomainError("REVIEW_UPLOAD_INCOMPLETE", "视频上传不完整", 400, "file", "重新上传")
-            return self.app.response(handler, self.service.add_upload(batch_id, filename, data), 201)
+            return self.app.response(handler, self.service.add_upload_stream(batch_id, filename, handler.rfile, length), 201)
+
         match = re.fullmatch(r"/api/review/batches/([^/]+)/start", path)
         if method == "POST" and match:
             return self.app.response(handler, self.service.start(match.group(1), body.get("rules")), 202)

@@ -26,7 +26,7 @@ describe("AppShell topic navigation", () => {
     expect(trigger).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByRole("link", { name: "行业热点" })).toHaveAttribute("href", "/topics/industry");
     expect(screen.getByRole("link", { name: "抖音选题" })).toHaveAttribute("href", "/topics/douyin");
-    expect(screen.getByRole("link", { name: "视频号选题" })).toHaveAttribute("href", "/topics/wechat");
+    expect(screen.getByRole("link", { name: "微信选题" })).toHaveAttribute("href", "/topics/wechat");
     expect(screen.getByRole("link", { name: "小红书选题" })).toHaveAttribute("href", "/topics/xiaohongshu");
 
     await user.click(trigger);
@@ -40,16 +40,12 @@ describe("AppShell topic navigation", () => {
   });
 });
 
-describe("AppShell analytics navigation", () => {
-  it("keeps account platforms without retired modules", async () => {
-    const user = userEvent.setup();
-    renderShell("/accounts/douyin");
-    expect(screen.getByRole("button", { name: "账号日报" })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("link", { name: "日报总览" })).toHaveAttribute("href", "/accounts");
-    expect(screen.getByRole("link", { name: "公众号" })).toHaveAttribute("href", "/accounts/wechat_official_account");
-    for (const name of ["竞对分析", "社媒能力", "内容复盘"]) expect(screen.queryByRole("link", { name })).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "账号日报" }));
-    expect(screen.queryByRole("link", { name: "日报总览" })).not.toBeInTheDocument();
-  });
+describe("AppShell retired analytics navigation", () => {
+ it("removes analytics while retaining topic and publishing access", () => {
+  renderShell("/accounts/douyin");
+  expect(screen.queryByRole("button",{name:"账号日报"})).not.toBeInTheDocument();
+  expect(screen.queryByRole("link",{name:"日报总览"})).not.toBeInTheDocument();
+  expect(screen.getByRole("button",{name:"选题中心"})).toBeInTheDocument();
+  expect(screen.getAllByRole("link",{name:"发布中心"}).length).toBeGreaterThan(0);
+ });
 });

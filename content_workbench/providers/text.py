@@ -1,9 +1,25 @@
 import json
+import os
 import shutil
 import tempfile
 from pathlib import Path
 
 from content_workbench.domain.errors import DomainError
+
+
+def discover_cli(name):
+    """Find user-installed CLIs even when Finder supplies a minimal PATH."""
+    candidates = [shutil.which(name), str(Path.home() / '.local/bin' / name),
+                  str(Path.home() / '.kimi-code/bin' / name) if name == 'kimi' else None,
+                  '/opt/homebrew/bin/' + name, '/usr/local/bin/' + name]
+    if name == 'codex':
+        for base in (Path('/Applications'), Path.home() / 'Applications'):
+            for app_name in ('ChatGPT.app', 'Codex.app'):
+                candidates.append(str(base / app_name / 'Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex'))
+    for candidate in candidates:
+        if candidate and Path(candidate).is_file() and os.access(candidate, os.X_OK):
+            return str(Path(candidate).resolve())
+    return None
 
 
 def assistant_text(stream):
@@ -78,7 +94,7 @@ class CodexCLIProvider:
     label = "本机 Codex CLI"
 
     def binary(self):
-        return shutil.which("codex")
+        return discover_cli("codex")
 
     def status(self):
         available = bool(self.binary())
@@ -113,12 +129,12 @@ class TextProviderRegistry:
         self.providers = providers or {provider.provider_id: provider for provider in (KimiCLIProvider(root), CodexCLIProvider())}
 
     def status(self):
-        return {"default": "kimi_cli", "items": [provider.status() for provider in self.providers.values()]}
+        return {"default": "codex_cli", "items": [provider.status() for provider in self.providers.values()]}
 
-    def get(self, provider_id="kimi_cli"):
-        provider = self.providers.get(provider_id or "kimi_cli")
+    def get(self, provider_id="codex_cli"):
+        provider = self.providers.get(provider_id or "codex_cli")
         if provider is None:
-            raise DomainError("MODEL_PROVIDER_INVALID", "模型 Provider 无效", 422, "provider", "选择 kimi_cli")
+            raise DomainError("MODEL_PROVIDER_INVALID", "模型 Provider 无效", 422, "provider", "选择 codex_cli")
         status = provider.status()
         if not status["available"]:
             raise DomainError("MODEL_PROVIDER_UNAVAILABLE", status["reason"], 503, "provider", "使用可用的本机模型 Provider")

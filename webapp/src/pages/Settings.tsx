@@ -1,3 +1,4 @@
+import MediaTools from '../components/MediaTools';
 import ImageProviderSettings from "@/components/ImageProviderSettings";
 import WorkspaceTransfer from "@/components/WorkspaceTransfer";
 import RenderCache from "@/components/RenderCache";
@@ -12,6 +13,7 @@ import { Badge, Button, Card, Empty, ErrorBox, Field, Input, PageHeader, Textare
 import { api, errorText, jsonOptions } from "@/lib/api";
 import "./Settings.css";
 
+const engineLabel=(value:string)=>({codex_cli:"Codex CLI · 本机登录",kimi_cli:"Kimi CLI · 本机登录",playwright:"浏览器自动化",macos_say:"macOS 系统语音",openvoice:"OpenVoice 本地音色",remotion:"Remotion 本地渲染"} as Record<string,string>)[value]||value;
 interface AgentDefinition {
   name: string;
   description: string;
@@ -82,7 +84,7 @@ interface CoreResource {
 type TestId = "kimi" | "assets" | "remotion" | "voice" | "whisperx" | "openvoice";
 
 const tests: Record<TestId, { path: string; success: string; progress: string }> = {
-  kimi: { path: "/api/ai/test", success: "Kimi 真实连接测试成功，脚本生成能力已验证", progress: "正在实际调用 Kimi，并验证五个 JSON 字符串字段…" },
+  kimi: { path: "/api/ai/test", success: "所选 CLI 真实连接测试成功，脚本生成能力已验证", progress: "正在实际调用所选 CLI，并验证五个 JSON 字符串字段…" },
   assets: { path: "/api/assets/test", success: "素材规划 Agent 的真实分镜 JSON 测试成功", progress: "正在实际生成分镜 JSON，并检查时间轴与素材类型…" },
   remotion: { path: "/api/render/test", success: "Remotion 真实 MP4 自测成功", progress: "正在执行真实 Remotion 渲染并验证 MP4，可能需要数分钟…" },
   voice: { path: "/api/voices/test", success: "系统语音生成、WAV 转换和媒体检查均已通过", progress: "正在使用 macOS 系统语音生成并检查临时 WAV…" },
@@ -167,12 +169,12 @@ function ConnectionCard({
     <div className="settings-connection-head">
       <span className="settings-connection-icon">{icon}</span>
       <div><p className="eyebrow">{eyebrow}</p><h2>{title}</h2></div>
-      <Badge tone={ready ? "green" : "orange"}>{status}</Badge>
+      <Badge tone={testing ? "orange" : error ? "red" : ready ? "green" : "orange"}>{testing ? "测试中" : error ? "最近测试失败" : status}</Badge>
     </div>
     <p className="settings-connection-description">{description}</p>
     {children}
-    <div className="settings-last-success"><span>最近真实成功</span><strong>{lastSuccess || "尚未验证"}</strong></div>
-    {error && <ErrorBox><strong>最近连接 / 测试错误</strong><p>{error}</p></ErrorBox>}
+    <div className="settings-last-success"><span>历史最近成功</span><strong>{lastSuccess || "尚未验证"}</strong></div>
+    {error && <ErrorBox><strong>最近测试结果</strong><p>{error}</p></ErrorBox>}
     {testing && <p className="settings-test-progress" role="status"><LoaderCircle className="spin" size={15} />{progress}</p>}
     <Button variant="primary" size="small" onClick={onTest} disabled={disabled} title={reason} aria-busy={testing}>
       {testing ? <LoaderCircle className="spin" size={14} /> : null}{testing ? "真实测试进行中…" : buttonLabel}
@@ -218,14 +220,14 @@ function TemplateLibrary() {
     }
   };
   return <section className="settings-connections" aria-label="视频模板库">
-    <div className="section-heading"><div><h2>视频模板库</h2><p>模板开发在 remotion-app 中由 Agent 使用 Remotion skills 完成并写入注册表；这里验收预览、升级稳定或停用。生产任务只能选择稳定模板。</p></div></div>
+    <div className="section-heading"><div><h2>视频模板库</h2><p>查看模板完整效果。稳定模板可用于制作；草稿和停用模板仍保留在本机。</p></div></div>
     {error && <ErrorBox>{error}</ErrorBox>}
     <div className="settings-template-grid">
       {templates.map(template => <article className="settings-template-card" key={template.key}>
-        {template.preview_url ? <img src={template.preview_url} alt={`${template.name} 真实渲染预览`} loading="lazy" /> : <div className="settings-template-empty">预览图未生成</div>}
+        {template.preview_url ? <a href={template.preview_url} target="_blank" rel="noreferrer" aria-label={`放大预览${template.name}`}><img src={template.preview_url} alt={`${template.name} 真实渲染预览`} loading="lazy" /></a> : <div className="settings-template-empty">预览图未生成</div>}
         <div className="settings-template-meta">
           <strong>{template.name} <small>v{template.version}</small></strong>
-          <span>{template.category} · {template.key}</span>
+          <span>{template.category}</span><details><summary>模板版本与标识</summary><code>{template.key} · v{template.version}</code></details>
           <p>{template.description}</p>
           <div className="tag-row">
             <Badge tone={template.status === "stable" ? "green" : template.status === "draft" ? "orange" : "neutral"}>{templateStatusNames[template.status] || template.status}</Badge>
@@ -348,8 +350,7 @@ export default function Settings() {
   async function reload() {
     if (refreshing) return;
     setRefreshing(true);
-    await refresh();
-    setRefreshing(false);
+    try { await refresh(); } finally { setRefreshing(false); }
   }
 
   const connectionProps = (id: TestId) => ({
@@ -363,12 +364,12 @@ export default function Settings() {
   if (!section || !(section in settingPages)) return <Navigate to="/settings/agents" replace />;
 
   return <div className="settings-page">
-    <PageHeader eyebrow="LOCAL SYSTEM / CONTROL ROOM" title={settingPages[page].title} description={settingPages[page].description} actions={<div className="settings-page-actions"><Badge tone="blue">{entries.length} 个独立 Agent · {enabledCount} 个已启用</Badge><Button size="small" onClick={() => { void reload(); }} disabled={refreshing}><RefreshCw className={refreshing ? "spin" : ""} size={14} />{refreshing ? "正在刷新" : "刷新真实状态"}</Button></div>} />
+    <PageHeader eyebrow="LOCAL SYSTEM / CONTROL ROOM" title={settingPages[page].title} description={settingPages[page].description} actions={<div className="settings-page-actions">{page === "agents" && <Badge tone="blue">{entries.length} 个独立 Agent · {enabledCount} 个已启用</Badge>}<Button size="small" onClick={() => { void reload(); }} disabled={refreshing}><RefreshCw className={refreshing ? "spin" : ""} size={14} />{refreshing ? "正在刷新" : "刷新真实状态"}</Button></div>} />
     {page === 'agents' && <RuntimeReadiness />}
     {page === 'agents' && <details className="article-skills"><summary>文案 Agent：图文创作技能接入计划</summary><p>写作统筹复用原文章 Agent；选题与记忆读取、公众号／小红书表达适配、图片搜索、本地图片引用、AI 生图、平台排版与分页长图、图文质检分别作为技能接入。配图搜索需搜索服务，生图需独立图像模型，长图在本地渲染。</p><p>当前已有大纲、正文、版本保存、配图搜索与导入、生图入口、平台排版和分页长图导出；生图依赖本机模型连接，平台配图上传须通过对应账号验收。母稿和各平台版本分开保存，正文、图片、模板版本一起交付审核，修改后旧审批失效。</p></details>}
     {dirty.size>0 && <p className="settings-draft-note">{dirty.size} 个 Agent 有未保存修改，切换设置子页会保留草稿。<NavLink to="/settings/agents">返回配置保存</NavLink></p>}
-    {page === "media" && <><LocalAssets /><RenderCache /><WorkspaceTransfer /></>}
-    {page === "models" && <ImageProviderSettings />}
+    {page === "media" && <><LocalAssets /><MediaTools /><RenderCache /><WorkspaceTransfer /></>}
+    {page === "models" && <ImageProviderSettings onRefresh={refresh} />}
     {activeTest && !['models','media'].includes(page) && <p role="status" className="settings-test-progress">{tests[activeTest].progress} 切换子页不会中断测试。</p>}
     {loadError && <ErrorBox>{resources ? `刷新失败：${loadError}\n当前仍显示上一次成功读取的数据。` : loadError}</ErrorBox>}
     {!resources ? (loading ? <Busy label="正在读取 Agent 配置与本地能力状态…" /> : <Empty title="设置数据尚未读取" description="请检查本地服务后点击“刷新真实状态”。" />) : <>
@@ -378,22 +379,22 @@ export default function Settings() {
           <aside className="settings-agent-list" aria-label="独立 Agent 列表">{entries.map(([id, item]) => <button type="button" key={id} className={`settings-agent-item${id === selectedId ? " active" : ""}`} onClick={() => selectAgent(id)} aria-pressed={id === selectedId}>
             <span className="settings-agent-item-top"><strong>{item.name}</strong>{dirty.has(id) && <i title="有未保存修改">未保存</i>}</span>
             <small>{item.description}</small>
-            <span className="settings-agent-item-meta">{configs[id]?.engine} · {configs[id]?.enabled ? "启用" : item.connected ? "停用" : "未接入"}</span>
+            <span className="settings-agent-item-meta">{engineLabel(configs[id]?.engine||"")} · {configs[id]?.enabled ? "启用" : item.connected ? "停用" : "未接入"}</span>
           </button>)}</aside>
           <section className="settings-agent-editor" aria-label={`${definition.name}配置`}>
             <div className="settings-editor-title"><div><p className="eyebrow">AGENT / {selectedId}</p><h3>{definition.name}</h3><p>{definition.description}</p></div>{dirty.has(selectedId) ? <Badge tone="orange">有未保存修改</Badge> : <Badge>已读取本地配置</Badge>}</div>
             <fieldset className="settings-agent-fieldset" disabled={configBusy !== null}>
               <label className="settings-switch"><input type="checkbox" checked={draft.enabled} onChange={event => updateDraft("enabled", event.target.checked)} disabled={!definition.connected} /><span><strong>允许该 Agent 接收新任务</strong><small>{definition.connected ? "停用只阻止新任务，不删除历史配置和产物。" : "该 Agent 的连接器尚未接入并通过验收，后端不允许启用；其余配置仍可保存。"}</small></span></label>
               <div className="form-grid">
-                <Field label="执行引擎"><select value={draft.engine} onChange={event => updateDraft("engine", event.target.value)}>{definition.engines.map(engine => <option value={engine} key={engine}>{engine}</option>)}</select></Field>
-                <Field label="模型 / 变体" hint={definition.variants ? "仅可选择后端已验证的变体。" : "可填写当前引擎支持的变体，最多 100 字符。"}>{definition.variants ? <select value={draft.model} onChange={event => updateDraft("model", event.target.value)}>{definition.variants.map(model => <option value={model} key={model}>{model}</option>)}</select> : <Input value={draft.model} maxLength={100} onChange={event => updateDraft("model", event.target.value)} />}</Field>
+                <Field label="执行引擎"><select value={draft.engine} onChange={event => updateDraft("engine", event.target.value)}>{definition.engines.map(engine => <option value={engine} key={engine}>{engineLabel(engine)}</option>)}</select></Field>
+                <Field label="模型 / 变体" hint={definition.variants ? "仅可选择后端已验证的变体。" : "可填写当前引擎支持的变体，最多 100 字符。"}>{definition.variants ? <select value={draft.model} onChange={event => updateDraft("model", event.target.value)}>{definition.variants.map(model => <option value={model} key={model}>{model === "default_unpinned" ? "当前 CLI 默认模型" : model}</option>)}</select> : <Input value={draft.model === "default_unpinned" ? "" : draft.model} placeholder="使用当前 CLI 默认模型" maxLength={100} onChange={event => updateDraft("model", event.target.value)} />}</Field>
               </div>
-              <div className="form-grid form-grid-3">
+              <details className="settings-advanced"><summary>高级执行参数：超时、重试与并发</summary><div className="form-grid form-grid-3">
                 <Field label="超时（秒）" hint="30～3600"><Input type="number" min={30} max={3600} step={1} value={draft.timeout_seconds} onChange={event => updateDraft("timeout_seconds", event.target.value)} /></Field>
                 <Field label="最多尝试次数" hint="1～5，含首次尝试"><Input type="number" min={1} max={5} step={1} value={draft.max_attempts} onChange={event => updateDraft("max_attempts", event.target.value)} /></Field>
                 <Field label="并发上限" hint="1～2"><Input type="number" min={1} max={2} step={1} value={draft.concurrency} onChange={event => updateDraft("concurrency", event.target.value)} /></Field>
               </div>
-              {definition.prompt ? <Field label="补充提示词" hint={`只追加到该 Agent，不覆盖原有安全约束，不影响其他 Agent。${draft.prompt.length} / 12000 字符`}><Textarea rows={5} maxLength={12000} value={draft.prompt} onChange={event => updateDraft("prompt", event.target.value)} /></Field> : <p className="settings-no-prompt">该 Agent 是确定性工具或调度器，没有可编辑提示词。</p>}
+              </details>{definition.prompt ? <Field label="补充提示词" hint={`只追加到该 Agent，不覆盖原有安全约束，不影响其他 Agent。${draft.prompt.length} / 12000 字符`}><Textarea rows={5} maxLength={12000} value={draft.prompt} onChange={event => updateDraft("prompt", event.target.value)} /></Field> : <p className="settings-no-prompt">该 Agent 是确定性工具或调度器，没有可编辑提示词。</p>}
               {["script_agent", "article_agent"].includes(selectedId) && <Field label="写作 Skills（每行一个只读 Markdown 路径）" hint="默认加载去 AI 味儿和写作技巧；仅允许 skills/ 或 .agents/skills/ 下的 .md 文件，生成与改写时真实注入。"><Textarea rows={3} value={(draft.custom.skills || ["skills/writing/de-ai/SKILL.md", "skills/writing/techniques/SKILL.md"]).join("\n")} onChange={event => updateDraft("custom", { ...draft.custom, skills: event.target.value.split("\n").map(value => value.trim()).filter(Boolean) })} /></Field>}
               {configError && <ErrorBox>{configError}</ErrorBox>}
               <div className="settings-editor-actions"><Button variant="primary" onClick={() => { void saveAgent(); }}><Save size={14} />{configBusy === `save:${selectedId}` ? "正在保存…" : `保存${definition.name}`}</Button><Button onClick={() => { void resetAgent(); }}><RotateCcw size={14} />{configBusy === `reset:${selectedId}` ? "正在恢复…" : "恢复该 Agent 默认"}</Button><span>保存与恢复均只调用当前 Agent 的配置接口。</span></div>
@@ -406,10 +407,10 @@ export default function Settings() {
         <div className="section-heading"><div><h2>{page === "models" ? "模型连接测试" : "本地媒体能力测试"}</h2><p>测试只使用临时自测文件，不加入内容任务，不公开发布，也不会自动启用 Agent。</p></div></div>
         <div className="settings-connection-grid">
           {page === "models" && <>
-          <ConnectionCard icon={<Bot size={19} />} eyebrow="SCRIPT / KIMI CLI" title="本地 Kimi" description="本地 CLI 调用云端模型，使用当前默认模型与共享会员额度；脚本生成后仍需人工确认。" ready={core.ai.ready} status={core.ai.ready ? "已连接" : core.ai.installed ? "未测试" : "未安装"} lastSuccess={core.ai.last_success} lastError={core.ai.last_error} buttonLabel="测试本地连接" footnote="测试会实际调用一次 Kimi，并验证五个 JSON 字符串；不会固定或伪造模型 ID。" disabledReason={!core.ai.installed ? "未找到 Kimi CLI，安装并确保本地服务可发现后刷新。" : undefined} {...connectionProps("kimi")}>
+          <ConnectionCard icon={<Bot size={19} />} eyebrow="SCRIPT / LOCAL CLI" title="脚本 Agent 模型连接" description="在 Agent 配置中选择 Codex 或 Kimi；使用所选 CLI 的登录与额度，不会自动切换。" ready={core.ai.ready} status={core.ai.ready ? "已连接" : core.ai.installed ? "未测试" : "未安装"} lastSuccess={core.ai.last_success} lastError={core.ai.last_error} buttonLabel="测试本地连接" footnote="测试会实际调用一次当前脚本 Agent 所选的 CLI，并验证五个 JSON 字符串；不会固定或伪造模型 ID。"  {...connectionProps("kimi")}>
             <div className="settings-kimi-metrics"><div><span>CLI 安装</span><strong>{core.ai.installed ? "已安装" : "未找到"}</strong></div><div><span>版本</span><strong>{core.ai.version || "未读取"}</strong></div><div><span>OAuth / 连接状态</span><strong>{core.ai.oauth_status || "未读取"}</strong></div><div><span>模型</span><strong>{core.ai.model || "使用 CLI 当前默认模型"}</strong></div></div>
           </ConnectionCard>
-          <ConnectionCard icon={<WandSparkles size={19} />} eyebrow="ASSET / JSON" title="素材规划 Agent" description="使用真实 Kimi 分镜 JSON 测试，并验证镜头时长与允许的素材类型。" ready={core.asset_ai.ready} status={core.asset_ai.status || (core.asset_ai.ready ? "已连接" : "未测试")} lastSuccess={core.asset_ai.last_success} lastError={core.asset_ai.last_error} buttonLabel="测试素材规划 Agent" footnote="不下载素材、不生成媒体，也不代表任何素材已获得授权。" {...connectionProps("assets")} />
+          <ConnectionCard icon={<WandSparkles size={19} />} eyebrow="ASSET / JSON" title="素材规划 Agent" description="使用素材规划 Agent 所选 CLI 进行分镜 JSON 测试，并验证镜头时长与允许的素材类型。" ready={core.asset_ai.ready} status={core.asset_ai.status || (core.asset_ai.ready ? "已连接" : "未测试")} lastSuccess={core.asset_ai.last_success} lastError={core.asset_ai.last_error} buttonLabel="测试素材规划 Agent" footnote="不下载素材、不生成媒体，也不代表任何素材已获得授权。" {...connectionProps("assets")} />
           </>}
           {page === "media" && <>
           <ConnectionCard icon={<Film size={19} />} eyebrow="VIDEO / MP4" title="Remotion 视频构建" description="执行真实 Remotion 渲染并验证输出 MP4，不以项目文件存在作为连接成功。" ready={core.render_ai.ready} status={core.render_ai.status || (core.render_ai.ready ? "已连接" : "未测试")} lastSuccess={core.render_ai.last_success} lastError={core.render_ai.last_error} buttonLabel="测试 Remotion 视频构建" footnote="自测音频和 MP4 仅用于验证，临时文件由后端清理。" {...connectionProps("remotion")} />
@@ -424,7 +425,7 @@ export default function Settings() {
 
       {page === "templates" && <TemplateLibrary />}
 
-      {page === "data" && <Card className="settings-boundary"><div><p className="eyebrow">SAFETY / LOCAL FIRST</p><h2>数据与自动化边界</h2></div><ul><li>任务、设置和审批保存在本机 SQLite，服务只监听 127.0.0.1；页面不会读取凭据文件。</li><li>生成输入仅包含当前任务、候选 / 热点证据和必要账号策略，不发送全库历史文章。</li><li>生成成功不会自动人工批准；连接测试不会自动发布任何内容。</li><li>未接入的质检、发布复盘和数据分析 Agent 不能启用；发布助手仅做预览填充，公开发布始终需要人工确认。</li></ul></Card>}
+      {page === "data" && <Card className="settings-boundary"><div><p className="eyebrow">SAFETY / LOCAL FIRST</p><h2>数据与隐私</h2></div><ul><li>任务、设置和审批保存在本机 SQLite，服务只监听 127.0.0.1；页面不会读取凭据文件。</li><li>生成输入仅包含当前任务、候选 / 热点证据和必要账号策略，不发送全库历史文章。</li><li>生成成功不会自动人工批准；连接测试不会自动发布任何内容。</li><li>未接入的质检、发布复盘和数据分析 Agent 不能启用；发布助手仅做预览填充，公开发布始终需要人工确认。</li></ul></Card>}
     </>}
   </div>;
 }

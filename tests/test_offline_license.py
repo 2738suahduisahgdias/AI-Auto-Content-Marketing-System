@@ -26,6 +26,15 @@ class OfflineLicenseTests(unittest.TestCase):
         (self.customer.folder/'public-keys.json').write_text(json.dumps(self.keys))
     def issue(self, **kwargs):
         return self.issuer.issue({'name':'测试客户', 'wechat':'测试备注', 'requestCode':self.customer.status()['requestCode'], 'days':30, 'password':self.password, **kwargs})
+    def test_presented_guide_persists_without_marking_steps_complete(self):
+        self.customer.activate(self.issue()['token'])
+        self.customer.onboarding({'step':'seen'})
+        reloaded=LicenseService(self.tmp_customer.name,mode='required')
+        self.assertTrue(reloaded.status()['onboarding']['presented'])
+        self.assertFalse(reloaded.status()['onboarding']['completed'])
+        reloaded.onboarding({'step':'restart'})
+        self.assertFalse(reloaded.status()['onboarding']['presented'])
+
     def test_activate_restart_and_first_run_persist(self):
         with self.assertRaises(DomainError): self.customer.require_active()
         record=self.issue()

@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
 
 from content_workbench.domain.errors import DomainError
@@ -16,12 +17,20 @@ class JobStore:
     def conn(self, readonly=False):
         return connect(self.db_path, readonly=readonly)
 
+    def enqueue_active_once(self, kind, input_data, aggregate_id, resource_key=None):
+        """Reuse an unfinished collection/recommendation job, including across tabs."""
+        with self.conn() as conn, immediate(conn):
+            row = conn.execute("SELECT * FROM wb_jobs WHERE kind=? AND aggregate_id=? AND status IN ('queued','leased','running','retry_wait','cancel_requested') ORDER BY created_at DESC LIMIT 1", (kind, aggregate_id)).fetchone()
+            if row:
+                return self.job_dict(row)
+            return self.enqueue(kind, input_data, aggregate_id, resource_key=resource_key, connection=conn)
+
     def enqueue(self, kind, input_data, aggregate_id=None, idempotency_key=None, scope=None,
-                max_attempts=3, resource_key=None, available_at=None):
+                max_attempts=3, resource_key=None, available_at=None, connection=None):
         key = idempotency_key or new_id("request")
         scope = scope or kind
         body_hash = payload_hash(input_data)
-        with self.conn() as conn, immediate(conn):
+        with (self.conn() if connection is None else nullcontext(connection)) as conn, (immediate(conn) if connection is None else nullcontext()):
             existing = conn.execute("SELECT * FROM wb_jobs WHERE idempotency_scope=? AND idempotency_key=?", (scope, key)).fetchone()
             if existing:
                 if existing["input_hash"] != body_hash:
@@ -61,6 +70,13 @@ class JobStore:
         with self.conn(readonly=True) as conn:
             return [self.job_dict(row) for row in conn.execute("SELECT * FROM wb_jobs ORDER BY created_at DESC LIMIT ?", (min(limit, 200),))]
 
+    @staticmethod
+    def reconcile_publish_failure(conn, job_id, error):
+        if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='publish_targets'").fetchone():
+            return
+        conn.execute("UPDATE publish_targets SET status=CASE WHEN status='publishing' THEN 'unknown_remote' ELSE 'failed' END,error_json=?,updated_at=? WHERE job_id=? AND status IN ('preparing','publishing')", (dumps(error or {"code":"JOB_INTERRUPTED","message":"任务已中断，请核实后重试"}), utcnow(), job_id))
+        # Batch status is read from its targets by the publishing service.
+
     def lease(self, owner, lease_seconds=90, kinds=None):
         with self.conn() as conn, immediate(conn):
             now = utcnow()
@@ -76,6 +92,7 @@ class JobStore:
             if row["attempt_count"] >= row["max_attempts"]:
                 conn.execute("UPDATE wb_jobs SET status='failed',error_json=?,updated_at=? WHERE id=?",
                              (dumps({"code": "ATTEMPTS_EXHAUSTED", "message": "任务重试次数已用完"}), now, row["id"]))
+                self.reconcile_publish_failure(conn, row["id"], {"code":"ATTEMPTS_EXHAUSTED","message":"任务中断且未完成，请核对平台状态后重试"})
                 return None
             token = row["fencing_token"] + 1
             attempt_no = row["attempt_count"] + 1
@@ -130,6 +147,8 @@ class JobStore:
             conn.execute("""UPDATE wb_attempts SET status=?,finished_at=?,error_json=?,usage_json=COALESCE(usage_json,?) WHERE
                 job_id=? AND attempt_no=? AND fencing_token=?""",
                 (status, timestamp, dumps(error) if error else None, dumps({}), job_id, row["attempt_count"], token))
+            if status in ("failed", "cancelled", "unknown_remote"):
+                self.reconcile_publish_failure(conn, job_id, error)
             Workbench.event(conn, "job", job_id, "job." + status, {"error": error, "result": result})
             return self.get(job_id)
 

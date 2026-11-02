@@ -75,9 +75,6 @@ class ReviewExecutors:
     def ai(self, job, context):
         config = require_agent_enabled(self.service.db_path, "video_review_agent")
         batch = self.service.get_batch(job["input"]["batch_id"])
-        binary = shutil.which("kimi") or str(Path.home() / ".kimi-code/bin/kimi")
-        if not Path(binary).is_file():
-            raise DomainError("KIMI_NOT_FOUND", "未找到 Kimi CLI", 503, "provider", "安装并登录后重试")
         items = [{"item_id": item["id"], "filename": Path(item["source_path"]).name,
                   "technical_report": item["report"]} for item in batch["items"] if item["report"]]
         if not items:
@@ -85,25 +82,10 @@ class ReviewExecutors:
         prompt = json.dumps({"operation": "短视频风险证据分析，逐条返回结果，不得声称看到了未提供的画面或事实",
                              "items": items, "agent_supplement": config["prompt"]}, ensure_ascii=False)
         agent = PROJECT_ROOT / "agents/video-review-agent.md"
-        stdout, _ = context.run_process([binary, "--agent-file", str(agent), "-p", prompt, "--output-format", "stream-json"],
-                                        timeout=config["timeout_seconds"], stage="video_review_agent", cwd=self.root)
-        contents = []
-        for line in stdout.splitlines():
-            try:
-                event = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if event.get("type") != "assistant" and event.get("role") != "assistant":
-                continue
-            content = event.get("content")
-            if isinstance(content, list):
-                content = "".join(part.get("text", "") for part in content if isinstance(part, dict))
-            elif isinstance(content, dict):
-                content = content.get("text", "")
-            if isinstance(content, str) and content.strip():
-                contents.append(content.strip())
+        from content_workbench.providers.text import CodexCLIProvider, KimiCLIProvider
+        provider = KimiCLIProvider(self.root) if config["engine"] == "kimi_cli" else CodexCLIProvider()
+        payload = provider.complete_json(prompt, context, agent, timeout=config["timeout_seconds"], stage=config["engine"] + "_video_review")
         try:
-            payload = json.loads(contents[-1])
             risks = payload["items"]
             by_id = {item["item_id"]: item for item in risks}
         except (IndexError, json.JSONDecodeError, KeyError, TypeError):

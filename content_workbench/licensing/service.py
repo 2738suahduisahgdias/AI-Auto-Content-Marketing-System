@@ -88,10 +88,13 @@ class LicenseService:
             state = self.read()
             current = state['onboarding']
             step = body.get('step')
-            if step not in ('storage', 'environment', 'capabilities', 'project', 'complete', 'restart'):
+            if step not in ('storage', 'environment', 'capabilities', 'project', 'complete', 'restart', 'seen'):
                 raise DomainError('ONBOARDING_STEP', '未知引导步骤')
             if step == 'restart':
                 current['completed'] = False
+                current['presented'] = False
+            elif step == 'seen':
+                current['presented'] = True
             elif step == 'complete':
                 current['completed'] = True
             else:

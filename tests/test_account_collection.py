@@ -26,6 +26,14 @@ class AccountCollectionCase(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
+    def test_closed_tab_recovers_navigation_only(self):
+        bridge = Bridge()
+        old = bridge.session
+        with mock.patch.object(bridge, "call", side_effect=[RuntimeError("No tab with given id 1"), RuntimeError("No tab with given id 1"), {}]) as call, mock.patch("time.sleep"):
+            bridge.goto("https://creator.douyin.com/")
+        self.assertNotEqual(old, bridge.session)
+        self.assertEqual(["find_tab", "navigate", "navigate"], [c.args[0] for c in call.call_args_list])
+
     def test_labeled_metrics_do_not_guess_unlabeled_numbers(self):
         metrics = labeled_metrics("播放量 1.2万 点赞 340 评论 21 分享 8 收藏 16 其他数字 999", "wechat_channels")
         self.assertEqual("1.2万", metrics["views"])
@@ -46,6 +54,8 @@ class AccountCollectionCase(unittest.TestCase):
             raise DomainError("LOGIN_REQUIRED", "需要扫码", 409)
         with mock.patch.object(self.executor, "platform", side_effect=collect):
             data = self.executor.sync({}, mock.Mock())
+        self.assertEqual("partial", data["status"])
+        self.assertEqual(["douyin", "xiaohongshu"], data["successful_platforms"])
         self.assertEqual(1, data["accounts"]["xiaohongshu"])
         self.assertEqual(2, data["accounts"]["douyin"])
         self.assertEqual("需要扫码", data["accounts"]["wechat_channels_error"])
@@ -76,7 +86,7 @@ class AccountCollectionCase(unittest.TestCase):
         actions = [call.args[1] for call in open_browser.call_args_list]
         self.assertEqual(["xiaohongshu_login", "douyin_publish_login", "channels_login", "official_login"], actions)
 
-    def test_login_success_runs_full_sync_and_timeout_guides_retry(self):
+    def test_login_success_stays_login_only_and_timeout_guides_retry(self):
         page = mock.Mock()
         with mock.patch("content_workbench.accounts.platform_worker.login_verified", side_effect=[False, True]):
             result = wait_for_login(page, "channels_login", timeout_seconds=180)
@@ -84,8 +94,8 @@ class AccountCollectionCase(unittest.TestCase):
         page.wait_for_timeout.assert_called_once_with(3000)
         with mock.patch.object(self.executor, "platform", return_value=result), mock.patch.object(self.executor, "sync", return_value={"accounts": {"douyin": 15}}) as sync:
             completed = self.executor.login({"input": {"platform": "wechat_channels"}}, mock.Mock())
-        sync.assert_called_once()
-        self.assertEqual("all_account_data", completed["refresh"])
+        sync.assert_not_called()
+        self.assertEqual("login_only", completed["refresh"])
         with mock.patch("content_workbench.accounts.platform_worker.login_verified", return_value=False):
             timeout = wait_for_login(page, "official_login", timeout_seconds=0)
         self.assertEqual("login_required", timeout["status"])

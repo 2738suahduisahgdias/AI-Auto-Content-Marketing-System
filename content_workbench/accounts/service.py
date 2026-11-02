@@ -74,7 +74,7 @@ class AccountService:
                 "collection_knowledge": collection_bootstrap(),
                 "publish_knowledge": publish_knowledge(),
                 "competitor_analytics": analytics["competitor_analytics"],
-                "jobs": [job for job in self.topics.jobs.list() if job["kind"].startswith("accounts.") or job["kind"] == "publish.douyin"][:20]}
+                "jobs": [job for job in self.topics.jobs.list() if job["kind"] in ("accounts.login", "publish.douyin")][:20]}
 
 
 def platform_names():

@@ -25,6 +25,17 @@ class LocalDesktopFlows(unittest.TestCase):
   self.file=app.import_yingxu_file(self.task,{'path':str(self.clip),'kind':'asset'})
   with app.connect() as c:self.task=app.get_task(c,self.task['content_id'])
   self.task=app.save_yingxu(self.task,{'revision':0,'snapshot':{'shots':[{'title':'镜头','text':'测试','fileId':self.file['id'],'source':'人工上传','duration':99}]}})
+ def test_portable_excludes_wechat_credentials(self):
+  config=self.root/'config';config.mkdir(exist_ok=True)
+  (config/'wechat-client.json').write_text('{"token":"test-only-secret"}')
+  (config/'wechat-inbox.env').write_text('TOKEN=test-only-secret')
+  (config/'video_templates.json').write_text('{}')
+  package=self.base/'package-clean'
+  export_workspace(app.DB_PATH,self.root,package)
+  self.assertFalse((package/'config/wechat-client.json').exists())
+  self.assertFalse((package/'config/wechat-inbox.env').exists())
+  self.assertTrue((package/'config/video_templates.json').exists())
+
  def test_proxy_real_audio_duration_reuse_and_final_original(self):
   original=file_hash(self.clip);directory=app.REMOTION_APP/'public-static/yingxu-assets'
   proxy=prepare(self.clip,directory,1024**3);info=probe(proxy)

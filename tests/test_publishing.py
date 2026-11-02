@@ -129,6 +129,43 @@ class PublishingCase(unittest.TestCase):
             self.service.retry(target["id"])
         self.assertEqual("PUBLISH_RETRY_BLOCKED", caught.exception.code)
 
+    def test_duplicate_prepare_reuses_job_and_rejects_late_result(self):
+        batch = self.service.create_batch("video", self.video, self.video_targets())
+        first = self.service.prepare(batch["id"], [])
+        second = self.service.prepare(batch["id"], [])
+        self.assertEqual([j["id"] for j in first], [j["id"] for j in second])
+        with self.assertRaises(DomainError):
+            self.service.set_target_result(batch["targets"][0]["id"], "ready", job_id="old-job")
+
+    def test_failed_executor_updates_target(self):
+        batch = self.service.create_batch("video", self.video, self.video_targets())
+        job = self.service.prepare(batch["id"], [batch["targets"][0]["platform"]])[0]
+        executor = PublishingExecutors(self.service)
+        with mock.patch.object(executor, "run", side_effect=DomainError("OFFLINE", "浏览器离线", 503)):
+            with self.assertRaises(DomainError):executor.prepare(job, mock.Mock())
+        self.assertEqual(self.service.get_batch(batch["id"])["targets"][0]["status"], "failed")
+
+    def test_manual_retry_never_enqueues(self):
+        batch = self.service.create_batch("video", self.video, self.video_targets())
+        target = batch["targets"][0]
+        payload = dict(target["payload"], manual_transfer=True)
+        with self.service.conn() as conn:
+            conn.execute("UPDATE publish_targets SET payload_json=? WHERE id=?", (json.dumps(payload),target["id"]))
+        with mock.patch.object(self.service.jobs,"enqueue") as enqueue:
+            with self.assertRaises(DomainError):self.service.retry(target["id"])
+            enqueue.assert_not_called()
+
+    def test_enqueue_state_update_rolls_back_together(self):
+        batch = self.service.create_batch("video", self.video, self.video_targets())
+        original = self.service.jobs.enqueue
+        def crash(*args, **kwargs):
+            original(*args, **kwargs)
+            raise RuntimeError("crash before target update")
+        with mock.patch.object(self.service.jobs,"enqueue",side_effect=crash):
+            with self.assertRaises(RuntimeError):self.service.prepare(batch["id"], [])
+        self.assertEqual(self.service.get_batch(batch["id"])["targets"][0]["status"], "draft")
+        self.assertEqual(self.service.jobs.list(), [])
+
     def test_same_batch_is_reused_without_losing_ready_preview(self):
         batch = self.service.create_batch("video", self.video, self.video_targets())
         target = batch["targets"][0]
@@ -152,7 +189,8 @@ class PublishingCase(unittest.TestCase):
         target = batch["targets"][0]
         executor = PublishingExecutors(self.service)
         with mock.patch.object(executor, "run", return_value={"status": "preview_ready", "fields_verified": ["title", "body"]}) as run:
-            result = executor.prepare({"id": "job-prepare", "input": {"target_id": target["id"]}}, mock.Mock())
+            job = self.service.prepare(batch["id"], [target["platform"]])[0]
+            result = executor.prepare(job, mock.Mock())
         self.assertEqual("ready", result["status"])
         self.assertFalse(result["auto_published"])
         self.assertEqual("prepare", run.call_args.args[1])
@@ -163,12 +201,11 @@ class PublishingCase(unittest.TestCase):
         batch = self.service.create_batch("video", self.video, self.video_targets())
         target = batch["targets"][0]
         self.service.set_target_result(target["id"], "ready", {"fields_verified": ["title"]})
-        with mock.patch.object(self.service.jobs, "enqueue", side_effect=lambda kind, data, aggregate, *args, **kwargs: {"id": "job-confirm", "kind": kind}):
-            self.service.confirm(batch["id"], batch["source_hash"])
+        confirmed_job = self.service.confirm(batch["id"], batch["source_hash"])[0]
         executor = PublishingExecutors(self.service)
         with mock.patch.object(executor, "run", return_value={"status": "unknown_remote", "error": "结果未知"}):
             with self.assertRaises(UnknownRemote):
-                executor.execute({"id": "job-execute", "input": {"target_id": target["id"]}}, mock.Mock())
+                executor.execute(confirmed_job, mock.Mock())
         self.assertEqual("unknown_remote", self.service.target(target["id"])[1]["status"])
         with self.assertRaises(DomainError):
             self.service.reconcile(target["id"], "已发布")
@@ -182,7 +219,7 @@ class PublishingCase(unittest.TestCase):
         self.service.set_target_result(target["id"], "unknown_remote", {})
         executor = PublishingExecutors(self.service)
         with mock.patch.object(executor, "run", return_value={"status": "published", "published_evidence": "笔记管理存在标题", "url": "https://example.com/note"}):
-            result = executor.verify({"id": "job-verify", "input": {"target_id": target["id"]}}, mock.Mock())
+            result = executor.verify(self.service.verify(target["id"]), mock.Mock())
         self.assertEqual("published", result["status"])
         self.assertEqual("published", self.service.target(target["id"])[1]["status"])
 
@@ -270,7 +307,9 @@ class PublishingCase(unittest.TestCase):
         from content_workbench.publishing.executors import browser_python
         with tempfile.TemporaryDirectory(prefix="browser-python-") as directory:
             root = Path(directory)
-            self.assertEqual(str(root / ".venv-topics/bin/python"), browser_python(root))
+            linux = root / ".venv-topics/bin/python"
+            linux.parent.mkdir(parents=True); linux.touch()
+            self.assertEqual(str(linux), browser_python(root))
             windows = root / ".venv-topics/Scripts/python.exe"
             windows.parent.mkdir(parents=True)
             windows.touch()

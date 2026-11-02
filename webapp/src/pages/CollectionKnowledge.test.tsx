@@ -18,11 +18,11 @@ vi.mock("@/AppContext", () => ({
 describe("CollectionKnowledge", () => {
   it("shows ontology contracts, verification states and agent links", () => {
     render(<MemoryRouter><CollectionKnowledge /></MemoryRouter>);
-    expect(screen.getByRole("heading", { name: "采集 Ontology" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "采集知识库" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "视频内容管理" })).toBeInTheDocument();
     expect(screen.getByText("2 个实体")).toBeInTheDocument();
-    expect(screen.getByText("1 个已验证")).toBeInTheDocument();
-    expect(screen.getByText("1 个待验证")).toBeInTheDocument();
+    expect(screen.getByText("1 个规则已验证")).toBeInTheDocument();
+    expect(screen.getByText("1 个规则待验证")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "查看机器可读 JSON" })).toHaveAttribute("href", "/api/accounts/collection-knowledge/wechat_channels/content_management");
   });
 });

@@ -1,0 +1,189 @@
+/* Shared presentation for inherited modules. No business controls are hidden. */
+.app-shell{--radius-control:8px;--radius-card:12px;--focus-ring:#bd681c44}
+.app-shell .page-container{max-width:1720px;margin-inline:auto;padding-bottom:112px}
+.app-shell .page-header{margin-bottom:24px;gap:20px;align-items:flex-start}
+.app-shell .page-header h1{font-size:28px;letter-spacing:-.5px;line-height:1.3}
+.app-shell .page-header p:not(.eyebrow){font-size:13px;line-height:1.75;max-width:760px;margin-top:8px}
+.app-shell .eyebrow{font-size:11px;letter-spacing:1.2px;line-height:1.5}
+.app-shell .card,.app-shell .panel,.app-shell .article-card{border-radius:var(--radius-card)}
+.app-shell .button,.app-shell .yx-native .btn,.app-shell .guide-actions>.button{min-height:36px;border-radius:var(--radius-control);padding:8px 13px;font:600 13px/1.4 var(--font-ui);gap:7px;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;white-space:normal;text-align:center}
+.app-shell .button-small{min-height:32px;padding:6px 10px;font-size:12px}
+.app-shell .button-primary,.app-shell .yx-native .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.app-shell .button-primary:hover,.app-shell .yx-native .btn.primary:hover{background:var(--accent-dark);border-color:var(--accent-dark)}
+.app-shell .input,.app-shell .textarea,.app-shell select{border-radius:var(--radius-control);min-height:38px;font-size:13px;line-height:1.6;background:var(--panel)}
+.app-shell .field-label{font-size:12px;line-height:1.5}
+.app-shell .field small,.app-shell .badge{font-size:11px;line-height:1.5}
+.app-shell .badge{white-space:normal}
+.app-shell .textarea{resize:both;max-width:100%}
+.app-shell :is(button,a,input,textarea,select):focus-visible{outline:3px solid var(--focus-ring);outline-offset:3px}
+.app-shell .card>p,.app-shell .panel.pad>p{font-size:13px;line-height:1.8;color:var(--muted);overflow-wrap:anywhere;margin-block:10px 16px}
+.app-shell .card>h2,.app-shell .panel.pad>h2{font-size:19px;line-height:1.5;margin-bottom:12px}
+.app-shell details>summary{cursor:pointer;font-size:12px;line-height:1.7;padding-block:9px;color:var(--muted)}
+.app-shell details[open]>summary{color:var(--accent-dark);margin-bottom:8px}
+.app-shell details>p{font-size:13px;line-height:1.8;margin-block:10px;color:var(--muted);overflow-wrap:anywhere}
+.app-shell code,.app-shell pre{overflow-wrap:anywhere;max-width:100%}
+.app-shell .button-row,.app-shell .migration-toolbar{gap:10px;flex-wrap:wrap}
+.app-shell .migration-toolbar{display:flex;align-items:center;padding-block:10px}
+.app-shell .migration-toolbar>span{flex:1 1 280px;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.app-shell .toast{position:sticky;bottom:16px;margin:16px 0 0 auto;width:fit-content;max-width:100%;right:auto;z-index:35}
+/* Topic research: content before promotional padding. */
+.app-shell .topic-intro{padding:16px 18px;margin-block:14px;gap:18px;align-items:center;border-radius:12px}
+.app-shell .topic-intro h2{font-size:18px;margin-block:8px 4px;line-height:1.5}
+.app-shell .topic-intro p,.app-shell .topic-sync-summary{font-size:12px;line-height:1.75}
+.app-shell .topic-layout{align-items:start}
+.app-shell .topic-card h3{font-size:16px;line-height:1.55}
+.app-shell .topic-job small,.app-shell .topic-card small{font-size:11px;line-height:1.6}
+.app-shell .topic-filter{min-height:36px;font-size:12px;border-radius:8px}
+/* Article writing: group actions and use the document as the visual anchor. */
+.app-shell .article-card{padding:22px}
+.app-shell .article-card-head{gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.app-shell .article-title-block h2{font-size:22px;line-height:1.45}
+.app-shell .article-work-tabs{gap:8px;flex-wrap:wrap}
+.app-shell .article-work-tabs button{min-height:38px;font-size:13px;border-radius:8px}
+.app-shell .article-entry-row{gap:12px;flex-wrap:wrap;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--surface-soft);margin-block:16px}
+.app-shell .article-draft-editor{font-size:15px;line-height:1.9;min-height:400px}
+.app-shell .article-export{padding:18px;border:1px solid var(--line);border-radius:12px;overflow-wrap:anywhere}
+/* Publish: queue and editors should not compete for a narrow column. */
+.app-shell .publish-queue-layout{grid-template-columns:260px minmax(0,1fr);gap:20px}
+.app-shell .publish-queue{top:96px;border-radius:12px}
+.app-shell .publish-queue-list{max-height:440px}
+.app-shell .publish-queue-item strong{font-size:13px}
+.app-shell .publish-queue-item small{font-size:11px;line-height:1.6;overflow-wrap:anywhere}
+.app-shell .publishing-target-grid,.app-shell .publishing-target-grid:has(.publishing-target:nth-child(3)){grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+.app-shell .publishing-target{padding:20px;border-radius:12px}
+.app-shell .publishing-target .button-row{align-items:flex-start}
+.app-shell .publishing-two-columns{grid-template-columns:1fr}
+.app-shell .publishing-generator-actions{flex-wrap:wrap;align-items:flex-start}
+.app-shell .publishing-generator-actions>p{flex:1 1 260px;font-size:12px}
+.app-shell .publishing-generator-actions>.button{flex:0 1 auto}
+.app-shell .publishing-batch-bar{padding:18px;border-radius:12px;gap:16px;flex-wrap:wrap}
+.app-shell .publishing-batch-bar p,.app-shell .platform-field-meta>p{font-size:11px;line-height:1.7}
+/* Memory and knowledge: labels never collapse to vertical text. */
+.app-shell .memory-toolbar{display:grid;grid-template-columns:minmax(220px,2fr) repeat(2,minmax(140px,1fr));gap:12px}
+.app-shell .memory-toolbar>*{min-width:0;width:100%}
+.app-shell .collection-toolbar{align-items:end;gap:14px}
+.app-shell .collection-toolbar label{display:flex;flex-direction:column;align-items:flex-start;gap:7px;min-width:160px;flex:1 1 180px;font-size:12px;white-space:nowrap}
+.app-shell .collection-toolbar select{min-width:0;width:100%}
+.app-shell .collection-detail-head{align-items:flex-start;flex-wrap:wrap}
+.app-shell .collection-detail-head>.button{flex:none;align-self:flex-start;min-height:36px}
+.app-shell .collection-layout{grid-template-columns:230px minmax(0,1fr)}
+.app-shell .collection-entity-list{max-height:520px}
+.app-shell .knowledge-detail{position:static;max-height:none;overflow:visible}
+.app-shell .collection-info-grid p,.app-shell .collection-info-grid pre{font-size:12px;line-height:1.8}
+/* Settings: compact index, readable editor, explicit utility groups. */
+.app-shell .settings-agent-layout{grid-template-columns:245px minmax(0,1fr);align-items:start}
+.app-shell .settings-agent-list{max-height:680px}
+.app-shell .settings-agent-editor{padding:24px;min-width:0}
+.app-shell .settings-agent-item-top strong{font-size:13px}
+.app-shell .settings-agent-item-meta,.app-shell .settings-agent-item p{font-size:11px;line-height:1.65}
+.app-shell .settings-editor-title{margin-bottom:20px}
+.app-shell .settings-editor-title h3{font-size:22px;line-height:1.4;margin-block:6px}
+.app-shell .settings-editor-actions{flex-wrap:wrap;gap:10px}
+.app-shell .settings-editor-actions>span{flex-basis:100%;margin:0;font-size:11px}
+.app-shell .settings-connection-description{min-height:0;font-size:13px;line-height:1.8}
+.app-shell .settings-connection-footnote,.app-shell .settings-last-success{font-size:12px;line-height:1.7}
+.app-shell .settings-template-card img{height:300px;max-height:none;object-fit:contain;object-position:center;background:#f0eeea;padding:10px}
+.app-shell .settings-template-meta{padding:18px}
+.app-shell .settings-template-meta p{font-size:13px}
+.app-shell .settings-template-meta strong{font-size:15px}
+.app-shell .media-tools{display:grid;gap:16px}
+.app-shell .media-tools>p{margin:0}
+.app-shell .media-tool-field{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:12px;padding-block:12px;border-top:1px solid var(--line)}
+.app-shell .media-tool-field>label{display:grid;gap:8px;font-size:12px;font-weight:600}
+.app-shell input[type=file]{max-width:100%;font-size:12px}
+.app-shell input[type=file]::file-selector-button{border:1px solid var(--line-strong);background:var(--panel);color:var(--ink);border-radius:8px;padding:8px 12px;font:600 12px var(--font-ui);margin-right:10px;cursor:pointer}
+/* Preserve the inherited video workflow while matching the shell. */
+.app-shell .yx-native .project-head{gap:18px;margin-block:18px}
+.app-shell .yx-native .steps{gap:6px;display:flex;flex-wrap:wrap;padding:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+.app-shell .yx-native .step{flex:1 1 130px;min-height:44px;font-size:12px;border-radius:8px;justify-content:center}
+.app-shell .yx-native .step:after{display:none}
+.app-shell .yx-native .step.active{background:var(--accent-soft);color:var(--accent-dark)}
+.app-shell .yx-native .workgrid{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:18px}
+.app-shell .yx-native .bottom-bar{position:static;padding:18px;margin-block:20px;border-radius:12px;flex-wrap:wrap;gap:16px}
+.app-shell .yx-native .native-project-preview{display:grid;place-items:center;min-height:300px;width:100%}
+.app-shell .yx-native .native-project-preview video{display:block;max-width:100%;max-height:560px;width:auto;border-radius:10px}
+.app-shell .yx-native .review-layout{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.app-shell .yx-native .video-frame{height:auto;min-height:300px;padding:18px}
+.app-shell .video-output video,.app-shell .review-item video{display:block;width:auto;max-width:100%;max-height:560px;margin:16px auto;object-fit:contain;background:#24211e;border-radius:10px}
+.app-shell .video-delivery-files{margin-top:24px;padding:22px}
+.app-shell .video-savebar{gap:16px;flex-wrap:wrap;padding:12px 16px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.app-shell .video-savebar>span{font-size:12px}
+.app-shell .video-history{margin-top:20px}
+/* Setup and activation share the standard controls and readable instructions. */
+.app-shell .setup-platform-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.app-shell .setup-platform p{min-height:0;font-size:13px;line-height:1.8}
+.app-shell .setup-dependency p,.app-shell .guide-dependency small{font-size:12px;line-height:1.75}
+.app-shell .guide-steps{display:flex;flex-wrap:wrap;gap:8px}
+.app-shell .guide-steps button{flex:1 1 150px;border-radius:8px;min-height:42px;font-size:13px}
+.app-shell .welcome-card{padding:24px;border-radius:12px;margin-block:20px}
+.app-shell .welcome-card p{margin-block:12px;font-size:14px;line-height:1.8}
+.app-shell .welcome-card code{display:block;padding:14px;border:1px solid var(--line);border-radius:8px;white-space:normal}
+@media(max-width:1250px){.app-shell .publish-queue-layout{grid-template-columns:1fr}.app-shell .publish-queue{position:static}.app-shell .publish-queue-list{max-height:240px}.app-shell .yx-native .workgrid{grid-template-columns:1fr}.app-shell .collection-layout{grid-template-columns:1fr}.app-shell .collection-entity-list{max-height:280px}}
+@media(max-width:1000px){.app-shell .settings-agent-layout{grid-template-columns:1fr}.app-shell .settings-agent-list{max-height:260px;border-right:0;border-bottom:1px solid var(--line)}.app-shell .memory-toolbar{grid-template-columns:1fr 1fr}.app-shell .memory-toolbar>input{grid-column:1/-1}.app-shell .yx-native .review-layout{grid-template-columns:1fr}}
+@media(max-width:760px){.app-shell .publishing-target-grid,.app-shell .publishing-target-grid:has(.publishing-target:nth-child(3)),.app-shell .setup-platform-grid{grid-template-columns:1fr}.app-shell .page-header h1{font-size:25px}.app-shell .page-container{padding-bottom:120px}.app-shell .media-tool-field{grid-template-columns:1fr}.app-shell .memory-toolbar{grid-template-columns:1fr}.app-shell .memory-toolbar>input{grid-column:auto}.app-shell .settings-agent-editor{padding:18px}.app-shell .yx-native .step{flex-basis:40%}.app-shell .toast{bottom:82px}.app-shell .article-card{padding:16px}}
+
+.app-shell .article-plan-toolbar{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding:14px 18px;margin:18px 0;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+.app-shell .article-plan-toolbar>span{color:var(--muted);font-size:12px}
+.app-shell .article-next-production{margin-block:20px;padding:18px;border:1px solid var(--line);border-radius:12px}
+.app-shell .article-next-production>span{font-size:13px;font-weight:600;margin-right:auto}
+.app-shell .article-page-previews{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;margin-bottom:20px}
+.app-shell .article-page-previews a{display:grid;gap:8px;justify-items:center;padding:12px;border:1px solid var(--line);border-radius:12px;font-size:12px}
+.app-shell .article-page-previews img{display:block;max-width:100%;height:260px;object-fit:contain}
+.app-shell .wechat-intake-grid{align-items:start}
+.app-shell .wechat-message-list{align-items:start}
+.app-shell .wechat-message-card{border-radius:12px;overflow:hidden}
+.app-shell .wechat-message-card:has(>.wechat-message-main:first-child){border-top:3px solid var(--gold)}
+.app-shell .license-summary{margin-bottom:20px}
+.app-shell .license-renewal{padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.app-shell .activation-page label{font-size:12px;font-weight:600;line-height:1.6}
+.app-shell .activation-page input[type=file]{display:block;margin-top:10px}
+.app-shell .settings-local-assets>label{display:block;font-size:12px;font-weight:600;margin-block:14px 8px}
+.app-shell .settings-local-assets .local-assets-list{max-height:none;overflow:visible;padding:0;list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.app-shell .local-assets-list>li{padding:16px;border:1px solid var(--line);border-radius:10px;min-width:0;overflow-wrap:anywhere}
+.app-shell .local-assets-list strong{font-size:13px}
+@media(max-width:1000px){.app-shell .settings-local-assets .local-assets-list{grid-template-columns:1fr}}
+
+.app-shell .yx-native .review-layout{align-items:start}
+.app-shell .memory-toolbar{grid-template-columns:minmax(220px,2fr) minmax(160px,1fr)}
+.app-shell .setup-section .card ol,.app-shell .page-container>.card ol{list-style:decimal;padding-left:24px;margin-block:16px}
+.app-shell .setup-section .card li,.app-shell .page-container>.card li{padding-left:5px;margin-block:12px;line-height:1.8}
+.app-shell .page-container>.card ol a{color:var(--accent-dark);text-decoration:underline;text-underline-offset:3px}
+.app-shell .article-steps{padding:10px 14px;border:1px solid var(--line);border-radius:8px;background:var(--surface-soft);font-size:12px;margin-block:18px}
+.app-shell .review-job{font-size:12px;line-height:1.7}
+.app-shell .review-item-head details{font-size:12px;overflow-wrap:anywhere}
+@media(max-width:760px){.app-shell .memory-toolbar{grid-template-columns:1fr}}
+
+.app-shell .shot-media-empty{display:grid;place-items:center;min-height:90px;height:100%;padding:12px;background:var(--surface-soft);color:var(--muted);font-size:12px;text-align:center}
+
+/* Disclosure hierarchy: secondary information remains collapsible, never a bare native marker. */
+.app-shell details>summary{display:flex;align-items:center;gap:10px;list-style:none;min-height:38px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font-size:12px;font-weight:550;line-height:1.6;cursor:pointer}
+.app-shell details>summary::-webkit-details-marker{display:none}
+.app-shell details>summary::after{content:"";display:block;flex:none;margin-left:auto;width:7px;height:7px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:rotate(45deg);transition:transform .15s}
+.app-shell details[open]>summary{background:var(--accent-soft);border-color:var(--line-strong);color:var(--accent-dark);margin-bottom:12px}
+.app-shell details[open]>summary::after{transform:rotate(225deg)}
+.app-shell details>summary:hover{border-color:var(--gold);background:var(--surface-soft)}
+.app-shell details>summary:focus-visible{outline:3px solid var(--focus-ring);outline-offset:3px}
+.app-shell .settings-page>.article-skills,.app-shell .topic-side>details,.app-shell .license-renewal,.app-shell .video-history,.app-shell .memory-graph{padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--panel);margin:16px 0}
+.app-shell .settings-page>.article-skills>summary,.app-shell .topic-side>details>summary,.app-shell .license-renewal>summary,.app-shell .video-history>summary,.app-shell .memory-graph>summary{font-size:14px;min-height:44px;padding:10px 12px;background:var(--surface-soft);border-color:transparent}
+.app-shell .settings-page>.article-skills>p{padding:0 12px;max-width:100%;font-size:13px;line-height:1.85}
+.app-shell .settings-runtime-readiness{padding:20px;margin-bottom:16px}
+.app-shell .runtime-status-header{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+.app-shell .runtime-status-header h2{font-size:18px;margin:0 0 6px}
+.app-shell .runtime-status-header p{font-size:12px;color:var(--muted);line-height:1.8}
+.app-shell .runtime-status-summary{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.app-shell .runtime-status-summary>span:last-child{font-size:12px;color:var(--muted);margin-left:auto}
+.app-shell .runtime-status-details{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.app-shell .runtime-status-details table{width:100%;min-width:580px;border-collapse:collapse;font-size:12px;line-height:1.8}
+.app-shell .runtime-status-details th{text-align:left;padding:12px;background:var(--surface-soft)}
+.app-shell .runtime-status-details td{padding:12px;vertical-align:top;border-bottom:1px solid var(--line)}
+.app-shell .runtime-status-details td:first-child{min-width:120px;font-weight:600}
+.app-shell .runtime-status-details td:nth-child(2){min-width:100px}
+.app-shell .runtime-status-details>p{font-size:12px;line-height:1.8;color:var(--muted);margin-top:14px}
+.app-shell .article-title-block details>summary,.app-shell .local-assets-list details>summary,.app-shell .settings-template-meta details>summary,.app-shell .video-dependencies>summary{font-size:11px;min-height:30px;padding:5px 9px;background:transparent}
+.app-shell .settings-advanced{margin:12px 0 18px}
+.app-shell .settings-local-assets+ .card{margin-top:18px}
+@media(max-width:900px){.app-shell .runtime-status-header{flex-direction:column}.app-shell .runtime-status-summary>span:last-child{margin-left:0;flex-basis:100%}}
+/* Topic configuration and execution history are secondary drawers. */
+.modal.modal-drawer{position:fixed;inset:0 0 0 auto;transform:none;width:min(520px,100vw);max-width:100vw;height:100dvh;max-height:100dvh;border-radius:16px 0 0 16px;display:flex;flex-direction:column}.modal-drawer .modal-body{overflow:auto;min-height:0}.topic-sync-toolbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin:12px 0 20px;color:var(--muted);font-size:13px}.topic-sync-toolbar>span{white-space:pre-line}.topic-cover-pending{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:14px}.today-selection{display:grid;grid-template-columns:minmax(220px,.8fr) minmax(0,1.2fr);gap:20px;margin:18px 0 28px}.today-selection-list{display:grid;align-content:start;gap:8px}.today-selection-list>button{text-align:left;padding:16px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);font:inherit}.today-selection-list>button[aria-pressed=true]{background:var(--accent-soft);border-color:var(--accent)}.today-selection-list small{display:block;margin-top:8px;color:var(--muted)}.today-selection .topic-recommendations{grid-template-columns:1fr}.today-candidates{display:grid;gap:12px}.today-candidate{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:18px}.today-candidate h3{margin:0 0 6px}.today-candidate p{margin:0;color:var(--muted)}@media(max-width:750px){.today-selection{grid-template-columns:1fr}.topic-sync-toolbar,.today-candidate{align-items:flex-start;flex-direction:column}}
+.topic-recommendation-reason{font-size:14px;line-height:1.8;color:var(--muted);margin:12px 0 16px}.today-selection .topic-recommendation-footer{flex-wrap:wrap;gap:14px}.today-selection .topic-recommendation details{margin-top:18px}
+.wechat-compact-actions{display:flex;justify-content:flex-end;gap:8px}#wechat-connect{scroll-margin-top:24px}#wechat-connect:target{outline:2px solid var(--accent);outline-offset:5px}

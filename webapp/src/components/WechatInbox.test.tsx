@@ -29,16 +29,18 @@ describe("WechatInbox", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存修改" }));
     await screen.findByRole("button", { name: "整理" });
     expect(vi.mocked(api)).toHaveBeenCalledWith("/api/topics/wechat/messages/message-1", expect.objectContaining({ method: "PUT" }));
-    const options = vi.mocked(api).mock.calls[0][1] as RequestInit;
+    const options = vi.mocked(api).mock.calls.find(([path])=>path==="/api/topics/wechat/messages/message-1")![1] as RequestInit;
     expect(JSON.parse(String(options.body))).toEqual(expect.objectContaining({ title: "修改后的标题", note: "修改后的备注", category: "featured" }));
   });
 
   it("creates manual notes as unclassified and reuses the research task flow", () => {
     const onCreateTask = vi.fn();
     render(<WechatInbox messages={messages} onCreateTask={onCreateTask} />);
+    fireEvent.click(screen.getByRole("button", { name: "手动记录" }));
     fireEvent.change(screen.getByLabelText("内容或当时的想法"), { target: { value: "新的随手记" } });
     fireEvent.click(screen.getByRole("button", { name: "保存到待分类" }));
     expect(vi.mocked(api)).toHaveBeenCalledWith("/api/topics/wechat/messages", expect.objectContaining({ method: "POST" }));
+    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
     fireEvent.click(screen.getByRole("button", { name: "转为内容任务" }));
     expect(onCreateTask).toHaveBeenCalledWith("research-1");
   });

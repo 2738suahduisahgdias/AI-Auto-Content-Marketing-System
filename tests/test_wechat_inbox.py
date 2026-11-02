@@ -67,6 +67,39 @@ class WechatInboxCase(unittest.TestCase):
         self.assertEqual("competitor", messages[0]["category"])
         self.assertEqual("https://example.com/old", messages[0]["original_url"])
 
+    def test_restart_does_not_backfill_modern_message_again(self):
+        item, _ = self.inbox.ingest({"msgid": "actual-id", "text": "新的微信消息"})
+        for _ in range(2):
+            service = WechatInboxService(self.topics.db_path, self.topics)
+            self.assertEqual([item["id"]], [row["id"] for row in service.list()])
+
+    def test_repair_archives_only_untouched_legacy_duplicate(self):
+        item, _ = self.inbox.ingest({"msgid": "actual-id", "text": "新的微信消息"})
+        with connect(self.topics.db_path) as conn:
+            conn.execute("""INSERT INTO wechat_topic_messages
+                SELECT 'synthetic-copy','legacy_' || research_item_id,research_item_id,'legacy',
+                    message_type,raw_text,original_url,raw_payload_json,title_override,note_override,
+                    category,ingest_status,received_at,created_at,updated_at
+                FROM wechat_topic_messages WHERE id=?""", (item["id"],))
+        service = WechatInboxService(self.topics.db_path, self.topics)
+        self.assertEqual(1, len(service.list()))
+        with connect(self.topics.db_path) as conn:
+            archived = conn.execute("SELECT canonical_message_id,message_json FROM wechat_legacy_duplicate_archive").fetchone()
+            self.assertEqual(item["id"], archived[0])
+            self.assertEqual("synthetic-copy", loads(archived[1], {})["id"])
+        self.assertEqual(1, len(WechatInboxService(self.topics.db_path, self.topics).list()))
+
+    def test_parallel_retries_do_not_leave_orphan_research_items(self):
+        from concurrent.futures import ThreadPoolExecutor
+        payload = {"msgid": "same-provider-message", "text": "并发重试原始消息"}
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            results = list(pool.map(lambda _: self.inbox.ingest(payload), range(4)))
+        self.assertEqual(1, len({result[0]["id"] for result in results}))
+        service = WechatInboxService(self.topics.db_path, self.topics)
+        self.assertEqual(1, len(service.list()))
+        with connect(self.topics.db_path) as conn:
+            self.assertEqual(1, conn.execute("SELECT count(*) FROM wb_research_items").fetchone()[0])
+
     def test_openclaw_sender_must_be_allowlisted(self):
         with self.assertRaises(DomainError) as caught:
             self.inbox.ingest({"msgid": "wx-other", "sender_id": "other", "source": "openclaw", "text": "越权消息"})

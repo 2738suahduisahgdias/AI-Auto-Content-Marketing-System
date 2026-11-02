@@ -17,6 +17,10 @@ class PublishingService:
         self.workbench = Workbench(db_path, self.root)
         self.jobs = JobStore(db_path)
         self.ensure_schema()
+        with self.conn() as conn, immediate(conn):
+            interrupted = conn.execute("SELECT j.id,j.error_json FROM wb_jobs j JOIN publish_targets t ON t.job_id=j.id WHERE j.status IN ('failed','cancelled','unknown_remote') AND t.status IN ('preparing','publishing')").fetchall() if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='wb_jobs'").fetchone() else []
+            for job in interrupted:
+                self.jobs.reconcile_publish_failure(conn, job["id"], loads(job["error_json"], None))
 
     def conn(self, readonly=False):
         return connect(self.db_path, readonly=readonly)
@@ -203,6 +207,11 @@ class PublishingService:
             target["error"] = loads(target.pop("error_json"), None)
             target["platform_name"] = PLATFORM_NAMES[target["platform"]]
         batch["targets"] = targets
+        states = {target["status"] for target in targets}
+        for state in ("publishing", "preparing", "unknown_remote", "failed"):
+            if state in states:
+                batch["status"] = state
+                break
         return batch
 
     def retrospective(self):
@@ -327,19 +336,37 @@ class PublishingService:
         selected = [target for target in batch["targets"] if not platforms or target["platform"] in platforms]
         if not selected:
             raise DomainError("PUBLISH_TARGETS_REQUIRED", "没有可预览的平台", 422, "platforms", "选择批次中的平台")
+        if any(target["payload"].get("manual_transfer") for target in selected):
+            raise DomainError("PUBLISH_MANUAL_TRANSFER", "此批次含手动发布平台，请复制内容并在平台后台选择封面后发布", 409)
+        return self._enqueue_targets(batch, selected, "publish.prepare", "preparing", idempotency_key)
+
+    def _enqueue_targets(self, batch, targets, kind, status, idempotency_key=None):
         jobs = []
-        for target in selected:
-            if target["status"] == "published":
-                continue
-            if not prepare_supported(target["platform"]):
-                raise DomainError("PUBLISH_CONNECTOR_PENDING", PLATFORM_NAMES[target["platform"]] + "尚未完成发布字段验证", 409, "platform", "先登录并完成连接器验收；不要执行发布")
-            job = self.jobs.enqueue("publish.prepare", {"target_id": target["id"]}, target["id"], idempotency_key,
-                                    scope="prepare:" + target["id"], max_attempts=1, resource_key="browser")
-            with self.conn() as conn, immediate(conn):
-                conn.execute("UPDATE publish_targets SET status='preparing',error_json=NULL,job_id=?,updated_at=? WHERE id=?",
-                             (job["id"], utcnow(), target["id"]))
-            jobs.append(job)
-        self.update_batch_status(batch_id)
+        with self.conn() as conn, immediate(conn):
+            for target in targets:
+                row = conn.execute("SELECT * FROM publish_targets WHERE id=?", (target["id"],)).fetchone()
+                if row["status"] == "published":
+                    continue
+                payload = loads(row["payload_json"], {})
+                if payload.get("manual_transfer"):
+                    raise DomainError("PUBLISH_MANUAL_TRANSFER", "请复制内容并在平台后台手动发布", 409)
+                if kind == "publish.prepare" and not prepare_supported(row["platform"]):
+                    raise DomainError("PUBLISH_CONNECTOR_PENDING", "此平台需要手动发布", 409)
+                if row["status"] in ("preparing", "publishing"):
+                    existing = conn.execute("SELECT * FROM wb_jobs WHERE id=?", (row["job_id"],)).fetchone()
+                    if existing:
+                        jobs.append(self.jobs.job_dict(existing))
+                    continue
+                if row["status"] == "unknown_remote":
+                    raise DomainError("PUBLISH_RETRY_BLOCKED", "请先核实平台结果，不能重复提交", 409)
+                if kind == "publish.execute" and row["status"] != "ready":
+                    raise DomainError("PUBLISH_PREVIEW_REQUIRED", "平台尚未完成预览", 409)
+                job = self.jobs.enqueue(kind, {"target_id": row["id"]}, row["id"], idempotency_key,
+                                        scope=kind + ":" + row["id"], max_attempts=1, resource_key="browser", connection=conn)
+                conn.execute("UPDATE publish_targets SET status=?,error_json=NULL,job_id=?,updated_at=? WHERE id=?",
+                             (status, job["id"], utcnow(), row["id"]))
+                jobs.append(job)
+        self.update_batch_status(batch["id"])
         return jobs
 
     def confirm(self, batch_id, source_hash, platforms=None, actor="local_user", idempotency_key=None):
@@ -353,37 +380,24 @@ class PublishingService:
         timestamp = utcnow()
         with self.conn() as conn, immediate(conn):
             conn.execute("UPDATE publish_batches SET confirmed_by=?,confirmed_at=?,updated_at=? WHERE id=?", (actor, timestamp, timestamp, batch_id))
-        jobs = []
-        for target in selected:
-            job = self.jobs.enqueue("publish.execute", {"target_id": target["id"]}, target["id"], idempotency_key,
-                                    scope="execute:" + target["id"] + ":" + timestamp, max_attempts=1, resource_key="browser")
-            with self.conn() as conn, immediate(conn):
-                conn.execute("UPDATE publish_targets SET status='publishing',error_json=NULL,job_id=?,updated_at=? WHERE id=?",
-                             (job["id"], utcnow(), target["id"]))
-            jobs.append(job)
-        self.update_batch_status(batch_id)
-        return jobs
+        return self._enqueue_targets(batch, selected, "publish.execute", "publishing", idempotency_key)
 
     def retry(self, target_id, idempotency_key=None):
         batch, target = self.target(target_id)
         if target["status"] not in ("failed", "draft"):
             raise DomainError("PUBLISH_RETRY_BLOCKED", "待人工核对或执行中的平台不能直接重试", 409, "status", "先核对平台后台，或重新生成预览")
         self.assert_current(batch)
-        job = self.jobs.enqueue("publish.prepare", {"target_id": target_id}, target_id, idempotency_key,
-                                scope="prepare:" + target_id, max_attempts=1, resource_key="browser")
-        with self.conn() as conn, immediate(conn):
-            conn.execute("UPDATE publish_targets SET status='preparing',error_json=NULL,job_id=?,updated_at=? WHERE id=?",
-                         (job["id"], utcnow(), target_id))
-        self.update_batch_status(batch["id"])
-        return job
+        return self._enqueue_targets(batch, [target], "publish.prepare", "preparing", idempotency_key)[0]
 
     def verify(self, target_id, idempotency_key=None):
         batch, target = self.target(target_id)
         if target["status"] != "unknown_remote":
             raise DomainError("PUBLISH_RECONCILE_NOT_REQUIRED", "只有待人工核对的目标需要后台结果核验", 409, "status", "先完成预览或核对当前状态")
         self.assert_current(batch)
-        return self.jobs.enqueue("publish.verify", {"target_id": target_id}, target_id, idempotency_key,
-                                 scope="verify:" + target_id, max_attempts=1, resource_key="browser")
+        with self.conn() as conn, immediate(conn):
+            job = self.jobs.enqueue("publish.verify", {"target_id":target_id}, target_id, idempotency_key, scope="verify:"+target_id, max_attempts=1, resource_key="browser", connection=conn)
+            conn.execute("UPDATE publish_targets SET job_id=? WHERE id=?", (job["id"],target_id))
+        return job
 
     def reconcile(self, target_id, evidence, external_url=None):
         batch, target = self.target(target_id)
@@ -399,6 +413,10 @@ class PublishingService:
 
     def set_target_result(self, target_id, status, preview=None, error=None, job_id=None, external_url=None):
         with self.conn() as conn, immediate(conn):
+            current = conn.execute("SELECT job_id FROM publish_targets WHERE id=?", (target_id,)).fetchone()
+            job = conn.execute("SELECT status FROM wb_jobs WHERE id=?", (job_id,)).fetchone() if job_id else None
+            if job_id and (not current or current["job_id"] != job_id or not job or job["status"] not in ("queued", "leased", "running")):
+                raise DomainError("FENCING_REJECTED", "旧发布任务不能覆盖当前结果", 409)
             conn.execute("""UPDATE publish_targets SET status=?,preview_json=?,error_json=?,job_id=COALESCE(?,job_id),
                 external_url=COALESCE(?,external_url),updated_at=? WHERE id=?""",
                 (status, dumps(preview or {}), dumps(error) if error else None, job_id, external_url, utcnow(), target_id))

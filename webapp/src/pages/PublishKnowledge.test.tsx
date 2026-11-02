@@ -25,10 +25,10 @@ describe("PublishKnowledge", () => {
     expect(screen.getByRole("heading", { name: "发布知识库" })).toBeInTheDocument();
     expect(screen.getByText("视频短标题")).toBeInTheDocument();
     expect(screen.getByText("300")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Agent JSON" })).toHaveAttribute("href", "/api/publishing/knowledge/douyin/video");
+    expect(screen.getByRole("link", { name: "查看规则 JSON" })).toHaveAttribute("href", "/api/publishing/knowledge/douyin/video");
     expect(screen.getByText(/必须 · MP4 · 人工终审/)).toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText("平台"), "wechat_official_account");
     expect(screen.getByText("作者名")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Agent JSON" })).toHaveAttribute("href", "/api/publishing/knowledge/wechat_official_account/article");
+    expect(screen.getByRole("link", { name: "查看规则 JSON" })).toHaveAttribute("href", "/api/publishing/knowledge/wechat_official_account/article");
   });
 });

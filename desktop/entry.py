@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import shlex
 import socket
 import subprocess
 import sys
@@ -12,6 +13,34 @@ import runpy
 import threading
 import time
 import urllib.request
+
+
+
+def refresh_renderer_code(resources, runtime):
+    """Refresh shipped code on upgrade without touching media, caches or templates."""
+    source = resources / 'remotion-app'
+    for name in ('src', 'scripts'):
+        directory = source / name
+        if not directory.is_dir():
+            continue
+        for item in directory.rglob('*'):
+            if not item.is_file():
+                continue
+            target = runtime / name / item.relative_to(directory)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            content = item.read_bytes()
+            if target.is_file() and target.read_bytes() == content:
+                continue
+            temporary = target.with_name(target.name + '.upgrade-tmp')
+            temporary.write_bytes(content)
+            temporary.replace(target)
+    for name in ('package.json', 'package-lock.json', 'remotion.config.ts', 'tsconfig.json'):
+        item = source / name
+        if item.is_file():
+            target = runtime / name
+            temporary = target.with_name(target.name + '.upgrade-tmp')
+            temporary.write_bytes(item.read_bytes())
+            temporary.replace(target)
 
 
 def main():
@@ -22,9 +51,7 @@ def main():
     root=args.root or os.environ.get('CONTENT_AGENT_ROOT')
     if not root and pointer.is_file():
         previous=json.loads(pointer.read_text())['root']
-        choice=subprocess.run(['/usr/bin/osascript','-e','button returned of (display dialog "选择映序工作区" buttons {"选择其他工作区", "打开上次工作区"} default button "打开上次工作区")'],capture_output=True,text=True)
-        if choice.returncode:return 0
-        if '打开上次工作区' in choice.stdout:root=previous
+        root=previous
     if not root:
         choice=subprocess.run(['/usr/bin/osascript','-e','POSIX path of (choose folder with prompt "选择新的空工作区文件夹，或已有恢复目录（建议外置硬盘）")'],capture_output=True,text=True)
         if choice.returncode:return 0
@@ -47,11 +74,29 @@ def main():
     lock=(root/'.desktop.lock').open('a')
     try:fcntl.flock(lock.fileno(),fcntl.LOCK_EX|fcntl.LOCK_NB)
     except BlockingIOError:
-        current=json.loads((root/'data/desktop-session.json').read_text())
-        if not args.no_browser:subprocess.run(['/usr/bin/open',f'http://127.0.0.1:{current["port"]}/demo/'])
-        return 0
+        # First launch can still be preparing dependencies. Do not use a stale session.
+        from desktop.browser import open_workbench
+        for attempt in range(120):
+            try:
+                current=json.loads((root/'data/desktop-session.json').read_text())
+                os.kill(int(current['pid']), 0)
+                with urllib.request.urlopen('http://127.0.0.1:{}/demo/'.format(int(current['port'])),timeout=1) as response:
+                    if response.status != 200: raise ValueError('not ready')
+                if not args.no_browser:open_workbench(current['port'])
+                return 0
+            except (OSError, ValueError, KeyError):
+                time.sleep(0.5)
+        raise RuntimeError('工作台仍在启动或服务无响应，请稍后再试；未新开网页')
+    # Only the local inbox credential and sender allowlist are loaded, never shell code.
+    inbox_env = root / 'config/wechat-inbox.env'
+    if inbox_env.is_file():
+        for line in inbox_env.read_text().splitlines():
+            key, sep, value = line.partition('=')
+            if sep and key in ('CONTENT_AGENT_WECHAT_TOKEN', 'CONTENT_AGENT_WECHAT_SENDER_ID'):
+                parts = shlex.split(value)
+                os.environ[key] = parts[0] if parts else ''
     # Writable build/cache directory stays with user data, not inside signed application.
-    runtime=root/'runtime/remotion-0.1.0'
+    runtime=root/'runtime/remotion-0.1.1'
     if not runtime.exists():
         if not args.no_browser:subprocess.run(['/usr/bin/osascript','-e','display notification "首次启动正在准备本地视频运行依赖，请勿拔出硬盘。完成后将打开工作台。" with title "映序工作台"'])
         if shutil.disk_usage(root).free < 2*1024**3:raise RuntimeError('首次运行需要至少 2 GB 可用空间，请选择空间充足的工作区')
@@ -65,6 +110,7 @@ def main():
             else:shutil.copyfile(item,stage/item.name)
         (stage/'node_modules').symlink_to(resources/'remotion-app/node_modules',target_is_directory=True)
         stage.rename(runtime)
+    refresh_renderer_code(resources, runtime)
     dependency=runtime/'node_modules'
     if dependency.is_symlink():
         dependency.unlink();dependency.symlink_to(resources/'remotion-app/node_modules',target_is_directory=True)
@@ -84,9 +130,23 @@ def main():
     app.V2.worker.allowed_kinds=[key for key in app.V2.worker.executors if key!='publish.execute']
     try:server=app.ThreadingHTTPServer(('127.0.0.1',args.port),app.Handler)
     except OSError:server=app.ThreadingHTTPServer(('127.0.0.1',0),app.Handler)
+    next_workspace = []
+    def select_workspace(destination):
+        from content_workbench.storage.workspace_selection import select_workspace as select
+        from content_workbench.storage.db import connect
+        from content_workbench.domain.errors import DomainError
+        with connect(app.DB_PATH) as conn:
+            if conn.execute("SELECT 1 FROM wb_jobs WHERE status IN ('queued','leased','running','retry_wait','cancel_requested') LIMIT 1").fetchone():
+                raise app.ApiError(409, '仍有任务进行中，请等待完成或取消后再切换')
+        try: result = select(root, destination, pointer)
+        except DomainError as error: raise app.ApiError(error.status, error.message)
+        next_workspace.append(result['path'])
+        threading.Timer(1, server.shutdown).start()
+        return result
+    app.DESKTOP_SELECT_WORKSPACE = select_workspace
     args.port=server.server_port
     os.environ['CONTENT_AGENT_MEDIA_BASE_URL']=f'http://127.0.0.1:{args.port}'
-    (root/'data/desktop-session.json').write_text(json.dumps({'port':args.port}))
+    (root/'data/desktop-session.json').write_text(json.dumps({'port':args.port,'pid':os.getpid()}))
     if args.smoke_test:
         thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
         import http.cookiejar
@@ -102,10 +162,24 @@ def main():
         print(json.dumps({'status':'ok','root':str(root),'port':server.server_port,'license':app.V2.license.status()['status']}))
         server.shutdown();server.server_close();return 0
     app.V2.worker.before_execute=app.V2.license.require_active
+    app.V2.topic_api.wechat_client.start()
     app.V2.worker.start()
-    if not args.no_browser:subprocess.run(['/usr/bin/open',f'http://127.0.0.1:{args.port}/demo/'])
+    app.V2.topic_scheduler.start()
+    if not args.no_browser:
+        from desktop.browser import open_workbench
+        try:open_workbench(args.port)
+        except (RuntimeError, subprocess.TimeoutExpired) as error:
+            print(str(error),file=sys.stderr)
+            subprocess.run(['/usr/bin/osascript','-e','on run argv\ndisplay alert "工作台已启动" message (item 1 of argv)\nend run',str(error)])
     try:server.serve_forever()
-    finally:app.V2.worker.stop();server.server_close();lock.close()
+    finally:app.V2.stop();server.server_close();lock.close()
+    if next_workspace:
+        if getattr(sys, 'frozen', False):
+            command=[sys.executable,'--root',next_workspace[-1],'--port',str(args.port)]
+        else:
+            bootstrap="import sys; sys._MEIPASS="+repr(str(resources))+"; from desktop.entry import main; raise SystemExit(main())"
+            command=[sys.executable,'-c',bootstrap,'--root',next_workspace[-1],'--port',str(args.port)]
+        os.execv(sys.executable,command)
     return 0
 
 if __name__=='__main__':

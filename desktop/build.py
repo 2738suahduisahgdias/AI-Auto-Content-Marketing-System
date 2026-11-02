@@ -13,7 +13,7 @@ stage=out/'resources';stage.mkdir(exist_ok=True)
 for folder in ('migrations','agents','workers','templates','content_workbench','config','skills'):
     if (repo/folder).is_dir():shutil.copytree(repo/folder,stage/folder,dirs_exist_ok=True,ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
 (stage/'data').mkdir(exist_ok=True);shutil.copyfile(repo/'data/seed.example.json',stage/'data/seed.example.json')
-shutil.copytree(repo/'webapp/dist',stage/'web/react-dist',dirs_exist_ok=True)
+shutil.copytree(repo/'web/react-dist',stage/'web/react-dist',dirs_exist_ok=True)
 shutil.copytree(repo/'web',stage/'web',dirs_exist_ok=True,ignore=shutil.ignore_patterns('react-dist'))
 for name in ('src','scripts','public','public-static'):
     source=repo/'remotion-app'/name
@@ -31,7 +31,7 @@ if not (stage/'dependencies.complete').exists():
 if a.public_keys:
     subprocess.run([os.sys.executable,str(repo/'scripts/configure-license.py'),'--root',str(stage),'--public-keys',a.public_keys],check=True)
 os.environ['PYINSTALLER_CONFIG_DIR']=str(out/'pyinstaller-cache')
-command=[os.sys.executable,'-m','PyInstaller','--noconfirm','--onedir','--name','YingxuService','--distpath',str(out/'engine'),'--workpath',str(out/'build'),'--specpath',str(out),'--paths',str(repo),'--collect-submodules','content_workbench','--hidden-import','app','--collect-submodules','PIL']
+command=[os.sys.executable,'-m','PyInstaller','--noconfirm','--onedir','--name','YingxuService','--distpath',str(out/'engine'),'--workpath',str(out/'build'),'--specpath',str(out),'--paths',str(repo),'--collect-submodules','content_workbench','--hidden-import','app','--collect-submodules','PIL','--collect-submodules','xlrd','--collect-submodules','playwright']
 # Keep vendor Chromium intact: PyInstaller must not rewrite its Mach-O load commands.
 for item in stage.iterdir():
     if item.name == 'dependencies.complete':continue
@@ -53,10 +53,12 @@ else:
         else:shutil.copyfile(item,target)
 def clone(source,destination):
     destination.parent.mkdir(parents=True,exist_ok=True)
-    if destination.exists():shutil.rmtree(destination)
+    if destination.is_symlink():destination.unlink()
+    elif destination.exists():shutil.rmtree(destination)
     result=subprocess.run(['/bin/cp','-cRp',str(source),str(destination)])
     if result.returncode:subprocess.run(['/usr/bin/ditto','--noqtn',str(source),str(destination)],check=True)
-if not a.assemble_only:clone(stage/'remotion-app/node_modules',out/'engine/YingxuService/_internal/remotion-app/node_modules')
+if not a.assemble_only or (out/'engine/YingxuService/_internal/remotion-app/node_modules').is_symlink():
+    clone((stage/'remotion-app/node_modules').resolve(),out/'engine/YingxuService/_internal/remotion-app/node_modules')
 app=out/'映序工作台.app';contents=app/'Contents';(contents/'MacOS').mkdir(parents=True,exist_ok=True)
 clone(out/'engine/YingxuService',contents/'Resources/engine')
 # A native launcher can be sealed as a Mac application; shell entry points cannot.
@@ -77,7 +79,8 @@ int main(int argc, char **argv) {
 }
 ''')
 subprocess.run(['/usr/bin/clang','-Os',str(launcher_source),'-o',str(launcher)],check=True)
-with (contents/'Info.plist').open('wb') as f:plistlib.dump({'CFBundleExecutable':'launcher','CFBundleIdentifier':'com.yingxu.workbench','CFBundleName':'映序工作台','CFBundleVersion':'0.1.0','CFBundleShortVersionString':'0.1.0','CFBundlePackageType':'APPL','LSMinimumSystemVersion':subprocess.check_output(['sw_vers','-productVersion'],text=True).strip().split('.')[0]+'.0'},f)
+shutil.copyfile(repo/'desktop/assets/Workbench.icns',contents/'Resources/Workbench.icns')
+with (contents/'Info.plist').open('wb') as f:plistlib.dump({'CFBundleExecutable':'launcher','CFBundleIconFile':'Workbench.icns','CFBundleIdentifier':'com.yingxu.workbench','CFBundleName':'映序工作台','CFBundleVersion':'0.1.3.2','CFBundleShortVersionString':'0.1.3.2','NSAppleEventsUsageDescription':'用于找到并唤起已有的 Chrome 工作台标签，避免重复打开页面。','CFBundlePackageType':'APPL','LSMinimumSystemVersion':subprocess.check_output(['sw_vers','-productVersion'],text=True).strip().split('.')[0]+'.0'},f)
 subprocess.run(['codesign','--force','--deep','--sign','-',str(app)],check=True)
 volume=out/'volume';volume.mkdir(exist_ok=True)
 clone(app,volume/app.name)

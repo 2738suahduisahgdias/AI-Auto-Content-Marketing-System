@@ -45,9 +45,19 @@ def body(bridge):
 def click_dom_text(bridge, text):
     script = """(()=>{const wanted=%s;const all=[];function walk(root){
       for(const element of root.querySelectorAll('*')){all.push(element);if(element.shadowRoot)walk(element.shadowRoot)}
-    }walk(document);const element=all.find(e=>e.childElementCount===0&&(e.innerText||'').trim()===wanted);
+    }walk(document);const element=all.find(e=>{if(e.childElementCount!==0||(e.innerText||'').trim()!==wanted)return false;const rect=e.getBoundingClientRect();return rect.width>0&&rect.height>0});
     if(!element)return false;element.click();return true})()""" % json.dumps(text, ensure_ascii=False)
     return bool(bridge.evaluate(script))
+
+
+def wait_click_dom_text(bridge, title, timeout=20):
+    """AX text can arrive before the collection card is mounted and clickable."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if click_dom_text(bridge, title):
+            return True
+        time.sleep(0.5)
+    return False
 
 
 def xhs_card_title(card):
@@ -94,8 +104,8 @@ def xhs_notes(bridge):
 def xhs_favorite_cards(bridge):
     return bridge.evaluate("""(() => {
       const result=[];const seen=new Set();
-      for(const a of document.querySelectorAll('a[href*="/explore/"],a[href*="/search_result/"]')){
-        const href=a.href;const match=href.match(/(?:explore|search_result)\\/([0-9a-zA-Z]+)/);
+      for(const a of document.querySelectorAll('a[href*="/explore/"],a[href*="/search_result/"],a[href*="/board/"]')){
+        const href=a.href;const match=href.match(/(?:explore|search_result)\\/([0-9a-zA-Z]+)/)||href.match(/board\\/[0-9a-zA-Z]+\\/([0-9a-zA-Z]+)/);
         if(!match||seen.has(match[1]))continue;
         const container=a.closest('section,li,article')||a;
         const text=(container.innerText||a.innerText||'').trim();
@@ -124,17 +134,20 @@ def xhs_favorites(bridge, collections):
     })()""")
     if not profile_url:
         return {"status": "error", "error": "未找到个人主页入口，可能未登录或页面结构已变化", "action": "确认个人小红书已登录，并检查页面是否改版"}
-    bridge.call("navigate", {"url": profile_url})
-    time.sleep(3)
-    click_dom_text(bridge, "收藏")
+    # 收藏 defaults to loose notes; collections live under the 专辑/board subtab.
+    board_url = profile_url.split("?", 1)[0] + "?tab=fav&subTab=board"
     grouped = {}
     errors = []
     for source, title in collections.items():
+        if not title:
+            continue
+        bridge.call("navigate", {"url": board_url})
+        bridge.wait_for_text(title, timeout=15)
         bridge.evaluate("() => { window.scrollTo(0,0); return true; }")
-        if not click_dom_text(bridge, title):
+        if not wait_click_dom_text(bridge, title):
             grouped[source] = []
-            errors.append({"source": source, "code": "COLLECTION_NOT_FOUND", "message": "未找到收藏夹：" + title,
-                           "action": "核对收藏夹名称，或在设置中修改后重新同步"})
+            errors.append({"source": source, "code": "COLLECTION_NOT_FOUND", "message": "等待页面加载后仍未找到可点击的收藏夹：" + title,
+                           "action": "先确认个人收藏页已加载并重试；名称确实不一致时再修改配置。旧数据不会因此删除"})
             continue
         time.sleep(2)
         collected = {}

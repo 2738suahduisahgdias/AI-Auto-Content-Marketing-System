@@ -6,7 +6,6 @@ import { Busy } from "@/components/ui";
 
 const Today = lazy(() => import("@/pages/Today"));
 const Topics = lazy(() => import("@/pages/Topics"));
-const Accounts = lazy(() => import("@/pages/AccountAnalytics"));
 const Articles = lazy(() => import("@/pages/Articles"));
 const YingxuVideoWorkspace = lazy(() => import("./migration/YingxuVideoWorkspace"));
 const Tasks = lazy(() => import("@/pages/Tasks"));
@@ -24,7 +23,7 @@ export default function App({migratedVideo=false}:{migratedVideo?:boolean}) {
   return <LicenseGate><AppShell><Suspense fallback={<Busy />}><Routes>
     <Route path="/" element={<Today />} />
     <Route path="/topics/:source" element={<Topics />} />
-    <Route path="/accounts/:view?" element={<Accounts />} />
+    <Route path="/accounts/:view?" element={<Navigate to="/" replace />} />
     <Route path="/articles/:id?" element={<Articles />} />
     <Route path="/tasks/:id?" element={migratedVideo ? <YingxuVideoWorkspace /> : <Tasks />} />
     <Route path="/review" element={<Review />} />

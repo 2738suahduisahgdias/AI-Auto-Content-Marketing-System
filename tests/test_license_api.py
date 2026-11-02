@@ -15,7 +15,21 @@ class LicenseAPITests(unittest.TestCase):
         self.app=V2Application(root/'test.db',root,self.creator)
         self.app.license.mode='required'
         self.app.sessions.add('test-session')
-        self.headers={'Host':'127.0.0.1:8876','Cookie':'wb_session=test-session','X-CSRF-Token':self.app.csrf('test-session')}
+        self.headers={'Host':'127.0.0.1:8876','Cookie':self.app.cookie_name+'=test-session','X-CSRF-Token':self.app.csrf('test-session')}
+    def test_workspace_cookies_do_not_overwrite_each_other(self):
+        other_root=Path(self.tmp.name)/'other'
+        other_root.mkdir()
+        other=V2Application(other_root/'test.db',other_root,self.creator)
+        try:
+            self.assertNotEqual(self.app.cookie_name, other.cookie_name)
+            handler=self.handler('/api/v2/license')
+            other_cookie=other.session_header(handler).split(';')[0]
+            handler.headers['Cookie'] += '; ' + other_cookie
+            self.assertEqual('test-session', self.app.authenticate(handler))
+            self.assertIsNotNone(other.cookie(handler))
+        finally:
+            other.stop()
+
     def handler(self,path,body=None):
         handler=Mock();handler.path=path;handler.headers=self.headers.copy();handler.read_json.return_value=body or {}
         return handler

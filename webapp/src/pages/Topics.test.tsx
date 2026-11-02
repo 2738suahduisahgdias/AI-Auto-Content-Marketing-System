@@ -24,7 +24,7 @@ vi.mock("@/AppContext", () => ({
           xhs_high_praise: [{ id: "praise-1", source_key: "xhs_high_praise", platform: "xiaohongshu", title: "高赞笔记", url: "https://www.xiaohongshu.com/explore/praise1", metadata: {}, last_seen_at: "今天" }],
           xhs_notes: [],
         },
-        recommendations: { xiaohongshu: [] }, archived: [], archived_count: 0, jobs: [],
+        recommendations: { xiaohongshu: [] }, archived: [], archived_count: 0, jobs: [{ id: "dy-job", kind: "topics.sync", status: "succeeded", stage: "succeeded", created_at: "today" }, { id: "xhs-job", kind: "topics.xhs_sync", status: "succeeded", stage: "succeeded", result: { status: "partial" }, created_at: "today" }],
       },
     },
     refresh: mocks.refresh,
@@ -48,26 +48,33 @@ describe("Xiaohongshu topic research", () => {
   it("uses the four personal collection tabs and switches real snapshots", async () => {
     const user = userEvent.setup();
     renderPage();
-    expect(screen.getByRole("heading", { name: "小红书今日推荐" })).toBeInTheDocument();
+    expect(screen.queryByText("同步抖音快照")).not.toBeInTheDocument();
+    expect(screen.queryByText("部分完成")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", {name:"同步记录"}));
+    expect(screen.getByText("部分完成")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", {name:"关闭"}));
+    await user.click(screen.getByRole("button", { name: /热点选题/ }));
+    expect(screen.queryByRole("heading", { name: "小红书今日推荐" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "热点笔记" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "精选笔记" })).not.toBeInTheDocument();
-    expect(screen.getByLabelText("热点收藏夹")).toHaveValue("热点");
+    await user.click(screen.getByRole("button", {name:"采集与自动化"}));
+    expect(screen.getByLabelText(/热点收藏夹/)).toHaveValue("热点");
+    await user.click(screen.getByRole("button", {name:"关闭"}));
 
     await user.click(screen.getByRole("button", { name: /精选选题/ }));
     expect(screen.getByRole("heading", { name: "精选笔记" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "热点笔记" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /竞品选题/ }));
+    await user.click(screen.getByRole("button", { name: /竞对选题/ }));
     expect(screen.getByRole("heading", { name: "竞品笔记" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /高赞选题/ }));
     expect(screen.getByRole("heading", { name: "高赞笔记" })).toBeInTheDocument();
   });
 
-  it("syncs personal collections and calls the Xiaohongshu recommendation agent", async () => {
+  it("syncs collections and keeps recommendation in Today", async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(screen.getByRole("button", { name: "同步收藏夹" }));
+    await user.click(screen.getByRole("button", { name: "同步内容" }));
     await waitFor(() => expect(mocks.api).toHaveBeenCalledWith("/api/topics/xiaohongshu/sync", expect.objectContaining({ method: "POST" })));
-    await user.click(screen.getByRole("button", { name: "生成今日推荐" }));
-    await waitFor(() => expect(mocks.api).toHaveBeenCalledWith("/api/topics/recommend", expect.objectContaining({ body: JSON.stringify({ agent: "xiaohongshu" }) })));
+    expect(screen.queryByRole("button", {name:"生成今日推荐"})).not.toBeInTheDocument();
   });
 });

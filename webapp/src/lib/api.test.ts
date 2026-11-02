@@ -24,3 +24,34 @@ describe("API session and errors", () => {
     await expect(request).rejects.toBeInstanceOf(ApiError);
   });
 });
+
+
+describe("session recovery", () => {
+  it("recovers a rejected activation without losing its body or idempotency key", async () => {
+    const calls: any[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (path, options) => {
+      calls.push([path, options]);
+      if (calls.length === 1) return new Response(JSON.stringify({error: {code: "SESSION_REQUIRED"}}), {status: 401});
+      if (calls.length === 2) return new Response("<html></html>");
+      if (calls.length === 3) return new Response(JSON.stringify({csrf_token: "renewed"}));
+      return new Response(JSON.stringify({status: "valid"}));
+    }));
+    const payload = jsonOptions("POST", {token: "test-license"});
+    await expect(api("/api/v2/license/activate", payload)).resolves.toMatchObject({status: "valid"});
+    expect(calls).toHaveLength(4);
+    expect(calls[3][1].body).toBe(payload.body);
+    expect(calls[3][1].headers.get("X-CSRF-Token")).toBe("renewed");
+    expect(calls[3][1].headers.get("Idempotency-Key")).toBe(calls[0][1].headers.get("Idempotency-Key"));
+  });
+  it("does not retry ambiguous network failures", async () => {
+    const fetcher = vi.fn(async () => { throw Error("connection lost"); });
+    vi.stubGlobal("fetch", fetcher);
+    await expect(api("/api/v2/license/activate", jsonOptions("POST", {token: "test"}))).rejects.toBeInstanceOf(ApiError);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+});
+
+ it("recovers legacy GET session failures with a flat code", async () => {
+ const fetcher=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({error:"本地会话已失效",code:"SESSION_REQUIRED"}),{status:401})).mockResolvedValueOnce(new Response("ok")).mockResolvedValueOnce(new Response(JSON.stringify({csrf_token:"new"}))).mockResolvedValueOnce(new Response(JSON.stringify({ready:true})));
+ vi.stubGlobal("fetch",fetcher);await expect(api("/api/bootstrap")).resolves.toMatchObject({ready:true});expect(fetcher).toHaveBeenCalledTimes(4);
+ });

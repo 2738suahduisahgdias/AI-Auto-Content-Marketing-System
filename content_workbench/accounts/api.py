@@ -12,8 +12,22 @@ class AccountAPI:
         self.jobs = app.jobs
 
     def handle(self, handler, method, path, body):
+        if method == "POST" and path in ("/api/accounts/sync", "/api/accounts/recommend"):
+            raise DomainError("ACCOUNT_ANALYTICS_PAUSED", "账号经营数据采集已停用；选题采集和发布账号登录不受影响", 410)
+
+        if path == "/api/accounts/browser/connection":
+            from content_workbench.accounts.browser_connection import status, control
+            if method == "GET":
+                return self.app.response(handler, status())
+            if method == "POST":
+                return self.app.response(handler, control((body or {}).get("action"), self.service.db_path))
+
         if method == "GET" and path == "/api/accounts/setup":
             data = setup_status(self.service.db_path)
+            from content_workbench.readiness import runtime_readiness
+            data["readiness"] = runtime_readiness(self.app)
+            data["activation"] = self.app.license.status()["status"]
+            data["wechat_client"] = self.app.topic_api.wechat_client.status()
             data["csrf_token"] = self.app.csrf(self.app.cookie(handler))
             return self.app.response(handler, data)
         if method == "GET" and path == "/api/accounts/collection-knowledge":

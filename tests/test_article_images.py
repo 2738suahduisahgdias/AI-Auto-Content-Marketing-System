@@ -57,11 +57,11 @@ class ArticleImagesTest(unittest.TestCase):
         source=service.source('article',self.item['id'])
         self.assertEqual(source['article_images'][0]['asset_id'],self.asset)
         fake=Mock(root=self.wb.root)
-        fake.target.return_value=({'content_kind':'article'}, {'id':'target','platform':'xiaohongshu','payload':{},'status':'draft'})
+        fake.target.return_value=({'content_kind':'article'}, {'id':'target','job_id':'job-test','platform':'xiaohongshu','payload':{},'status':'draft'})
         fake.assert_current=Mock(return_value=source)
         executor=PublishingExecutors(fake);executor.run=Mock(return_value={'status':'preview_ready','fields_verified':['title','body']})
         with self.assertRaises(DomainError) as caught:
-            executor.prepare({'input':{'target_id':'target'}},Mock())
+            executor.prepare({'id':'job-test','input':{'target_id':'target'}},Mock())
         self.assertEqual(caught.exception.code,'ARTICLE_IMAGES_NOT_VERIFIED')
         executor.run.assert_called_once()
 

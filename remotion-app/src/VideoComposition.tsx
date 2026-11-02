@@ -51,6 +51,7 @@ export type TalkingHeadProps = {
   durationSeconds: number;
   appearance?: Partial<TalkingHeadAppearance>;
   preview?: boolean;
+  sceneRenderer?: React.ComponentType<{scene: TalkingHeadScene; appearance: TalkingHeadAppearance}>;
   storyboard?: {schema_version: string; engine_version: string; seed: number};
 };
 
@@ -65,9 +66,9 @@ const defaultAppearance: TalkingHeadAppearance = {
   captionColor: "#ffffff",
 };
 
-const SceneLayer: React.FC<{scene: TalkingHeadScene; appearance: TalkingHeadAppearance}> = ({scene, appearance}) => (
+const SceneLayer: React.FC<{scene: TalkingHeadScene; appearance: TalkingHeadAppearance; renderer?: TalkingHeadProps["sceneRenderer"]}> = ({scene, appearance, renderer: Renderer}) => (
   <div style={{position: "absolute", inset: 0, background: appearance.background}}>
-    <SmartScene scene={scene} theme={appearance} />
+    {Renderer && !scene.media ? <Renderer scene={scene} appearance={appearance}/> : <SmartScene scene={scene} theme={appearance} />}
   </div>
 );
 
@@ -80,6 +81,7 @@ export const VideoComposition: React.FC<TalkingHeadProps> = ({
   backgroundMusicSegments,
   captions,
   appearance,
+  sceneRenderer,
 }) => {
   const {fps} = useVideoConfig();
   const theme = {...defaultAppearance, ...appearance};
@@ -96,7 +98,7 @@ export const VideoComposition: React.FC<TalkingHeadProps> = ({
           premountFor={fps}
         >
           <SceneFade durationSeconds={scene.end_seconds - scene.start_seconds}>
-            <SceneLayer scene={scene} appearance={theme} />
+            <SceneLayer scene={scene} appearance={theme} renderer={sceneRenderer} />
           </SceneFade>
         </Sequence>
       ))}

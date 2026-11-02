@@ -1,4 +1,5 @@
 import json
+import importlib.util
 import sys
 import tempfile
 from pathlib import Path
@@ -15,7 +16,11 @@ from .schemas import PLATFORM_NAMES
 def browser_python(root):
     environment = Path(root) / ".venv-topics"
     windows = environment / "Scripts/python.exe"
-    return str(windows if windows.is_file() else environment / "bin/python")
+    linux = environment / "bin/python"
+    if windows.is_file(): return str(windows)
+    if linux.is_file(): return str(linux)
+    if importlib.util.find_spec("playwright") is not None: return sys.executable
+    raise DomainError("BROWSER_RUNTIME_MISSING", "当前客户端缺少浏览器运行依赖", 503, "browser", "安装包含浏览器依赖的客户端版本")
 
 
 class PublishingExecutors:
@@ -127,6 +132,8 @@ class PublishingExecutors:
         config = require_agent_enabled(self.service.db_path, "publish_agent")
         with tempfile.TemporaryDirectory(prefix="publishing-job-") as directory:
             use_bridge = action in ("prepare", "execute") and (platform in ("wechat_channels", "wechat_official_account") or (platform == "xiaohongshu" and payload and (payload.get("source", {}).get("article_images") or payload.get("source", {}).get("article_pages"))))
+            if action == "prepare" and platform in ("douyin", "xiaohongshu") and payload and payload.get("source", {}).get("absolute_video_path"):
+                use_bridge = True
             worker = "webbridge_worker.py" if use_bridge else "browser_worker.py"
             python = sys.executable if use_bridge else browser_python(self.root)
             arguments = [python, str(PROJECT_ROOT / "content_workbench/publishing" / worker),
@@ -144,7 +151,19 @@ class PublishingExecutors:
             raise DomainError("PUBLISH_WORKER_PROTOCOL_ERROR", "发布浏览器没有返回有效结果", 502, platform, "查看 data/server.log 中对应发布阶段")
 
     def prepare(self, job, context):
+        try:
+            return self._prepare(job, context)
+        except Exception as error:
+            if getattr(error, "code", None) != "FENCING_REJECTED":
+                self.service.set_target_result(job["input"]["target_id"], "failed", error={"code":getattr(error,"code","PREPARE_FAILED"), "message":str(error), "action":"检查错误后重试，或复制内容手动发布"}, job_id=job["id"])
+            raise
+
+    def _prepare(self, job, context):
         batch, target = self.service.target(job["input"]["target_id"])
+        if target["payload"].get("manual_transfer"):
+            raise DomainError("PUBLISH_MANUAL_TRANSFER", "此目标只能手动发布", 409)
+        if target.get("job_id") != job["id"]:
+            raise DomainError("FENCING_REJECTED", "发布任务已被替换", 409)
         source = self.service.assert_current(batch)
         if target["status"] == "published":
             raise DomainError("PUBLISH_ALREADY_RECORDED", "该平台已经发布，不能重复预览执行", 409, "platform", "核对平台后台")
@@ -162,6 +181,10 @@ class PublishingExecutors:
 
     def execute(self, job, context):
         batch, target = self.service.target(job["input"]["target_id"])
+        if target["payload"].get("manual_transfer"):
+            raise DomainError("PUBLISH_MANUAL_TRANSFER", "此目标只能手动发布", 409)
+        if target.get("job_id") != job["id"]:
+            raise DomainError("FENCING_REJECTED", "发布任务已被替换", 409)
         if not batch.get("confirmed_at") or target["status"] != "publishing":
             raise DomainError("PUBLISH_CONFIRMATION_REQUIRED", "缺少有效的一键发布确认", 409, "confirmed_at", "先完成预览并由用户确认")
         source = self.service.assert_current(batch)

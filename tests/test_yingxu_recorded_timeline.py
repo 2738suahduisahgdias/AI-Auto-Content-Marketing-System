@@ -70,7 +70,7 @@ class RecordedTimelineCase(unittest.TestCase):
     def test_incomplete_render_does_not_register_a_deliverable(self):
         import app, shutil
         def incomplete(props, output, **kwargs):shutil.copyfile(self.clip,output)
-        with mock.patch.object(app,'run_remotion_render',side_effect=incomplete):
+        with mock.patch.object(app,'run_remotion_render',side_effect=incomplete), mock.patch.object(app,'prepare_yingxu_remotion_code',return_value=None):
             with self.assertRaises(app.ApiError):app.render_yingxu(self.task,{'revision':1,'preview':False})
         with app.connect() as conn:
             self.assertEqual(conn.execute("SELECT count(*) FROM files WHERE content_id=? AND kind='video'",(self.task['content_id'],)).fetchone()[0],0)

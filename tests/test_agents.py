@@ -37,6 +37,14 @@ class AgentRegistryCase(unittest.TestCase):
         self.assertNotEqual(updated["prompt"], reset["prompt"])
         self.assertEqual(other, agent_config(self.db, "douyin_topic_agent")["prompt"])
 
+    def test_cli_selection_persists_independently(self):
+        self.assertEqual("codex_cli", agent_config(self.db, "script_agent")["engine"])
+        save_agent_config(self.db, "script_agent", {"engine": "kimi_cli"})
+        self.assertEqual("kimi_cli", agent_config(self.db, "script_agent")["engine"])
+        self.assertEqual("codex_cli", agent_config(self.db, "article_agent")["engine"])
+        save_agent_config(self.db, "script_agent", {"engine": "codex_cli"})
+        self.assertEqual("codex_cli", agent_config(self.db, "script_agent")["engine"])
+
     def test_invalid_config_and_unconnected_enable_rejected(self):
         with self.assertRaises(DomainError):
             save_agent_config(self.db, "quality_agent", {"enabled": True})

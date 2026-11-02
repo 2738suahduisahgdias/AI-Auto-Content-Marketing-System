@@ -70,10 +70,13 @@ def validate_payload(kind, platform, payload):
         definitions = contract_fields(platform, kind)
     except ValueError:
         raise DomainError("PUBLISH_CONTENT_PLATFORM_MISMATCH", "内容类型与发布平台不匹配", 422, "platform", "使用页面提供的平台")
-    result = {}
+    manual_transfer = raw.get("manual_transfer") is True and platform in ("wechat_official_account", "wechat_channels")
+    result = {"manual_transfer": True} if manual_transfer else {}
     for definition in definitions:
         name = definition["name"]
         control = definition["control"]
+        if manual_transfer and control == "asset":
+            continue
         if control == "source":
             if raw.get(name):
                 result[name] = raw[name]

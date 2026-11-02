@@ -39,11 +39,11 @@ class GrowthMemoryCase(unittest.TestCase):
             captured['candidates'] = candidates
             return ['candidate_1']
         executor.service = SimpleNamespace(db_path=self.service.db_path, bootstrap=lambda: {'settings': {'industry_scope':'AI', 'douyin_prompt':'推荐'}, 'sources': {'hot':[{'id':'source_1'}]}}, save_candidates=save)
-        def generate(context, agent, prompt, timeout):
+        def generate(context, agent, prompt, timeout, engine="codex_cli"):
             captured['prompt'] = json.loads(prompt)
             return [{'title':'客服落地', 'memory_ids':[memory['id'],'fabricated',memory['id']]}]
         executor.kimi_json = generate
-        with patch('content_workbench.topics.executors.require_agent_enabled', return_value={'prompt':'', 'timeout_seconds':30}):
+        with patch('content_workbench.topics.executors.require_agent_enabled', return_value={'prompt':'', 'timeout_seconds':30, 'engine':'codex_cli'}):
             executor.recommend({'input':{'agent':'douyin'}}, SimpleNamespace(progress=lambda *args:None))
         self.assertEqual(memory['id'], captured['prompt']['growth_memories'][0]['id'])
         self.assertEqual([memory['id']], captured['candidates'][0]['memory_ids'])

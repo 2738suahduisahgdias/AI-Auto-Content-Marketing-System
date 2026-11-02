@@ -21,7 +21,7 @@ vi.mock("@/lib/api", () => ({
 
 vi.mock("@/AppContext", () => ({
   useApp: () => ({
-    resources: { core: { tasks: [] }, accounts: { publish_knowledge: { platforms: [] } }, articles: { items: [] } },
+    resources: { core: { tasks: [{content_id:"video-context",title:"视频交付上下文",source:{yingxu_handoff:{file_id:3,revision:1,status:"approved"}}}] }, accounts: { publish_knowledge: { platforms: [] } }, articles: { items: [] } },
     run: vi.fn((action: () => unknown) => action()), refresh: vi.fn(), notify: vi.fn(),
   }),
 }));
@@ -36,11 +36,20 @@ describe("Publication queue", () => {
     render(<MemoryRouter><Publish /></MemoryRouter>);
     expect((await screen.findAllByText("企业 AI 案例")).length).toBeGreaterThan(0);
     expect(screen.getByText("发布目标队列")).toBeInTheDocument();
-    expect(screen.getByText("本地发布预览")).toBeInTheDocument();
+    expect(screen.getByRole("button", {name:"一键同步到后台"})).toBeInTheDocument();
+    expect(screen.queryByText("本地发布预览")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "全选当前筛选" }));
     expect(screen.queryByText("发布选中就绪项")).not.toBeInTheDocument();
     expect(document.querySelector("video")).toHaveAttribute("src", "/api/files/3/media");
     expect(screen.getByRole("button", {name: /确认公开发布/})).toBeInTheDocument();
-    expect(screen.getByText("#企业AI")).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/#企业AI/)).toBeInTheDocument();
   });
+});
+
+it("文章发布不会显示视频交付区", async()=>{
+ render(<MemoryRouter initialEntries={["/publish?kind=article"]}><Publish/></MemoryRouter>);
+ await screen.findByText("选择已批准的文章正文");
+ expect(screen.queryByText("视频制作交付")).not.toBeInTheDocument();
+ expect(screen.queryByText("视频交付上下文")).not.toBeInTheDocument();
+ expect(screen.getByRole("link",{name:"视频任务"})).toHaveAttribute("href","/tasks");
 });

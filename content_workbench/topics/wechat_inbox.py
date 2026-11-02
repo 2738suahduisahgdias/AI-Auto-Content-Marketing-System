@@ -1,4 +1,5 @@
 import os
+import hashlib
 import re
 import sqlite3
 
@@ -24,6 +25,7 @@ class WechatInboxService:
         with self.conn() as conn:
             conn.executescript((PROJECT_ROOT / "migrations/006_wechat_inbox.sql").read_text())
             conn.executescript((PROJECT_ROOT / "migrations/007_wechat_snapshots.sql").read_text())
+        self.repair_legacy_duplicates()
         self.backfill()
 
     def conn(self, readonly=False):
@@ -104,9 +106,9 @@ class WechatInboxService:
             return existing, False
         title = message_title(text, original_url)
         timestamp = utcnow()
-        message_id = new_id("wechat")
+        message_id = "wechat_" + hashlib.sha256(msgid.encode("utf-8")).hexdigest()[:20]
         canonical = "https://wechat.local/messages/" + message_id
-        source_name = "微信私聊" if data.get("source") == "openclaw" else "本机手动"
+        source_name = "微信私聊" if data.get("source") in ("openclaw", "local_clawbot") else "本机手动"
         metadata = {"title": title, "raw_message": text, "original_url": original_url or None,
                     "source_name": source_name, "tag": "待分类", "message_id": message_id,
                     "message_type": message_type, "ingest": "wechat_manual"}
@@ -155,6 +157,34 @@ class WechatInboxService:
         return {"status": "manual_ready", "label": "本机入库可用，OpenClaw 待接入",
                 "detail": "当前可使用手动录入；微信插件完成真实消息验收后才显示已连接"}
 
+    def repair_legacy_duplicates(self):
+        # The old backfill keyed only on legacy msgid and duplicated modern messages
+        # after restart. Archive only untouched, identical synthetic copies.
+        with self.conn() as conn, immediate(conn):
+            conn.execute("""CREATE TABLE IF NOT EXISTS wechat_legacy_duplicate_archive (
+                id TEXT PRIMARY KEY, canonical_message_id TEXT NOT NULL,
+                message_json TEXT NOT NULL, archived_at TEXT NOT NULL)""")
+            rows = conn.execute("""SELECT legacy.*, current.id AS canonical_message_id
+                FROM wechat_topic_messages legacy JOIN wechat_topic_messages current
+                  ON current.research_item_id=legacy.research_item_id AND current.id!=legacy.id
+                WHERE legacy.msgid='legacy_' || legacy.research_item_id AND legacy.sender_id='legacy'
+                  AND current.msgid!='legacy_' || current.research_item_id
+                  AND legacy.updated_at=legacy.created_at
+                  AND legacy.raw_text=current.raw_text
+                  AND legacy.original_url IS current.original_url
+                  AND legacy.title_override=current.title_override
+                  AND legacy.note_override=current.note_override
+                  AND legacy.category=current.category
+                  AND NOT EXISTS (SELECT 1 FROM wechat_link_snapshots s WHERE s.message_id=legacy.id)
+                  AND NOT EXISTS (SELECT 1 FROM wb_jobs j WHERE instr(j.input_json,legacy.id)>0)
+                """).fetchall()
+            for row in rows:
+                record = dict(row)
+                canonical = record.pop("canonical_message_id")
+                conn.execute("INSERT OR IGNORE INTO wechat_legacy_duplicate_archive VALUES (?,?,?,?)",
+                             (row["id"], canonical, dumps(record), utcnow()))
+                conn.execute("DELETE FROM wechat_topic_messages WHERE id=?", (row["id"],))
+
     def backfill(self):
         with self.conn(readonly=True) as conn:
             rows = conn.execute("SELECT * FROM wb_research_items").fetchall()
@@ -165,7 +195,7 @@ class WechatInboxService:
                 continue
             msgid = "legacy_" + row["id"]
             with self.conn(readonly=True) as conn:
-                exists = conn.execute("SELECT 1 FROM wechat_topic_messages WHERE msgid=?", (msgid,)).fetchone()
+                exists = conn.execute("SELECT 1 FROM wechat_topic_messages WHERE research_item_id=?", (row["id"],)).fetchone()
             if exists:
                 continue
             original_url = metadata.get("original_url")

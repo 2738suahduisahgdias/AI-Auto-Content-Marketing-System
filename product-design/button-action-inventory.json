@@ -1,0 +1,3425 @@
+[
+  {
+    "file": "webapp/src/components/AnalyticsShared.tsx",
+    "line": 21,
+    "action": "onClick={() => onChange(key)}",
+    "disabled": "",
+    "label": "<button type=\"button\" role=\"tab\" aria-selected={value === key} className={value === key ? \"active\" : \"\"} key={key} onClick={() => onChange(key)}>{rangeLabels[key]}</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/AnalyticsShared.tsx",
+    "line": 35,
+    "action": "onClick={() => setMode(item.key)}",
+    "disabled": "",
+    "label": "<button type=\"button\" role=\"tab\" aria-selected={mode === item.key} className={mode === item.key ? \"active\" : \"\"} key={item.key} onClick={() => setMode(item.key)}>{item.label}</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/AnalyticsShared.tsx",
+    "line": 35,
+    "action": "onClick={() => onSelect(item)}",
+    "disabled": "",
+    "label": "<button type=\"button\" className=\"analytics-content-link\" onClick={() => onSelect(item)}>{item.title}</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/AnalyticsShared.tsx",
+    "line": 35,
+    "action": "onClick={() => onSelect(item)}",
+    "disabled": "",
+    "label": "<button type=\"button\" className=\"analytics-row-action\" aria-label={`分析 ${item.title}`} onClick={() => onSelect(item)}><ArrowUpRight size={16} /></button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/AnalyticsShared.tsx",
+    "line": 40,
+    "action": "onClick={() => setWindow(key)}",
+    "disabled": "",
+    "label": "<button type=\"button\" className={window === key ? \"active\" : \"\"} key={key} onClick={() => setWindow(key)}>{windowLabels[key]}</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/AppShell.tsx",
+    "line": 56,
+    "action": "onClick={() => setOpen(value => !value)}",
+    "disabled": "",
+    "label": "<button type=\"button\" className={cn(\"nav-link nav-dropdown-toggle\", active && \"active\")} aria-expanded={open} aria-controls={menuId} onClick={() => setOpen(value => !value)}><Icon size={16} /><span>{label}</span><ChevronDown className={cn(\"nav-dropdown-chevron\", open && \"open\")} size={14} /></button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/ArticleCreativePlan.tsx",
+    "line": 19,
+    "action": "onClick={onSave}",
+    "disabled": "disabled={disabled}",
+    "label": "<Button disabled={disabled} onClick={onSave}>保存正文与配图计划</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/ArticleCreativePlan.tsx",
+    "line": 20,
+    "action": "onClick={()=>{onApply(`主要平台：${platform}。写作目的：${purpose||'清楚讲解主题'}。按平台独立组织标题、正文和结尾，不编造事实。`);setNotice('已加入写作要求，尚未启动生成。')}}",
+    "disabled": "disabled={disabled}",
+    "label": "<Button disabled={disabled} onClick={()=>{onApply(`主要平台：${platform}。写作目的：${purpose||'清楚讲解主题'}。按平台独立组织标题、正文和结尾，不编造事实。`);setNotice('已加入写作要求，尚未启动生成。')}}>加入写作要求</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/ArticleCreativePlan.tsx",
+    "line": 21,
+    "action": "onClick={()=>setPictures(rows=>[...rows,{id:Date.now(),position:'',method:'搜索现成图片',description:''}])}",
+    "disabled": "",
+    "label": "<Button onClick={()=>setPictures(rows=>[...rows,{id:Date.now(),position:'',method:'搜索现成图片',description:''}])}>添加配图位置</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/ArticleCreativePlan.tsx",
+    "line": 23,
+    "action": "onClick={()=>setPictures(rows=>rows.filter(x=>x.id!==row.id))}",
+    "disabled": "",
+    "label": "<Button onClick={()=>setPictures(rows=>rows.filter(x=>x.id!==row.id))}>移除位置</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/ArticleImagePicker.tsx",
+    "line": 11,
+    "action": "onClick={()=>void importImage()}",
+    "disabled": "disabled={!path.trim()||busy||disabled}",
+    "label": "<Button disabled={!path.trim()||busy||disabled} onClick={()=>void importImage()}>{busy?'正在检查图片…':'导入并采用'}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/ArticleImageTools.tsx",
+    "line": 13,
+    "action": "onClick={()=>void search()}",
+    "disabled": "disabled={disabled||busy||!prompt.trim()}",
+    "label": "<Button disabled={disabled||busy||!prompt.trim()} onClick={()=>void search()}>{busy?'正在处理…':'搜索图片'}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/ArticleImageTools.tsx",
+    "line": 13,
+    "action": "onClick={()=>void adopt(r)}",
+    "disabled": "disabled={disabled||busy}",
+    "label": "<Button disabled={disabled||busy} onClick={()=>void adopt(r)}>下载并采用</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/ArticleImageTools.tsx",
+    "line": 13,
+    "action": "onClick={()=>void generate()}",
+    "disabled": "disabled={disabled||busy||!prompt.trim()}",
+    "label": "<Button disabled={disabled||busy||!prompt.trim()} onClick={()=>void generate()}>{busy?'正在生成…':'生成图片'}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/GrowthMemory.tsx",
+    "line": 17,
+    "action": "onClick={()=>{setDraft({...blank});setEditing(true);setNotice(\"\");}}",
+    "disabled": "",
+    "label": "<Button variant=\"primary\" onClick={()=>{setDraft({...blank});setEditing(true);setNotice(\"\");}}>新增记忆</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/GrowthMemory.tsx",
+    "line": 18,
+    "action": "onClick={()=>void load()}",
+    "disabled": "",
+    "label": "<Button size=\"small\" onClick={()=>void load()}>重新读取</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/GrowthMemory.tsx",
+    "line": 19,
+    "action": "type=\"submit\"",
+    "disabled": "disabled={busy}",
+    "label": "<Button type=\"submit\" variant=\"primary\" disabled={busy}>{busy?\"保存中…\":\"保存本地记忆\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/GrowthMemory.tsx",
+    "line": 19,
+    "action": "onClick={()=>setEditing(false)}",
+    "disabled": "disabled={busy}",
+    "label": "<Button type=\"button\" disabled={busy} onClick={()=>setEditing(false)}>取消</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/GrowthMemory.tsx",
+    "line": 21,
+    "action": "onClick={()=>{setDraft({...item});setEditing(true);}}",
+    "disabled": "disabled={busy}",
+    "label": "<Button size=\"small\" disabled={busy} onClick={()=>{setDraft({...item});setEditing(true);}}>编辑记忆</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/GrowthMemory.tsx",
+    "line": 21,
+    "action": "onClick={()=>void save({...item,enabled:!item.enabled})}",
+    "disabled": "disabled={busy}",
+    "label": "<Button size=\"small\" disabled={busy} onClick={()=>void save({...item,enabled:!item.enabled})}>{item.enabled?\"暂停用于推荐\":\"启用推荐\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/ImageProviderSettings.tsx",
+    "line": 8,
+    "action": "onClick={()=>void load()}",
+    "disabled": "",
+    "label": "<Button onClick={()=>void load()}>刷新 CLI 状态</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/LeadPanel.tsx",
+    "line": 128,
+    "action": "onClick={() => void remove(selectedVisible.map(lead => lead.id))}",
+    "disabled": "disabled={busy === \"delete\"}",
+    "label": "<Button size=\"small\" variant=\"danger\" disabled={busy === \"delete\"} onClick={() => void remove(selectedVisible.map(lead => lead.id))}><Trash2 size={14} />删除所选（{selectedVisible.length}）</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/LeadPanel.tsx",
+    "line": 128,
+    "action": "onClick={openCreate}",
+    "disabled": "",
+    "label": "<Button size=\"small\" variant=\"primary\" onClick={openCreate}><Plus size={14} />记录私信</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/LeadPanel.tsx",
+    "line": 129,
+    "action": "onClick={() => setDetail(lead)}",
+    "disabled": "",
+    "label": "<Button size=\"small\" onClick={() => setDetail(lead)}>详情</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/LeadPanel.tsx",
+    "line": 129,
+    "action": "onClick={() => void quickStage(lead, \"inquiry\")}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy)} onClick={() => void quickStage(lead, \"inquiry\")}>取消有效</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/LeadPanel.tsx",
+    "line": 129,
+    "action": "onClick={() => void quickStage(lead, \"qualified\")}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy)} onClick={() => void quickStage(lead, \"qualified\")}><Check size={12} />标为有效</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/LeadPanel.tsx",
+    "line": 129,
+    "action": "onClick={() => openEdit(lead)}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy)} onClick={() => openEdit(lead)}><Pencil size={12} />编辑</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/LeadPanel.tsx",
+    "line": 129,
+    "action": "onClick={() => void remove([lead.id])}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button size=\"small\" variant=\"danger\" disabled={Boolean(busy)} aria-label={`删除 ${lead.author_alias}`} onClick={() => void remove([lead.id])}><Trash2 size={12} /></Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/LeadPanel.tsx",
+    "line": 132,
+    "action": "onClick={() => { const current = detail; setDetail(null); openEdit(current); }}",
+    "disabled": "",
+    "label": "<Button size=\"small\" onClick={() => { const current = detail; setDetail(null); openEdit(current); }}><Pencil size={13} />编辑这条记录</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/LeadPanel.tsx",
+    "line": 134,
+    "action": "onClick={() => setOpen(false)}",
+    "disabled": "",
+    "label": "<Button type=\"button\" onClick={() => setOpen(false)}>取消</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/LeadPanel.tsx",
+    "line": 134,
+    "action": "type=\"submit\"",
+    "disabled": "disabled={busy === \"save\"}",
+    "label": "<Button variant=\"primary\" type=\"submit\" disabled={busy === \"save\"}>{busy === \"save\" ? \"正在保存…\" : editing ? \"保存修改\" : \"保存到本机\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/LicenseGate.tsx",
+    "line": 11,
+    "action": "onClick={()=>window.location.reload()}",
+    "disabled": "",
+    "label": "<button onClick={()=>window.location.reload()}>重新连接</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/LocalAssets.tsx",
+    "line": 11,
+    "action": "onClick={()=>void load().catch(e=>setError(errorText(e)))}",
+    "disabled": "disabled={busy}",
+    "label": "<Button disabled={busy} onClick={()=>void load().catch(e=>setError(errorText(e)))}>刷新文件状态</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/LocalAssets.tsx",
+    "line": 11,
+    "action": "onClick={()=>void save()}",
+    "disabled": "disabled={busy||!path.trim()}",
+    "label": "<Button disabled={busy||!path.trim()} onClick={()=>void save()}>{busy?'正在检查文件…':target?'验证并重新定位':'导入素材'}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/LocalAssets.tsx",
+    "line": 11,
+    "action": "onClick={()=>{setTarget(null);setPath('')}}",
+    "disabled": "disabled={busy}",
+    "label": "<Button disabled={busy} onClick={()=>{setTarget(null);setPath('')}}>取消</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/LocalAssets.tsx",
+    "line": 11,
+    "action": "onClick={()=>{setTarget(item.id);setPath('')}}",
+    "disabled": "disabled={busy}",
+    "label": "<Button disabled={busy} onClick={()=>{setTarget(item.id);setPath('')}}>重新定位</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/LocalAssets.tsx",
+    "line": 11,
+    "action": "onClick={()=>setVisible(n=>n+10)}",
+    "disabled": "",
+    "label": "<Button onClick={()=>setVisible(n=>n+10)}>显示更多素材（剩余 {items.length-visible}）</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/PublishingPanel.tsx",
+    "line": 249,
+    "action": "onClick={() => void generateFields()}",
+    "disabled": "disabled={Boolean(busy) || generationActive || !generatablePlatforms.length}",
+    "label": "<Button variant=\"primary\" disabled={Boolean(busy) || generationActive || !generatablePlatforms.length} title={!generatablePlatforms.length ? \"先勾选至少一个可编辑平台\" : \"生成后会覆盖选中平台的当前文本字段，请检查后保存\"} onClick={() => void generateFields()}><Sparkles size={15} />{busy === \"generate-fields\" ? \"正在提交…\" : generationActive ? \"发布 Agent 生成中…\" : \"发布 Agent 生成选中平台字段\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/PublishingPanel.tsx",
+    "line": 268,
+    "action": "onClick={() => void execute(`login:${platform}`, () => api(`/api/publishing/connections/${platform}/login`, jsonOptions(\"POST\")), \"登录页面已打开；登录后重新生成预览\")}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button size=\"small\" variant=\"ghost\" disabled={Boolean(busy)} onClick={() => void execute(`login:${platform}`, () => api(`/api/publishing/connections/${platform}/login`, jsonOptions(\"POST\")), \"登录页面已打开；登录后重新生成预览\")}><LogIn size={14} />{[\"wechat_channels\", \"wechat_official_account\"].includes(platform) ? \"在已登录 Chrome 中打开\" : \"打开专用登录窗口\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/PublishingPanel.tsx",
+    "line": 281,
+    "action": "onClick={() => { const evidence = window.prompt(\"请填写平台后台的实际发布证据（时间、内容或真实链接）；不要只写已发布\"); if (evidence) void execute(`reconcile:${target?.id}`, () => api(`/api/publishing/targets/${target?.id}/reconcile`, jsonOptions(\"POST\", { evidence })), \"平台实际发布结果已记录\"); }}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy)} onClick={() => { const evidence = window.prompt(\"请填写平台后台的实际发布证据（时间、内容或真实链接）；不要只写已发布\"); if (evidence) void execute(`reconcile:${target?.id}`, () => api(`/api/publishing/targets/${target?.id}/reconcile`, jsonOptions(\"POST\", { evidence })), \"平台实际发布结果已记录\"); }}>已在后台核实为已发布</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/PublishingPanel.tsx",
+    "line": 285,
+    "action": "onClick={() => void execute(`retry:${target?.id}`, () => api(`/api/publishing/targets/${target?.id}/retry`, jsonOptions(\"POST\")), \"失败目标已重新加入预览队列\")}",
+    "disabled": "disabled={Boolean(busy) || dirtyPlatforms.has(platform)}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy) || dirtyPlatforms.has(platform)} title={dirtyPlatforms.has(platform) ? \"先保存本平台的修改，再重试已保存内容\" : \"重新生成已保存内容的平台预览\"} onClick={() => void execute(`retry:${target?.id}`, () => api(`/api/publishing/targets/${target?.id}/retry`, jsonOptions(\"POST\")), \"失败目标已重新加入预览队列\")}><RotateCcw size={14} />重试失败预览</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/PublishingPanel.tsx",
+    "line": 293,
+    "action": "onClick={() => void saveBatch()}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button disabled={Boolean(busy)} onClick={() => void saveBatch()}><Save size={15} />{busy === \"save\" ? \"正在保存…\" : `保存${kind === \"article\" ? \"文章\" : \"视频\"}批次`}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/PublishingPanel.tsx",
+    "line": 294,
+    "action": "onClick={() => void execute(\"prepare\", () => api(`/api/publishing/batches/${batch?.id}/prepare`, jsonOptions(\"POST\", { platforms: selectedPreparable.map(target => target.platform) })), \"平台预览已加入后台队列，不会公开发布\")}",
+    "disabled": "disabled={Boolean(busy) || !batch || !selectedPreparable.length || hasDirtySelection}",
+    "label": "<Button disabled={Boolean(busy) || !batch || !selectedPreparable.length || hasDirtySelection} title={!batch ? \"先保存发布批次\" : hasDirtySelection ? \"先保存当前修改\" : !selectedPreparable.length ? \"选中的平台没有待预览或失败目标\" : undefined} onClick={() => void execute(\"prepare\", () => api(`/api/publishing/batches/${batch?.id}/prepare`, jsonOptions(\"POST\", { platforms: selectedPreparable.map(target => target.platform) })), \"平台预览已加入后台队列，不会公开发布\")}>{busy === \"prepare\" ? \"正在提交…\" : \"打开后台并预填选中平台\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/PublishingPanel.tsx",
+    "line": 295,
+    "action": "onClick={() => setConfirmOpen(true)}",
+    "disabled": "disabled={!executionEnabled || Boolean(busy) || !selectedReady.length || hasDirtySelection}",
+    "label": "<Button variant=\"primary\" disabled={!executionEnabled || Boolean(busy) || !selectedReady.length || hasDirtySelection} title={!executionEnabled ? \"当前环境未启用自动公开发布，请在平台后台人工确认\" : hasDirtySelection ? \"先保存修改并重新生成受影响平台预览\" : !selectedReady.length ? \"至少一个选中平台必须已完成真实预览\" : \"对所有选中的就绪平台进行一次公开确认\"} onClick={() => setConfirmOpen(true)}><Send size={15} />确认公开发布{selectedReady.length ? `（${selectedReady.length}）` : \"\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/PublishingPanel.tsx",
+    "line": 301,
+    "action": "onClick={() => setConfirmOpen(false)}",
+    "disabled": "",
+    "label": "<Button onClick={() => setConfirmOpen(false)}>返回检查</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/PublishingPanel.tsx",
+    "line": 301,
+    "action": "onClick={() => { setConfirmOpen(false); void execute(\"confirm\", () => api(`/api/publishing/batches/${batch?.id}/confirm`, jsonOptions(\"POST\", { source_hash: batch?.source_hash, platforms: selectedReady.map(target => target.platform) })), \"公开发布已确认，正在逐平台执行\"); }}",
+    "disabled": "disabled={!executionEnabled || Boolean(busy)}",
+    "label": "<Button variant=\"primary\" disabled={!executionEnabled || Boolean(busy)} onClick={() => { setConfirmOpen(false); void execute(\"confirm\", () => api(`/api/publishing/batches/${batch?.id}/confirm`, jsonOptions(\"POST\", { source_hash: batch?.source_hash, platforms: selectedReady.map(target => target.platform) })), \"公开发布已确认，正在逐平台执行\"); }}>我已完成预览检查，确认公开</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/RenderCache.tsx",
+    "line": 11,
+    "action": "onClick={()=>void change('limit')}",
+    "disabled": "disabled={busy||!Number.isInteger(Number(limit))||Number(limit)<1||Number(limit)>1000}",
+    "label": "<Button disabled={busy||!Number.isInteger(Number(limit))||Number(limit)<1||Number(limit)>1000} onClick={()=>void change('limit')}>保存容量</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/RenderCache.tsx",
+    "line": 11,
+    "action": "onClick={()=>void change('clear')}",
+    "disabled": "disabled={busy||!cache.reclaimable_bytes}",
+    "label": "<Button disabled={busy||!cache.reclaimable_bytes} onClick={()=>void change('clear')}>清理可重建缓存</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/RenderCache.tsx",
+    "line": 11,
+    "action": "onClick={()=>void load().catch(e=>setError(errorText(e)))}",
+    "disabled": "disabled={busy}",
+    "label": "<Button disabled={busy} onClick={()=>void load().catch(e=>setError(errorText(e)))}>刷新占用</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/RuntimeReadiness.tsx",
+    "line": 9,
+    "action": "onClick={()=>void load()}",
+    "disabled": "disabled={busy}",
+    "label": "<Button disabled={busy} onClick={()=>void load()}>{busy?'检查中…':'重新检查本机'}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/ScheduleSettings.tsx",
+    "line": 49,
+    "action": "onClick={create}",
+    "disabled": "disabled={!ready.length || busy}",
+    "label": "<Button variant=\"primary\" disabled={!ready.length || busy} onClick={create}>创建定时队列（{ready.length} 个目标）</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/ScheduleSettings.tsx",
+    "line": 49,
+    "action": "onClick={() => update(schedule, schedule.status === \"active\" ? \"paused\" : \"active\")}",
+    "disabled": "disabled={busy}",
+    "label": "<Button size=\"small\" disabled={busy} onClick={() => update(schedule, schedule.status === \"active\" ? \"paused\" : \"active\")}>{schedule.status === \"active\" ? <Pause size={13} /> : <Play size={13} />}{schedule.status === \"active\" ? \"暂停\" : \"恢复\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/ScheduleSettings.tsx",
+    "line": 49,
+    "action": "onClick={() => update(schedule)}",
+    "disabled": "disabled={busy}",
+    "label": "<Button size=\"small\" disabled={busy} onClick={() => update(schedule)}>应用上方设置</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/ScheduleSettings.tsx",
+    "line": 49,
+    "action": "onClick={() => execute(() => api(`/api/schedule/${schedule.id}/cancel`, jsonOptions(\"POST\")), \"未开始任务已取消，运行中任务不变\")}",
+    "disabled": "disabled={busy || !schedule.queue.some((item: any) => item.status === \"queued\")}",
+    "label": "<Button size=\"small\" variant=\"danger\" disabled={busy || !schedule.queue.some((item: any) => item.status === \"queued\")} onClick={() => execute(() => api(`/api/schedule/${schedule.id}/cancel`, jsonOptions(\"POST\")), \"未开始任务已取消，运行中任务不变\")}><X size={13} />取消未开始</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/SetupPrompt.tsx",
+    "line": 20,
+    "action": "onClick={dismiss}",
+    "disabled": "",
+    "label": "<Button onClick={dismiss}>稍后设置</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/TopicCard.tsx",
+    "line": 29,
+    "action": "onClick={() => onCreate(item)}",
+    "disabled": "disabled={busy}",
+    "label": "<Button size=\"small\" disabled={busy} onClick={() => onCreate(item)}><Plus size={13} />转为选题</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/TopicCard.tsx",
+    "line": 30,
+    "action": "onClick={() => onArchive(item)}",
+    "disabled": "disabled={busy}",
+    "label": "<Button size=\"small\" variant=\"ghost\" disabled={busy} onClick={() => onArchive(item)}>{archived ? <><ArchiveRestore size={13} />恢复</> : <><Archive size={13} />归档</>}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/TopicCard.tsx",
+    "line": 48,
+    "action": "onClick={() => onCreate(item)}",
+    "disabled": "disabled={busy}",
+    "label": "<Button size=\"small\" disabled={busy} onClick={() => onCreate(item)}><Plus size={13} />创建任务</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/TopicCard.tsx",
+    "line": 49,
+    "action": "onClick={() => onAnalyze(item)}",
+    "disabled": "disabled={busy}",
+    "label": "<Button size=\"small\" disabled={busy} onClick={() => onAnalyze(item)}><ScanText size={13} />{item.analysis_status === \"succeeded\" ? \"重新检查拆解\" : \"下载并拆解\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/TopicCard.tsx",
+    "line": 50,
+    "action": "onClick={() => onDetail(item)}",
+    "disabled": "disabled={busy}",
+    "label": "<Button size=\"small\" variant=\"ghost\" disabled={busy} onClick={() => onDetail(item)}><FileSearch size={13} />{item.analysis_status === \"succeeded\" ? \"查看拆解\" : \"详情\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/TopicCard.tsx",
+    "line": 51,
+    "action": "onClick={() => onArchive(item)}",
+    "disabled": "disabled={busy}",
+    "label": "<Button size=\"small\" variant=\"ghost\" disabled={busy} onClick={() => onArchive(item)}>{archived ? <><ArchiveRestore size={13} />恢复</> : <><Archive size={13} />归档</>}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 63,
+    "action": "onClick={() => setActiveScript(key)}",
+    "disabled": "",
+    "label": "<button type=\"button\" role=\"tab\" aria-selected={activeScript === key} className={activeScript === key ? \"active\" : \"\"} key={key} onClick={() => setActiveScript(key)}>{scriptNames[key]}{key === \"master\" || key === \"wechat_official_account\" ? \"（可选）\" : \"\"}<small>{task.script_meta?.[key]?.origin === \"agent\" ? \"AI\" : scripts[key].trim() ? \"手填\" : \"空缺\"}</small></button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 67,
+    "action": "onClick={() => void generate(Boolean(scripts[activeScript].trim()))}",
+    "disabled": "disabled={Boolean(busy) || !ai.ready}",
+    "label": "<Button disabled={Boolean(busy) || !ai.ready} title={disabledReason(Boolean(busy), ai.ready ? \"按需生成当前字段\" : \"脚本Agent尚未通过真实连接测试\")} onClick={() => void generate(Boolean(scripts[activeScript].trim()))}>{busy === \"generate-scripts\" ? \"正在按需生成…\" : scripts[activeScript].trim() ? \"根据现有资料重写此栏\" : \"生成此栏\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 67,
+    "action": "onClick={() => void save()}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button disabled={Boolean(busy)} onClick={() => void save()}>{busy === \"save-scripts\" ? \"正在保存…\" : \"保存手填文稿\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 67,
+    "action": "onClick={() => void approve()}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button variant=\"primary\" disabled={Boolean(busy)} onClick={() => void approve()}>保存并确认口播稿</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 122,
+    "action": "onClick={() => upload(\"audio\", audioFile, `${audioFile?.name} 已上传并通过检查`)}",
+    "disabled": "disabled={Boolean(busy) || !audioFile}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy) || !audioFile} title={disabledReason(Boolean(busy), audioFile ? \"上传并检查真人录音\" : \"请先选择录音文件\")} onClick={() => upload(\"audio\", audioFile, `${audioFile?.name} 已上传并通过检查`)}>{busy === \"upload-audio\" ? \"正在上传并检查…\" : \"上传真人录音\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 125,
+    "action": "onClick={() => upload(\"srt\", srtUpload, `${srtUpload?.name} 已上传并通过检查`)}",
+    "disabled": "disabled={Boolean(busy) || !srtUpload}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy) || !srtUpload} title={disabledReason(Boolean(busy), srtUpload ? \"上传并检查 SRT\" : \"请先选择 SRT 文件\")} onClick={() => upload(\"srt\", srtUpload, `${srtUpload?.name} 已上传并通过检查`)}>{busy === \"upload-srt\" ? \"正在上传并检查…\" : \"上传并检查 SRT\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 126,
+    "action": "onClick={() => void request(\"transcribe\", `/api/tasks/${task.content_id}/transcribe`, { method: \"POST\", headers: { \"Content-Type\": \"application/json\" }, body: JSON.stringify({ file_id: whisperFile, model: whisperModel }) }, \"WhisperX 已生成 SRT，请人工校对后确认\")}",
+    "disabled": "disabled={Boolean(busy) || !mediaAI.whisperx.ready || !whisperFile}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy) || !mediaAI.whisperx.ready || !whisperFile} title={disabledReason(Boolean(busy), !mediaAI.whisperx.ready ? \"WhisperX 尚未通过真实转写测试\" : !whisperFile ? \"请先准备音频\" : \"生成真实 SRT\")} onClick={() => void request(\"transcribe\", `/api/tasks/${task.content_id}/transcribe`, { method: \"POST\", headers: { \"Content-Type\": \"application/json\" }, body: JSON.stringify({ file_id: whisperFile, model: whisperModel }) }, \"WhisperX 已生成 SRT，请人工校对后确认\")}>{busy === \"transcribe\" ? \"正在本地转写…\" : \"使用 WhisperX 生成 SRT\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 128,
+    "action": "onClick={generateAudio}",
+    "disabled": "disabled={Boolean(busy) || !voice || !voiceReady || !ttsText.trim()}",
+    "label": "<Button variant=\"primary\" disabled={Boolean(busy) || !voice || !voiceReady || !ttsText.trim()} title={disabledReason(Boolean(busy), !voice ? \"尚无可用音色\" : !voiceReady ? `${voiceKind === \"clone\" ? \"OpenVoice\" : \"系统语音\"}尚未通过真实生成测试` : !ttsText.trim() ? \"请填写朗读文本\" : \"生成真实 WAV\")} onClick={generateAudio}>{busy === \"generate-audio\" ? \"正在生成并验证 WAV…\" : \"生成 AI 录音\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 129,
+    "action": "onClick={saveSample}",
+    "disabled": "disabled={Boolean(busy) || !sampleFile || !sampleName.trim() || !authorized}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy) || !sampleFile || !sampleName.trim() || !authorized} title={disabledReason(Boolean(busy), !sampleFile ? \"请选择本人语音样本\" : !sampleName.trim() ? \"请填写档案名\" : !authorized ? \"必须明确确认本人声音与授权\" : \"保存真实样本\")} onClick={saveSample}>{busy === \"voice-sample\" ? \"正在检查并保存样本…\" : \"保存本人样本\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 131,
+    "action": "onClick={() => void request(\"save-subtitle\", `/api/tasks/${task.content_id}/subtitles`, { method: \"PUT\", headers: { \"Content-Type\": \"application/json\" }, body: JSON.stringify({ file_id: subtitleId, text: subtitle }) }, \"字幕校对已保存并通过检查\")}",
+    "disabled": "disabled={Boolean(busy) || task.state !== \"waiting_audio\" || !subtitleId || !subtitle.trim()}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy) || task.state !== \"waiting_audio\" || !subtitleId || !subtitle.trim()} title={task.state !== \"waiting_audio\" ? \"当前阶段字幕只读\" : \"保存并验证校对后的 SRT\"} onClick={() => void request(\"save-subtitle\", `/api/tasks/${task.content_id}/subtitles`, { method: \"PUT\", headers: { \"Content-Type\": \"application/json\" }, body: JSON.stringify({ file_id: subtitleId, text: subtitle }) }, \"字幕校对已保存并通过检查\")}>{busy === \"save-subtitle\" ? \"正在校对检查…\" : \"保存字幕校对\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 133,
+    "action": "onClick={() => void action(\"revise_script\")}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button variant=\"danger\" disabled={Boolean(busy)} onClick={() => void action(\"revise_script\")}>返回修改脚本</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 133,
+    "action": "onClick={() => void action(\"confirm_audio\")}",
+    "disabled": "disabled={Boolean(busy) || !audioFiles.length || !srtFiles.length}",
+    "label": "<Button variant=\"primary\" disabled={Boolean(busy) || !audioFiles.length || !srtFiles.length} title={!audioFiles.length ? \"缺少有效录音\" : !srtFiles.length ? \"缺少有效 SRT\" : \"确认进入素材规划\"} onClick={() => void action(\"confirm_audio\")}>确认录音与字幕</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 156,
+    "action": "onClick={() => void request(\"generate-assets\", `/api/tasks/${task.content_id}/generate-asset-plan`, { method: \"POST\", headers: { \"Content-Type\": \"application/json\" }, body: JSON.stringify({ file_id: srtId, allowed_types: allowed }) }, \"分镜建议已保存；请上传真实素材并逐项确认授权\")}",
+    "disabled": "disabled={Boolean(busy) || !srtId || !core.ai?.ready || !allowed.length}",
+    "label": "<Button variant=\"primary\" disabled={Boolean(busy) || !srtId || !core.ai?.ready || !allowed.length} title={disabledReason(Boolean(busy), !srtId ? \"请先准备 SRT\" : !core.ai?.ready ? \"Kimi 尚未通过真实连接测试\" : !allowed.length ? \"至少允许一种素材类型\" : \"生成真实分镜建议\")} onClick={() => void request(\"generate-assets\", `/api/tasks/${task.content_id}/generate-asset-plan`, { method: \"POST\", headers: { \"Content-Type\": \"application/json\" }, body: JSON.stringify({ file_id: srtId, allowed_types: allowed }) }, \"分镜建议已保存；请上传真实素材并逐项确认授权\")}>{busy === \"generate-assets\" ? \"正在生成分镜建议…\" : \"生成分镜建议\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 157,
+    "action": "onClick={() => { if (assetFile) void request(\"upload-asset\", `/api/tasks/${task.content_id}/files?kind=asset&filename=${encodeURIComponent(assetFile.name)}`, { method: \"POST\", headers: { \"Content-Type\": \"application/octet-stream\" }, body: assetFile }, `${assetFile.name} 已上传并通过检查`); }}",
+    "disabled": "disabled={Boolean(busy) || !assetFile}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy) || !assetFile} title={disabledReason(Boolean(busy), assetFile ? \"上传真实素材\" : \"请先选择素材或授权凭证\")} onClick={() => { if (assetFile) void request(\"upload-asset\", `/api/tasks/${task.content_id}/files?kind=asset&filename=${encodeURIComponent(assetFile.name)}`, { method: \"POST\", headers: { \"Content-Type\": \"application/octet-stream\" }, body: assetFile }, `${assetFile.name} 已上传并通过检查`); }}>{busy === \"upload-asset\" ? \"正在上传并检查…\" : \"上传素材\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 158,
+    "action": "onClick={() => setPlan(current => [...current, blankAsset()])}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy)} onClick={() => setPlan(current => [...current, blankAsset()])}><Plus size={14} />添加一项</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 159,
+    "action": "onClick={() => setPlan(current => current.filter((_, itemIndex) => itemIndex !== index))}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button size=\"small\" variant=\"danger\" disabled={Boolean(busy)} onClick={() => setPlan(current => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={13} />移除</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 160,
+    "action": "onClick={() => void save()}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button disabled={Boolean(busy)} onClick={() => void save()}>{busy === \"save-assets\" ? \"正在保存…\" : \"保存分镜与素材清单\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 160,
+    "action": "onClick={() => void skip()}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button disabled={Boolean(busy)} onClick={() => void skip()}>保存并跳过未完成项</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 160,
+    "action": "onClick={() => void approve()}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button variant=\"primary\" disabled={Boolean(busy)} onClick={() => void approve()}>保存并确认全部素材与授权</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 277,
+    "action": "onClick={() => void render()}",
+    "disabled": "disabled={Boolean(busy) || productionActive || (mode !== \"upload\" && (preview?.status !== \"succeeded\" || !selectedTemplate))}",
+    "label": "<Button variant=\"primary\" disabled={Boolean(busy) || productionActive || (mode !== \"upload\" && (preview?.status !== \"succeeded\" || !selectedTemplate))} title={productionActive ? \"已有自动生产正在进行\" : mode !== \"upload\" && preview?.status !== \"succeeded\" ? \"等待10秒预览生成成功\" : \"确认当前效果并生成完整视频\"} onClick={() => void render()}>{productionActive ? \"自动生产进行中…\" : busy === \"render\" ? \"正在提交…\" : mode === \"upload\" ? \"开始渲染 MP4\" : preview?.approved ? \"开始生成完整成片\" : \"确认效果并生成成片\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 292,
+    "action": "onClick={() => void request(\"cancel-production\", `/api/tasks/${task.content_id}/jobs/${productionJob.id}/cancel`, { method: \"POST\" }, \"已请求取消生产\")}",
+    "disabled": "",
+    "label": "<Button size=\"small\" variant=\"danger\" onClick={() => void request(\"cancel-production\", `/api/tasks/${task.content_id}/jobs/${productionJob.id}/cancel`, { method: \"POST\" }, \"已请求取消生产\")}>取消生产</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 292,
+    "action": "onClick={() => void request(\"retry-production\", `/api/tasks/${task.content_id}/jobs/${productionJob.id}/retry`, { method: \"POST\" }, \"失败生产已重新排队\")}",
+    "disabled": "",
+    "label": "<Button size=\"small\" onClick={() => void request(\"retry-production\", `/api/tasks/${task.content_id}/jobs/${productionJob.id}/retry`, { method: \"POST\" }, \"失败生产已重新排队\")}>重试生产</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 293,
+    "action": "onClick={() => onNavigateGroup(2)}",
+    "disabled": "",
+    "label": "<Button size=\"small\" onClick={() => onNavigateGroup(2)}>前往制作方案选择风格</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 296,
+    "action": "onClick={() => setPreviewFileId(file.id)}",
+    "disabled": "",
+    "label": "<Button size=\"small\" variant={file.id === previewFile?.id ? \"primary\" : \"default\"} onClick={() => setPreviewFileId(file.id)}>查看</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 297,
+    "action": "onClick={() => { if (video) void request(\"upload-video\", `/api/tasks/${task.content_id}/files?kind=video&filename=${encodeURIComponent(video.name)}`, { method: \"POST\", headers: { \"Content-Type\": \"application/octet-stream\" }, body: video }, `${video.name} 已上传并通过检查`); }}",
+    "disabled": "disabled={Boolean(busy) || !video}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy) || !video} title={disabledReason(Boolean(busy), video ? \"上传并检查真实成片\" : \"请先选择成片文件\")} onClick={() => { if (video) void request(\"upload-video\", `/api/tasks/${task.content_id}/files?kind=video&filename=${encodeURIComponent(video.name)}`, { method: \"POST\", headers: { \"Content-Type\": \"application/octet-stream\" }, body: video }, `${video.name} 已上传并通过检查`); }}>{busy === \"upload-video\" ? \"正在上传并检查…\" : \"上传并检查成片\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 298,
+    "action": "onClick={() => void action(\"revise_assets\")}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button variant=\"danger\" disabled={Boolean(busy)} onClick={() => void action(\"revise_assets\")}>返回修改素材</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 311,
+    "action": "onClick={() => void request(\"cover-ai\", `/api/tasks/${task.content_id}/cover`, { method: \"POST\", headers: { \"Content-Type\": \"application/json\" }, body: JSON.stringify({ source: \"ai\" }) }, \"AI 封面已生成\")}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy)} onClick={() => void request(\"cover-ai\", `/api/tasks/${task.content_id}/cover`, { method: \"POST\", headers: { \"Content-Type\": \"application/json\" }, body: JSON.stringify({ source: \"ai\" }) }, \"AI 封面已生成\")}>{busy === \"cover-ai\" ? \"正在渲染封面…\" : \"AI 生成封面\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 312,
+    "action": "onClick={() => void request(\"cover-frame\", `/api/tasks/${task.content_id}/cover`, { method: \"POST\", headers: { \"Content-Type\": \"application/json\" }, body: JSON.stringify({ source: \"frame\" }) }, \"已从成片抽取封面\")}",
+    "disabled": "disabled={Boolean(busy) || !hasVideo}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy) || !hasVideo} title={hasVideo ? \"从最新成片抽取封面帧\" : \"还没有成片，可先 AI 生成或上传\"} onClick={() => void request(\"cover-frame\", `/api/tasks/${task.content_id}/cover`, { method: \"POST\", headers: { \"Content-Type\": \"application/json\" }, body: JSON.stringify({ source: \"frame\" }) }, \"已从成片抽取封面\")}>{busy === \"cover-frame\" ? \"正在抽帧…\" : \"从成片抽帧\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 314,
+    "action": "onClick={() => { if (coverFile) void request(\"upload-cover\", `/api/tasks/${task.content_id}/files?kind=cover&filename=${encodeURIComponent(coverFile.name)}`, { method: \"POST\", headers: { \"Content-Type\": \"application/octet-stream\" }, body: coverFile }, \"封面已上传\"); }}",
+    "disabled": "disabled={Boolean(busy) || !coverFile}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy) || !coverFile} title={coverFile ? \"上传封面图片\" : \"请先选择图片\"} onClick={() => { if (coverFile) void request(\"upload-cover\", `/api/tasks/${task.content_id}/files?kind=cover&filename=${encodeURIComponent(coverFile.name)}`, { method: \"POST\", headers: { \"Content-Type\": \"application/octet-stream\" }, body: coverFile }, \"封面已上传\"); }}>{busy === \"upload-cover\" ? \"正在上传…\" : \"上传封面\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 330,
+    "action": "onClick={() => onNavigateGroup(2)}",
+    "disabled": "",
+    "label": "<Button size=\"small\" onClick={() => onNavigateGroup(2)}>追加一种风格</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 334,
+    "action": "onClick={() => setVariantId(variant.id)}",
+    "disabled": "",
+    "label": "<Button size=\"small\" variant={variant.id === variantId ? \"primary\" : \"default\"} onClick={() => setVariantId(variant.id)}>质检 / 审批</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 334,
+    "action": "onClick={() => regenerate(variant)}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy)} onClick={() => regenerate(variant)}>重新生成</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 348,
+    "action": "onClick={() => onNavigateGroup(2)}",
+    "disabled": "",
+    "label": "<Button size=\"small\" onClick={() => onNavigateGroup(2)}>前往自动生产</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 387,
+    "action": "onClick={() => void save()}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button disabled={Boolean(busy)} onClick={() => void save()}>{busy === \"save-quality\" ? \"正在保存…\" : \"保存质检结果\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 387,
+    "action": "onClick={() => void action(\"revise_assets\")}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button variant=\"danger\" disabled={Boolean(busy)} onClick={() => void action(\"revise_assets\")}>返回素材返修</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 387,
+    "action": "onClick={() => void action(\"revise_render\")}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button variant=\"danger\" disabled={Boolean(busy)} onClick={() => void action(\"revise_render\")}>仅重做成片</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 387,
+    "action": "onClick={() => void submit()}",
+    "disabled": "disabled={Boolean(busy) || !Object.values(checks).every(Boolean)}",
+    "label": "<Button variant=\"primary\" disabled={Boolean(busy) || !Object.values(checks).every(Boolean)} title={!Object.values(checks).every(Boolean) ? \"五项全部通过后才能提交人工审核\" : \"保存结果并提交人工终审\"} onClick={() => void submit()}>保存并提交人工审核</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 396,
+    "action": "onClick={() => void action(\"revise_script\")}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button variant=\"danger\" disabled={Boolean(busy)} onClick={() => void action(\"revise_script\")}>返回脚本返修</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 396,
+    "action": "onClick={() => void action(\"revise_assets\")}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button variant=\"danger\" disabled={Boolean(busy)} onClick={() => void action(\"revise_assets\")}>返回素材返修</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 396,
+    "action": "onClick={() => void action(\"approve_final\", { variant_id: currentVariant?.id })}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button variant=\"primary\" disabled={Boolean(busy)} onClick={() => void action(\"approve_final\", { variant_id: currentVariant?.id })}>我已看当前成片，批准此版本</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 422,
+    "action": "onClick={() => void save()}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button disabled={Boolean(busy)} onClick={() => void save()}>{busy === \"save-metrics\" ? \"正在保存…\" : \"保存复盘数据\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/VideoStages.tsx",
+    "line": 422,
+    "action": "onClick={() => void complete()}",
+    "disabled": "disabled={Boolean(busy) || !retrospective.trim() || Object.keys(periods).some(period => metrics[period].views === \"\")}",
+    "label": "<Button variant=\"primary\" disabled={Boolean(busy) || !retrospective.trim() || Object.keys(periods).some(period => metrics[period].views === \"\")} title={!retrospective.trim() ? \"请填写复盘结论\" : Object.keys(periods).some(period => metrics[period].views === \"\") ? \"四个窗口均需填写播放/阅读数据\" : \"保存并归档复盘\"} onClick={() => void complete()}>保存并完成复盘归档</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/WechatInbox.tsx",
+    "line": 102,
+    "action": "onClick={() => void connectWechat(\"login\")}",
+    "disabled": "disabled={!!busy}",
+    "label": "<Button disabled={!!busy} onClick={() => void connectWechat(\"login\")}>获取微信登录二维码</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/WechatInbox.tsx",
+    "line": 105,
+    "action": "onClick={() => void connectWechat(\"poll\")}",
+    "disabled": "disabled={!!busy}",
+    "label": "<Button disabled={!!busy} onClick={() => void connectWechat(\"poll\")}>{busy === \"wechat\" ? \"正在检查…\" : \"我已扫码，检查连接\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/WechatInbox.tsx",
+    "line": 111,
+    "action": "type=\"submit\"",
+    "disabled": "disabled={!!busy}",
+    "label": "<Button variant=\"primary\" type=\"submit\" disabled={!!busy}><Plus size={14} />{busy === \"manual\" ? \"正在保存…\" : \"保存到待分类\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/WechatInbox.tsx",
+    "line": 114,
+    "action": "onClick={() => setCategory(item.id)}",
+    "disabled": "",
+    "label": "<button type=\"button\" key={item.id} className={`topic-filter ${category === item.id ? \"active\" : \"\"}`} aria-pressed={category === item.id} onClick={() => setCategory(item.id)}>{item.label}{item.id === \"archived\" ? ` ${messages.filter(message => message.archived).length}` : ` ${messages.filter(message => !message.archived && message.category === item.id).length}`}</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/WechatInbox.tsx",
+    "line": 123,
+    "action": "onClick={() => setEditing(item)}",
+    "disabled": "",
+    "label": "<button type=\"button\" className=\"wechat-message-title\" onClick={() => setEditing(item)}>{item.title}</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/WechatInbox.tsx",
+    "line": 131,
+    "action": "onClick={() => setEditing(item)}",
+    "disabled": "",
+    "label": "<Button size=\"small\" onClick={() => setEditing(item)}><FileText size={13} />整理</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/WechatInbox.tsx",
+    "line": 131,
+    "action": "onClick={() => onCreateTask(item.research_item_id)}",
+    "disabled": "",
+    "label": "<Button size=\"small\" variant=\"primary\" onClick={() => onCreateTask(item.research_item_id)}>转为内容任务</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/WechatInbox.tsx",
+    "line": 131,
+    "action": "onClick={() => void refreshSnapshot(item)}",
+    "disabled": "disabled={!!busy}",
+    "label": "<Button size=\"small\" disabled={!!busy} onClick={() => void refreshSnapshot(item)}>{item.snapshot_status === \"failed\" ? \"重新解析\" : \"生成快照\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/WechatInbox.tsx",
+    "line": 131,
+    "action": "onClick={() => void archive(item)}",
+    "disabled": "",
+    "label": "<Button size=\"small\" variant=\"ghost\" onClick={() => void archive(item)}>{item.archived ? <><ArchiveRestore size={13} />恢复</> : <><Archive size={13} />归档</>}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/WechatInbox.tsx",
+    "line": 135,
+    "action": "type=\"submit\"",
+    "disabled": "disabled={!!busy}",
+    "label": "<Button variant=\"primary\" type=\"submit\" disabled={!!busy}>{busy.startsWith(\"edit-\") ? \"正在保存…\" : \"保存修改\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/WechatInbox.tsx",
+    "line": 135,
+    "action": "onClick={() => setEditing(null)}",
+    "disabled": "",
+    "label": "<Button type=\"button\" onClick={() => setEditing(null)}>取消</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/WorkOverview.tsx",
+    "line": 15,
+    "action": "onClick={()=>void load()}",
+    "disabled": "disabled={busy}",
+    "label": "<Button size=\"small\" onClick={()=>void load()} disabled={busy}>{busy?'读取本地记录…':'刷新工作进度'}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/WorkOverview.tsx",
+    "line": 16,
+    "action": "onClick={()=>setSelected(g.key)}",
+    "disabled": "",
+    "label": "<button key={g.key} aria-pressed={selected===g.key} onClick={()=>setSelected(g.key)}>{g.label}<strong>{g.total}</strong></button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/WorkspaceTransfer.tsx",
+    "line": 7,
+    "action": "onClick={()=>void run('export')}",
+    "disabled": "disabled={busy||!destination.trim()}",
+    "label": "<Button disabled={busy||!destination.trim()} onClick={()=>void run('export')}>导出完整工作区</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/WorkspaceTransfer.tsx",
+    "line": 7,
+    "action": "onClick={()=>void run('restore')}",
+    "disabled": "disabled={busy||!source.trim()||!destination.trim()}",
+    "label": "<Button disabled={busy||!source.trim()||!destination.trim()} onClick={()=>void run('restore')}>校验并恢复到新目录</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/components/ui.tsx",
+    "line": 10,
+    "action": "type=\"button\"",
+    "disabled": "",
+    "label": "<button type=\"button\" className={cn(\"button\", `button-${variant}`, size === \"small\" && \"button-small\", className)} {...props} />",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/migration/BoundYingxu.tsx",
+    "line": 26,
+    "action": "onClick={()=>void save().catch(e=>setMessage(e.message))}",
+    "disabled": "disabled={busy}",
+    "label": "<button className=\"btn primary\" disabled={busy} onClick={()=>void save().catch(e=>setMessage(e.message))}>保存项目</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/migration/BoundYingxu.tsx",
+    "line": 26,
+    "action": "onClick={()=>safeNavigate(\"/settings/media\")}",
+    "disabled": "",
+    "label": "<button className=\"btn\" onClick={()=>safeNavigate(\"/settings/media\")}>重新定位素材</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/migration/BoundYingxu.tsx",
+    "line": 26,
+    "action": "onClick={async()=>{setBusy(true);try{const file=await importLocal(localPath.trim(),\"video\",copyLocal);setFileId(String(file.id));setRendered({url:file.url,name:file.original_name});setLocalPath(\"\");setMessage(\"已有成片已关联，可提交审核\")}catch(error){setMessage(error instanceof Error?error.message:\"关联失败\")}finally{setBusy(false)}}}",
+    "disabled": "disabled={busy||!localPath.trim()}",
+    "label": "<button className=\"btn\" disabled={busy||!localPath.trim()} onClick={async()=>{setBusy(true);try{const file=await importLocal(localPath.trim(),\"video\",copyLocal);setFileId(String(file.id));setRendered({url:file.url,name:file.original_name});setLocalPath(\"\");setMessage(\"已有成片已关联，可提交审核\")}catch(error){setMessage(error instanceof Error?error.message:\"关联失败\")}finally{setBusy(false)}}}>关联成片</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/migration/YingxuVideoWorkspace.tsx",
+    "line": 20,
+    "action": "onClick={()=>setPanel('create')}",
+    "disabled": "",
+    "label": "<button className=\"btn primary\" onClick={()=>setPanel('create')}>新建视频</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/migration/YingxuVideoWorkspace.tsx",
+    "line": 20,
+    "action": "onClick={()=>setPanel('projects')}",
+    "disabled": "",
+    "label": "<button className=\"btn\" onClick={()=>setPanel('projects')}>打开已有视频</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/migration/YingxuVideoWorkspace.tsx",
+    "line": 21,
+    "action": "onClick={()=>setPanel(null)}",
+    "disabled": "disabled={busy}",
+    "label": "<button className=\"btn\" disabled={busy} onClick={()=>setPanel(null)}>关闭</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/migration/YingxuVideoWorkspace.tsx",
+    "line": 22,
+    "action": "onClick={()=>setPanel('create')}",
+    "disabled": "",
+    "label": "<button className=\"btn primary\" onClick={()=>setPanel('create')}>＋ 新建视频</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/migration/YingxuVideoWorkspace.tsx",
+    "line": 22,
+    "action": "onClick={()=>void create()}",
+    "disabled": "disabled={busy||!title.trim()}",
+    "label": "<button className=\"btn primary\" disabled={busy||!title.trim()} onClick={()=>void create()}>{busy?'正在创建…':'创建并开始写稿 →'}</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Accounts.tsx",
+    "line": 67,
+    "action": "onClick={() => void perform(\"sync\", () => api(\"/api/accounts/sync\", jsonOptions(\"POST\")), \"账号同步已加入后台，请在专用窗口处理登录\")}",
+    "disabled": "disabled={!!busy}",
+    "label": "<Button disabled={!!busy} onClick={() => void perform(\"sync\", () => api(\"/api/accounts/sync\", jsonOptions(\"POST\")), \"账号同步已加入后台，请在专用窗口处理登录\")}><RefreshCw size={14} />{busy === \"sync\" ? \"正在提交…\" : \"立即同步\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Accounts.tsx",
+    "line": 67,
+    "action": "onClick={() => void perform(\"recommend\", () => api(\"/api/accounts/recommend\", jsonOptions(\"POST\")), \"账号分析 Agent 已加入后台\")}",
+    "disabled": "disabled={!!busy || !automatedAccounts.length}",
+    "label": "<Button variant=\"primary\" disabled={!!busy || !automatedAccounts.length} title={!automatedAccounts.length ? \"先同步至少一个真实账号快照\" : undefined} onClick={() => void perform(\"recommend\", () => api(\"/api/accounts/recommend\", jsonOptions(\"POST\")), \"账号分析 Agent 已加入后台\")}>生成账号选题推荐</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Accounts.tsx",
+    "line": 68,
+    "action": "onClick={() => void refresh()}",
+    "disabled": "",
+    "label": "<Button size=\"small\" onClick={() => void refresh()}>重新读取</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Accounts.tsx",
+    "line": 69,
+    "action": "onClick={() => setActionError(\"\")}",
+    "disabled": "",
+    "label": "<Button size=\"small\" onClick={() => setActionError(\"\")}>关闭错误详情</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Accounts.tsx",
+    "line": 70,
+    "action": "onClick={() => setPlatform(key)}",
+    "disabled": "",
+    "label": "<button key={key} className={`account-platform-tab ${platform === key ? \"active\" : \"\"}`} onClick={() => setPlatform(key)}>{platformNames[key]}{automatedAccounts.some(item => item.platform === key) ? \" · 已同步\" : \"\"}</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Accounts.tsx",
+    "line": 74,
+    "action": "onClick={() => void perform(\"login-xhs\", () => api(\"/api/accounts/browser/open\", jsonOptions(\"POST\", { platform: \"xiaohongshu\" })), \"小红书专用登录窗口正在打开，请在 5 分钟内完成扫码后重新同步\")}",
+    "disabled": "disabled={!!busy}",
+    "label": "<Button size=\"small\" disabled={!!busy} onClick={() => void perform(\"login-xhs\", () => api(\"/api/accounts/browser/open\", jsonOptions(\"POST\", { platform: \"xiaohongshu\" })), \"小红书专用登录窗口正在打开，请在 5 分钟内完成扫码后重新同步\")}>打开小红书登录窗口</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Accounts.tsx",
+    "line": 74,
+    "action": "onClick={() => void perform(\"login-douyin\", () => api(\"/api/accounts/browser/open\", jsonOptions(\"POST\", { platform: \"douyin_publish\" })), \"抖音发布后台登录窗口正在打开，请在 5 分钟内完成验证\")}",
+    "disabled": "disabled={!!busy}",
+    "label": "<Button size=\"small\" disabled={!!busy} onClick={() => void perform(\"login-douyin\", () => api(\"/api/accounts/browser/open\", jsonOptions(\"POST\", { platform: \"douyin_publish\" })), \"抖音发布后台登录窗口正在打开，请在 5 分钟内完成验证\")}>打开抖音发布后台登录</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Activation.tsx",
+    "line": 12,
+    "action": "onClick={()=>void navigator.clipboard.writeText(data.requestCode).then(()=>setNotice('申请码已复制')).catch(()=>setError('复制失败，请选中申请码手动复制'))}",
+    "disabled": "disabled={!data}",
+    "label": "<Button disabled={!data} onClick={()=>void navigator.clipboard.writeText(data.requestCode).then(()=>setNotice('申请码已复制')).catch(()=>setError('复制失败，请选中申请码手动复制'))}>复制申请码</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Activation.tsx",
+    "line": 14,
+    "action": "onClick={()=>void activate()}",
+    "disabled": "disabled={busy||!token.trim()||!data?.configured}",
+    "label": "<Button variant=\"primary\" disabled={busy||!token.trim()||!data?.configured} onClick={()=>void activate()}>{busy?'正在本机验证…':'验证并激活'}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Activation.tsx",
+    "line": 14,
+    "action": "onClick={()=>{sessionStorage.setItem('yx-read-only','1');navigate('/')}}",
+    "disabled": "",
+    "label": "<Button onClick={()=>{sessionStorage.setItem('yx-read-only','1');navigate('/')}}>先查看已有工作与成果</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Articles.tsx",
+    "line": 132,
+    "action": "onClick={()=>leave('/articles/'+item.id)}",
+    "disabled": "",
+    "label": "<button className=\"article-picker-row\" key={item.id} onClick={()=>leave('/articles/'+item.id)}><span><strong>{String(item.campaign.title)}</strong><small>{(item as any).updated_at ? '更新于 '+new Date((item as any).updated_at).toLocaleString() : '暂无更新时间'} · {(item as any).platform === 'xiaohongshu' ? '小红书' : (item as any).platform === 'wechat_official_account' ? '公众号' : '平台未标注'} · {/选题ID[:：]/.test(String(item.campaign.brief?.text || '')) ? '来源：关联选题（详见写作要求）' : '来源：未记录'}</small></span><Badge>{articleStateNames[item.state] || item.state}</Badge><span>打开 →</span></button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Articles.tsx",
+    "line": 132,
+    "action": "onClick={()=>setPage(currentPage-1)}",
+    "disabled": "disabled={currentPage===1}",
+    "label": "<Button disabled={currentPage===1} onClick={()=>setPage(currentPage-1)}>上一页</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Articles.tsx",
+    "line": 132,
+    "action": "onClick={()=>setPage(currentPage+1)}",
+    "disabled": "disabled={currentPage===pageCount}",
+    "label": "<Button disabled={currentPage===pageCount} onClick={()=>setPage(currentPage+1)}>下一页</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Articles.tsx",
+    "line": 136,
+    "action": "onClick={() => setCreateOpen(true)}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button variant=\"primary\" onClick={() => setCreateOpen(true)} disabled={Boolean(busy)}><Plus size={16} />新建文章</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Articles.tsx",
+    "line": 137,
+    "action": "onClick={()=>leave(\"/articles\")}",
+    "disabled": "",
+    "label": "<Button onClick={()=>leave(\"/articles\")}>← 返回文章列表</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Articles.tsx",
+    "line": 137,
+    "action": "onClick={()=>{setSearch(\"\");setStatus(\"all\");setPage(1);setSwitchOpen(true)}}",
+    "disabled": "",
+    "label": "<Button onClick={()=>{setSearch(\"\");setStatus(\"all\");setPage(1);setSwitchOpen(true)}}>{selected?.campaign.title || \"选择文章\"} ▾</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Articles.tsx",
+    "line": 138,
+    "action": "onClick={()=>setWorkspace(key)}",
+    "disabled": "",
+    "label": "<button key={key} aria-pressed={workspace===key} onClick={()=>setWorkspace(key)}>{label}</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Articles.tsx",
+    "line": 142,
+    "action": "onClick={() => setCreateOpen(true)}",
+    "disabled": "",
+    "label": "<Button variant=\"primary\" onClick={() => setCreateOpen(true)}><FilePlus2 size={15} />新建文章</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Articles.tsx",
+    "line": 145,
+    "action": "onClick={()=>setCreateOpen(true)}",
+    "disabled": "",
+    "label": "<Button onClick={()=>setCreateOpen(true)}>自由写作 / 粘贴已有稿</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Articles.tsx",
+    "line": 152,
+    "action": "onClick={() => void generate(\"article.outline\")}",
+    "disabled": "disabled={Boolean(busy) || hasActiveJob}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy) || hasActiveJob} title={hasActiveJob ? \"已有文章后台任务运行中\" : undefined} onClick={() => void generate(\"article.outline\")}><Sparkles size={14} />{busy === \"article.outline\" ? \"正在提交…\" : \"文章Agent生成大纲\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Articles.tsx",
+    "line": 155,
+    "action": "onClick={() => void saveRevision(\"outline\")}",
+    "disabled": "disabled={Boolean(busy) || !canEdit}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy) || !canEdit} onClick={() => void saveRevision(\"outline\")}>保存大纲</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Articles.tsx",
+    "line": 158,
+    "action": "onClick={() => void generate(\"article.draft\")}",
+    "disabled": "disabled={Boolean(busy) || !outline || hasActiveJob}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy) || !outline || hasActiveJob} title={!outline ? \"先保存或生成大纲\" : hasActiveJob ? \"已有文章后台任务运行中\" : undefined} onClick={() => void generate(\"article.draft\")}><Sparkles size={14} />{busy === \"article.draft\" ? \"正在提交…\" : \"文章Agent生成正文\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Articles.tsx",
+    "line": 162,
+    "action": "onClick={() => void saveRevision(\"draft\")}",
+    "disabled": "disabled={Boolean(busy) || !canEdit}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy) || !canEdit} onClick={() => void saveRevision(\"draft\")}>保存正文</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Articles.tsx",
+    "line": 163,
+    "action": "onClick={() => void execute(\"review\", () => api(`/api/articles/${selected.id}/actions`, jsonOptions(\"POST\", { action: \"submit_review\", expected_version: selected.version })), \"已提交人工审核\")}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy)} onClick={() => void execute(\"review\", () => api(`/api/articles/${selected.id}/actions`, jsonOptions(\"POST\", { action: \"submit_review\", expected_version: selected.version })), \"已提交人工审核\")}>提交人工审核</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Articles.tsx",
+    "line": 164,
+    "action": "onClick={() => decide(\"approve\")}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button size=\"small\" variant=\"primary\" disabled={Boolean(busy)} onClick={() => decide(\"approve\")}><Check size={14} />我已核查并批准当前正文</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Articles.tsx",
+    "line": 165,
+    "action": "onClick={() => decide(\"reject\")}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button size=\"small\" variant=\"danger\" disabled={Boolean(busy)} onClick={() => decide(\"reject\")}>退回修改</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Articles.tsx",
+    "line": 166,
+    "action": "onClick={() => void execute(\"export\", () => api(`/api/articles/${selected.id}/export`, jsonOptions(\"POST\", { revision_id: draft.id, expected_version: selected.version })), \"文章导出已加入后台；完成后可下载真实文件\")}",
+    "disabled": "disabled={Boolean(busy) || hasActiveJob}",
+    "label": "<Button size=\"small\" variant=\"primary\" disabled={Boolean(busy) || hasActiveJob} onClick={() => void execute(\"export\", () => api(`/api/articles/${selected.id}/export`, jsonOptions(\"POST\", { revision_id: draft.id, expected_version: selected.version })), \"文章导出已加入后台；完成后可下载真实文件\")}><Download size={14} />导出当前正文</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Articles.tsx",
+    "line": 171,
+    "action": "onClick={()=>{if(!selected||!draft)return;void run<any>(()=>api('/api/tasks',jsonOptions('POST',{title:selected.campaign.title,article_id:selected.id,article_revision_id:draft.id,source_type:'article',pillar:'enterprise_ai',audience:'business_owners'})),'已从保存的文章版本创建视频任务').then(task=>{if(task)void refresh().then(()=>navigate('/tasks/'+task.content_id))})}}",
+    "disabled": "disabled={!selected||!draft||Boolean(busy)||draftText!==String(draft?.payload.text||'')}",
+    "label": "<Button disabled={!selected||!draft||Boolean(busy)||draftText!==String(draft?.payload.text||'')} onClick={()=>{if(!selected||!draft)return;void run<any>(()=>api('/api/tasks',jsonOptions('POST',{title:selected.campaign.title,article_id:selected.id,article_revision_id:draft.id,source_type:'article',pillar:'enterprise_ai',audience:'business_owners'})),'已从保存的文章版本创建视频任务').then(task=>{if(task)void refresh().then(()=>navigate('/tasks/'+task.content_id))})}}>从已保存正文制作视频</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Articles.tsx",
+    "line": 182,
+    "action": "onClick={() => setCreateOpen(false)}",
+    "disabled": "",
+    "label": "<Button type=\"button\" onClick={() => setCreateOpen(false)}>取消</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Articles.tsx",
+    "line": 182,
+    "action": "type=\"submit\"",
+    "disabled": "disabled={busy === \"create\"}",
+    "label": "<Button variant=\"primary\" type=\"submit\" disabled={busy === \"create\"}><Send size={14} />{busy === \"create\" ? \"正在创建…\" : \"创建本地文章\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/CollectionKnowledge.tsx",
+    "line": 45,
+    "action": "onClick={() => setSelected(entityKey(item))}",
+    "disabled": "",
+    "label": "<button key={entityKey(item)} className={entityKey(current) === entityKey(item) ? \"active\" : \"\"} onClick={() => setSelected(entityKey(item))}><div><strong>{item.title}</strong><small>{platformNames[item.platform]} · {item.category_name}</small></div><Badge tone={item.status === \"verified\" ? \"green\" : \"orange\"}>{item.verification}</Badge></button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Competitors.tsx",
+    "line": 27,
+    "action": "onClick={() => { setPlatform(\"all\"); resetAccount(); }}",
+    "disabled": "",
+    "label": "<button type=\"button\" role=\"tab\" aria-selected={platform === \"all\"} className={platform === \"all\" ? \"active\" : \"\"} onClick={() => { setPlatform(\"all\"); resetAccount(); }}>全部平台</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Competitors.tsx",
+    "line": 27,
+    "action": "onClick={() => { setPlatform(key); resetAccount(); }}",
+    "disabled": "",
+    "label": "<button type=\"button\" role=\"tab\" aria-selected={platform === key} className={platform === key ? \"active\" : \"\"} key={key} onClick={() => { setPlatform(key); resetAccount(); }}>{platformLabels[key]}</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Competitors.tsx",
+    "line": 28,
+    "action": "onClick={resetAccount}",
+    "disabled": "",
+    "label": "<button type=\"button\" onClick={resetAccount}>清除账号筛选</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Competitors.tsx",
+    "line": 32,
+    "action": "onClick={() => setAccount(account === item.id ? null : item.id)}",
+    "disabled": "",
+    "label": "<button type=\"button\" className={`competitor-account-card${account === item.id ? \" active\" : \"\"}`} key={item.id} onClick={() => setAccount(account === item.id ? null : item.id)}><div className=\"competitor-account-head\"><span>{item.name.slice(0, 1)}</span><div><strong>{item.name}</strong><small>{platformLabels[item.platform]} · {item.group}</small></div><Badge tone={item.completeness === \"完整\" ? \"green\" : \"orange\"}>{item.completeness}</Badge></div><div className=\"competitor-account-stats\"><span><small>粉丝</small><strong>{numberText(item.followers)}</strong></span><span><small>30 天涨粉</small><strong>+{numberText(item.followerGrowth)}</strong></span><span><small>互动中位数</small><strong>{numberText(item.medianInteractions)}</strong></span></div></button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Competitors.tsx",
+    "line": 34,
+    "action": "onClick={() => setSelected(item)}",
+    "disabled": "",
+    "label": "<button type=\"button\" aria-label={`研究 ${item.title}`} onClick={() => setSelected(item)}>研究内容 <ArrowUpRight size={14} /></button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Knowledge.tsx",
+    "line": 67,
+    "action": "onClick={() => void backfill()}",
+    "disabled": "disabled={!!busy}",
+    "label": "<Button variant=\"primary\" disabled={!!busy} onClick={() => void backfill()}><RefreshCw size={14} />{busy === \"backfill\" ? \"正在回填…\" : \"同步现有数据到知识库\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Knowledge.tsx",
+    "line": 69,
+    "action": "onClick={() => void refresh()}",
+    "disabled": "",
+    "label": "<Button size=\"small\" onClick={() => void refresh()}>重新读取</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Knowledge.tsx",
+    "line": 70,
+    "action": "onClick={() => setActionError(\"\")}",
+    "disabled": "",
+    "label": "<Button size=\"small\" onClick={() => setActionError(\"\")}>关闭错误详情</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Knowledge.tsx",
+    "line": 73,
+    "action": "type=\"submit\"",
+    "disabled": "disabled={!!busy}",
+    "label": "<Button type=\"submit\" disabled={!!busy}><Search size={14} />{busy === \"search\" ? \"搜索中…\" : \"搜索\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Knowledge.tsx",
+    "line": 74,
+    "action": "onClick={clearFilters}",
+    "disabled": "disabled={!!busy}",
+    "label": "<button className=\"button button-small\" onClick={clearFilters} disabled={!!busy}>清空筛选</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Knowledge.tsx",
+    "line": 76,
+    "action": "onClick={() => setSelectedId(entity.id)}",
+    "disabled": "",
+    "label": "<button key={entity.id} className={`knowledge-entity-card ${selected?.id === entity.id ? \"active\" : \"\"}`} onClick={() => setSelectedId(entity.id)}><span>{entity.type}</span><strong>{entity.name}</strong><small>{entity.summary || \"暂无摘要\"}</small></button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Knowledge.tsx",
+    "line": 76,
+    "action": "onClick={clearFilters}",
+    "disabled": "",
+    "label": "<Button onClick={clearFilters}>清空筛选</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Knowledge.tsx",
+    "line": 78,
+    "action": "onClick={() => setSelectedId(null)}",
+    "disabled": "",
+    "label": "<Button size=\"small\" variant=\"ghost\" aria-label=\"关闭实体详情\" onClick={() => setSelectedId(null)}><X size={15} /></Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Publish.tsx",
+    "line": 84,
+    "action": "onClick={()=>void openReview(task.content_id)}",
+    "disabled": "disabled={!!receiving || h.stale}",
+    "label": "<Button disabled={!!receiving || h.stale} onClick={()=>void openReview(task.content_id)}>{receiving===task.content_id?\"正在定位…\":\"打开对应审核\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Publish.tsx",
+    "line": 84,
+    "action": "onClick={()=>setSearchParams({kind:\"video\",id:h.review_item_id})}",
+    "disabled": "",
+    "label": "<Button onClick={()=>setSearchParams({kind:\"video\",id:h.review_item_id})}>准备发布字段</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Publish.tsx",
+    "line": 89,
+    "action": "onClick={() => chooseKind(\"article\")}",
+    "disabled": "",
+    "label": "<button role=\"tab\" aria-selected={kind === \"article\"} className={`publish-kind-tab${kind === \"article\" ? \" active\" : \"\"}`} onClick={() => chooseKind(\"article\")}><FileText size={14} /> 文章发布</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Publish.tsx",
+    "line": 89,
+    "action": "onClick={() => chooseKind(\"video\")}",
+    "disabled": "",
+    "label": "<button role=\"tab\" aria-selected={kind === \"video\"} className={`publish-kind-tab${kind === \"video\" ? \" active\" : \"\"}`} onClick={() => chooseKind(\"video\")}><Film size={14} /> 视频发布</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Publish.tsx",
+    "line": 93,
+    "action": "onClick={() => setSelectedIds(new Set(filteredSources.map(sourceKey)))}",
+    "disabled": "",
+    "label": "<Button size=\"small\" onClick={() => setSelectedIds(new Set(filteredSources.map(sourceKey)))}>全选当前筛选</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Publish.tsx",
+    "line": 94,
+    "action": "onClick={() => setSearchParams({ kind, id: key })}",
+    "disabled": "",
+    "label": "<button type=\"button\" onClick={() => setSearchParams({ kind, id: key })}><Badge tone={item.status === \"ready\" ? \"green\" : item.status === \"failed\" ? \"red\" : \"orange\"}>{publishStatusNames[item.status || \"draft\"] || item.status || \"待处理\"}</Badge></button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Publish.tsx",
+    "line": 95,
+    "action": "onClick={() => void run(prepare, \"选中目标已加入平台预览队列\")}",
+    "disabled": "disabled={!selectedTargets.some(item => item.batch?.targets?.some((target: Json) => [\"draft\", \"failed\"].includes(target.status)))}",
+    "label": "<Button size=\"small\" disabled={!selectedTargets.some(item => item.batch?.targets?.some((target: Json) => [\"draft\", \"failed\"].includes(target.status)))} onClick={() => void run(prepare, \"选中目标已加入平台预览队列\")}><Send size={13} />提交选中后台预填</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/RealAccountAnalytics.tsx",
+    "line": 116,
+    "action": "onClick={() => void refresh()}",
+    "disabled": "",
+    "label": "<Button onClick={() => void refresh()}>重新读取</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/RealAccountAnalytics.tsx",
+    "line": 141,
+    "action": "onClick={() => void sync()}",
+    "disabled": "disabled={busy}",
+    "label": "<Button variant=\"primary\" disabled={busy} onClick={() => void sync()}><RefreshCw size={14} />{busy ? \"正在提交…\" : \"同步真实账号\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/RealAccountAnalytics.tsx",
+    "line": 147,
+    "action": "onClick={() => selectRange(\"custom\")}",
+    "disabled": "",
+    "label": "<button type=\"button\" className={`analytics-custom-range${range === \"custom\" ? \" active\" : \"\"}`} onClick={() => selectRange(\"custom\")}>自定义</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/RealAccountAnalytics.tsx",
+    "line": 167,
+    "action": "onClick={() => setContentMode(\"published\")}",
+    "disabled": "",
+    "label": "<button type=\"button\" className={contentMode === \"published\" ? \"active\" : \"\"} onClick={() => setContentMode(\"published\")}>期间发布</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/RealAccountAnalytics.tsx",
+    "line": 167,
+    "action": "onClick={() => setContentMode(\"recorded\")}",
+    "disabled": "",
+    "label": "<button type=\"button\" className={contentMode === \"recorded\" ? \"active\" : \"\"} onClick={() => setContentMode(\"recorded\")}>期间有记录</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/RealCompetitors.tsx",
+    "line": 51,
+    "action": "onClick={() => setPlatform(\"all\")}",
+    "disabled": "",
+    "label": "<button type=\"button\" role=\"tab\" aria-selected={platform === \"all\"} className={platform === \"all\" ? \"active\" : \"\"} onClick={() => setPlatform(\"all\")}>全部平台</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/RealCompetitors.tsx",
+    "line": 51,
+    "action": "onClick={() => setPlatform(key)}",
+    "disabled": "",
+    "label": "<button type=\"button\" role=\"tab\" aria-selected={platform === key} className={platform === key ? \"active\" : \"\"} key={key} onClick={() => setPlatform(key)}>{platformLabels[key]}</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Retrospective.tsx",
+    "line": 55,
+    "action": "onClick={() => window.location.reload()}",
+    "disabled": "",
+    "label": "<Button size=\"small\" onClick={() => window.location.reload()}>重新读取</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Retrospective.tsx",
+    "line": 61,
+    "action": "onClick={() => setPlatform(key)}",
+    "disabled": "",
+    "label": "<button role=\"tab\" aria-selected={platform === key} className={`retro-tab${platform === key ? \" active\" : \"\"}`} key={key} onClick={() => setPlatform(key)}>{platformNames[key]}<Badge>{data?.platforms[key]?.items.length ?? 0}</Badge></button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Review.tsx",
+    "line": 85,
+    "action": "onClick={() => void create(false)}",
+    "disabled": "disabled={!folder || Boolean(busy)}",
+    "label": "<Button disabled={!folder || Boolean(busy)} onClick={() => void create(false)}><FolderOpen size={15} />读取文件夹</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Review.tsx",
+    "line": 85,
+    "action": "onClick={() => void create(true)}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button disabled={Boolean(busy)} onClick={() => void create(true)}><Upload size={15} />新建上传批次</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Review.tsx",
+    "line": 85,
+    "action": "onClick={() => void uploadFiles()}",
+    "disabled": "disabled={!files.length || Boolean(busy)}",
+    "label": "<Button disabled={!files.length || Boolean(busy)} onClick={() => void uploadFiles()}>上传 {files.length || \"\"} 个视频</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Review.tsx",
+    "line": 86,
+    "action": "onClick={() => void start()}",
+    "disabled": "disabled={!batch?.items?.length || active || Boolean(busy)}",
+    "label": "<Button variant=\"primary\" disabled={!batch?.items?.length || active || Boolean(busy)} onClick={() => void start()}><RotateCcw size={15} />{active ? \"机器预审中…\" : \"开始机器预审\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Review.tsx",
+    "line": 87,
+    "action": "onClick={() => void approveEligible()}",
+    "disabled": "disabled={!batch?.items?.some((item: any) => Object.keys(item.report || {}).length && !item.delivery?.stale && item.status !== \"reviewing\" && item.decision !== \"approved\" && !(item.report.issues || []).some((issue: any) => issue.severity === \"error\")) || Boolean(busy)}",
+    "label": "<Button disabled={!batch?.items?.some((item: any) => Object.keys(item.report || {}).length && !item.delivery?.stale && item.status !== \"reviewing\" && item.decision !== \"approved\" && !(item.report.issues || []).some((issue: any) => issue.severity === \"error\")) || Boolean(busy)} onClick={() => void approveEligible()}><ShieldCheck size={15} />通过全部无阻断项</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Review.tsx",
+    "line": 96,
+    "action": "onClick={() => setExpanded(!expanded)}",
+    "disabled": "",
+    "label": "<button className=\"text-button\" onClick={() => setExpanded(!expanded)}>{expanded ? \"收起证据\" : \"查看检查详情\"}</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Review.tsx",
+    "line": 96,
+    "action": "onClick={() => onRepair(item)}",
+    "disabled": "disabled={!item.report?.safe_transcode_candidate?.eligible || Boolean(busy)}",
+    "label": "<Button size=\"small\" disabled={!item.report?.safe_transcode_candidate?.eligible || Boolean(busy)} onClick={() => onRepair(item)}><Wrench size={14} />安全转码并复审</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Review.tsx",
+    "line": 96,
+    "action": "onClick={() => onDecide(item, \"rejected\")}",
+    "disabled": "disabled={!Object.keys(item.report || {}).length || item.delivery?.stale || item.status === \"reviewing\" || item.decision === \"approved\" || Boolean(busy)}",
+    "label": "<Button size=\"small\" disabled={!Object.keys(item.report || {}).length || item.delivery?.stale || item.status === \"reviewing\" || item.decision === \"approved\" || Boolean(busy)} onClick={() => onDecide(item, \"rejected\")}><X size={14} />驳回</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Review.tsx",
+    "line": 96,
+    "action": "onClick={() => onDecide(item, \"approved\")}",
+    "disabled": "disabled={!Object.keys(item.report || {}).length || item.delivery?.stale || item.status === \"reviewing\" || item.decision === \"approved\" || issues.some((issue: any) => issue.severity === \"error\") || Boolean(busy)}",
+    "label": "<Button size=\"small\" variant=\"primary\" disabled={!Object.keys(item.report || {}).length || item.delivery?.stale || item.status === \"reviewing\" || item.decision === \"approved\" || issues.some((issue: any) => issue.severity === \"error\") || Boolean(busy)} onClick={() => onDecide(item, \"approved\")}><Check size={14} />人工通过</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Settings.tsx",
+    "line": 177,
+    "action": "onClick={onTest}",
+    "disabled": "disabled={disabled}",
+    "label": "<Button variant=\"primary\" size=\"small\" onClick={onTest} disabled={disabled} title={reason} aria-busy={testing}>\n      {testing ? <LoaderCircle className=\"spin\" size={14} /> : null}{testing ? \"真实测试进行中…\" : buttonLabel}\n    </Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Settings.tsx",
+    "line": 232,
+    "action": "onClick={() => { void setStatus(template, \"stable\"); }}",
+    "disabled": "disabled={busy === template.key}",
+    "label": "<Button size=\"small\" disabled={busy === template.key} onClick={() => { void setStatus(template, \"stable\"); }}>{busy === template.key ? \"正在升级…\" : \"升级为稳定\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Settings.tsx",
+    "line": 233,
+    "action": "onClick={() => { void setStatus(template, \"deprecated\"); }}",
+    "disabled": "disabled={busy === template.key}",
+    "label": "<Button size=\"small\" disabled={busy === template.key} onClick={() => { void setStatus(template, \"deprecated\"); }}>{busy === template.key ? \"正在停用…\" : \"停用\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Settings.tsx",
+    "line": 234,
+    "action": "onClick={() => { void setStatus(template, \"draft\"); }}",
+    "disabled": "disabled={busy === template.key}",
+    "label": "<Button size=\"small\" disabled={busy === template.key} onClick={() => { void setStatus(template, \"draft\"); }}>{busy === template.key ? \"正在恢复…\" : \"恢复为草稿\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Settings.tsx",
+    "line": 366,
+    "action": "onClick={() => { void reload(); }}",
+    "disabled": "disabled={refreshing}",
+    "label": "<Button size=\"small\" onClick={() => { void reload(); }} disabled={refreshing}><RefreshCw className={refreshing ? \"spin\" : \"\"} size={14} />{refreshing ? \"正在刷新\" : \"刷新真实状态\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Settings.tsx",
+    "line": 378,
+    "action": "onClick={() => selectAgent(id)}",
+    "disabled": "",
+    "label": "<button type=\"button\" key={id} className={`settings-agent-item${id === selectedId ? \" active\" : \"\"}`} onClick={() => selectAgent(id)} aria-pressed={id === selectedId}>\n            <span className=\"settings-agent-item-top\"><strong>{item.name}</strong>{dirty.has(id) && <i title=\"有未保存修改\">未保存</i>}</span>\n            <small>{item.description}</small>\n            <span className=\"settings-agent-item-meta\">{configs[id]?.engine} · {configs[id]?.enabled ? \"启用\" : item.connected ? \"停用\" : \"未接入\"}</span>\n          </button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Settings.tsx",
+    "line": 399,
+    "action": "onClick={() => { void saveAgent(); }}",
+    "disabled": "",
+    "label": "<Button variant=\"primary\" onClick={() => { void saveAgent(); }}><Save size={14} />{configBusy === `save:${selectedId}` ? \"正在保存…\" : `保存${definition.name}`}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Settings.tsx",
+    "line": 399,
+    "action": "onClick={() => { void resetAgent(); }}",
+    "disabled": "",
+    "label": "<Button onClick={() => { void resetAgent(); }}><RotateCcw size={14} />{configBusy === `reset:${selectedId}` ? \"正在恢复…\" : \"恢复该 Agent 默认\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Setup.tsx",
+    "line": 71,
+    "action": "onClick={() => void load()}",
+    "disabled": "disabled={loading}",
+    "label": "<Button size=\"small\" disabled={loading} onClick={() => void load()}><RefreshCw size={14} />重新检查</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Setup.tsx",
+    "line": 74,
+    "action": "onClick={() => setOs(key)}",
+    "disabled": "",
+    "label": "<button type=\"button\" className={os === key ? \"active\" : \"\"} key={key} onClick={() => setOs(key)}>{key}</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Setup.tsx",
+    "line": 78,
+    "action": "onClick={() => void login(item.platform)}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy)} onClick={() => void login(item.platform)}>{busy === item.platform ? \"正在提交…\" : item.verified ? \"重新打开登录窗口\" : \"打开登录窗口\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Setup.tsx",
+    "line": 78,
+    "action": "onClick={() => void syncNow()}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button variant=\"primary\" disabled={Boolean(busy)} onClick={() => void syncNow()}><RefreshCw size={14} />{busy === \"sync\" ? \"正在提交…\" : \"验证并同步全部账号\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/SocialData.tsx",
+    "line": 121,
+    "action": "onClick={() => void load()}",
+    "disabled": "",
+    "label": "<Button onClick={() => void load()}><RefreshCw size={14} />刷新</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/SocialData.tsx",
+    "line": 122,
+    "action": "onClick={() => void load()}",
+    "disabled": "",
+    "label": "<Button size=\"small\" onClick={() => void load()}>重新读取</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/SocialData.tsx",
+    "line": 139,
+    "action": "onClick={() => setSelectedId(item.id)}",
+    "disabled": "",
+    "label": "<button type=\"button\" key={item.id} className={selectedId === item.id ? \"active\" : \"\"} onClick={() => setSelectedId(item.id)}>\n            <span><Badge tone={item.status === \"supported\" ? \"green\" : \"orange\"}>{item.status === \"supported\" ? \"可执行\" : \"待适配\"}</Badge><Badge>{item.platform_label}</Badge><Badge>{kindNames[item.kind] || item.kind}</Badge></span>\n            <code>{item.id}</code>\n          </button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/SocialData.tsx",
+    "line": 160,
+    "action": "type=\"submit\"",
+    "disabled": "disabled={busy}",
+    "label": "<Button type=\"submit\" variant=\"primary\" disabled={busy}><Play size={14} />{busy ? \"正在加入本地队列…\" : \"执行并记录结果\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/SocialData.tsx",
+    "line": 169,
+    "action": "onClick={() => setSelectedRunId(run.id)}",
+    "disabled": "",
+    "label": "<button type=\"button\" key={run.id} className={selectedRunId === run.id ? \"active\" : \"\"} onClick={() => setSelectedRunId(run.id)}>\n          <span><strong>{run.operation_id}</strong><small>{run.created_at} · {run.provider}</small></span><Badge tone={run.status === \"succeeded\" ? \"green\" : run.status === \"failed\" ? \"red\" : \"orange\"}>{run.status}</Badge>\n        </button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Tasks.tsx",
+    "line": 51,
+    "action": "onClick={onClose}",
+    "disabled": "",
+    "label": "<Button size=\"small\" onClick={onClose}>取消</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Tasks.tsx",
+    "line": 71,
+    "action": "onClick={() => void submit()}",
+    "disabled": "disabled={busy || !title.trim()}",
+    "label": "<Button variant=\"primary\" disabled={busy || !title.trim()} title={!title.trim() ? \"请填写选题标题\" : \"创建视频任务\"} onClick={() => void submit()}>{busy ? \"正在创建…\" : \"创建并继续\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Tasks.tsx",
+    "line": 132,
+    "action": "onClick={() => setCreating(true)}",
+    "disabled": "",
+    "label": "<Button size=\"small\" onClick={() => setCreating(true)}><Plus size={14} />新建视频任务</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Tasks.tsx",
+    "line": 134,
+    "action": "onClick={() => navigate(`/tasks/${allTasks[0].content_id}`, { replace: true })}",
+    "disabled": "",
+    "label": "<Button onClick={() => navigate(`/tasks/${allTasks[0].content_id}`, { replace: true })}><ArrowLeft size={15} />返回最新任务</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Tasks.tsx",
+    "line": 147,
+    "action": "onClick={() => void refresh()}",
+    "disabled": "disabled={Boolean(busy)}",
+    "label": "<Button size=\"small\" disabled={Boolean(busy)} onClick={() => void refresh()}><RefreshCw size={14} />刷新任务数据</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Tasks.tsx",
+    "line": 151,
+    "action": "onClick={() => setFilter(key)}",
+    "disabled": "",
+    "label": "<button type=\"button\" role=\"tab\" aria-selected={filter === key} className={filter === key ? \"active\" : \"\"} key={key} onClick={() => setFilter(key)}>{name}</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Tasks.tsx",
+    "line": 154,
+    "action": "onClick={() => goToPage(currentPage - 1)}",
+    "disabled": "disabled={currentPage === 1}",
+    "label": "<Button size=\"small\" disabled={currentPage === 1} onClick={() => goToPage(currentPage - 1)}>上一页</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Tasks.tsx",
+    "line": 154,
+    "action": "onClick={() => goToPage(currentPage + 1)}",
+    "disabled": "disabled={currentPage === pageCount}",
+    "label": "<Button size=\"small\" disabled={currentPage === pageCount} onClick={() => goToPage(currentPage + 1)}>下一页</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Tasks.tsx",
+    "line": 159,
+    "action": "onClick={() => setSearchParams(index === group ? {} : { stage: String(index) })}",
+    "disabled": "disabled={index > group}",
+    "label": "<button type=\"button\" disabled={index > group} onClick={() => setSearchParams(index === group ? {} : { stage: String(index) })}><span>{done ? <Check size={13} /> : `0${index + 1}`}</span><strong>{name}</strong><small>{videoGroupOwners[index]}</small></button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Tasks.tsx",
+    "line": 160,
+    "action": "onClick={() => setSearchParams({})}",
+    "disabled": "",
+    "label": "<Button size=\"small\" onClick={() => setSearchParams({})}>返回当前步骤</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Topics.tsx",
+    "line": 70,
+    "action": "onClick={() => onConvert(item)}",
+    "disabled": "disabled={busy || (item.status === \"converted\" && !item.task_id)}",
+    "label": "<Button size=\"small\" variant=\"primary\" disabled={busy || (item.status === \"converted\" && !item.task_id)} onClick={() => onConvert(item)}>{item.status === \"converted\" ? \"打开选题\" : \"转为选题\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Topics.tsx",
+    "line": 184,
+    "action": "onClick={saveSettings}",
+    "disabled": "disabled={!!busy}",
+    "label": "<Button variant=\"primary\" disabled={!!busy} onClick={saveSettings}>{busy === \"settings\" ? \"正在保存…\" : \"保存设置与每日任务\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Topics.tsx",
+    "line": 184,
+    "action": "onClick={() => void perform(\"sync\", () => api(\"/api/topics/sync\", jsonOptions(\"POST\")), \"抖音快照同步已加入后台，此阶段不下载视频\")}",
+    "disabled": "disabled={!!busy}",
+    "label": "<Button disabled={!!busy} onClick={() => void perform(\"sync\", () => api(\"/api/topics/sync\", jsonOptions(\"POST\")), \"抖音快照同步已加入后台，此阶段不下载视频\")}><RefreshCw size={14} />同步抖音快照</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Topics.tsx",
+    "line": 184,
+    "action": "onClick={() => void perform(\"login\", () => api(\"/api/topics/browser/open\", jsonOptions(\"POST\")), \"专用采集窗口正在打开，请本人完成扫码和验证\")}",
+    "disabled": "disabled={!!busy}",
+    "label": "<Button disabled={!!busy} onClick={() => void perform(\"login\", () => api(\"/api/topics/browser/open\", jsonOptions(\"POST\")), \"专用采集窗口正在打开，请本人完成扫码和验证\")}>连接抖音采集窗口</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Topics.tsx",
+    "line": 194,
+    "action": "onClick={saveSettings}",
+    "disabled": "disabled={!!busy}",
+    "label": "<Button variant=\"primary\" disabled={!!busy} onClick={saveSettings}>{busy === \"settings\" ? \"正在保存…\" : \"保存收藏夹与推荐规则\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Topics.tsx",
+    "line": 194,
+    "action": "onClick={() => void perform(\"xhs-sync\", () => api(\"/api/topics/xiaohongshu/sync\", jsonOptions(\"POST\")), \"个人小红书已配置的收藏夹开始同步，此阶段不下载媒体\")}",
+    "disabled": "disabled={!!busy}",
+    "label": "<Button disabled={!!busy} onClick={() => void perform(\"xhs-sync\", () => api(\"/api/topics/xiaohongshu/sync\", jsonOptions(\"POST\")), \"个人小红书已配置的收藏夹开始同步，此阶段不下载媒体\")}><RefreshCw size={14} />同步四个收藏夹</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Topics.tsx",
+    "line": 194,
+    "action": "onClick={() => void perform(\"xhs-login\", () => api(\"/api/topics/xiaohongshu/browser/open\", jsonOptions(\"POST\")), \"个人小红书登录页已打开，请在 3 分钟内完成扫码；成功后自动同步\")}",
+    "disabled": "disabled={!!busy}",
+    "label": "<Button disabled={!!busy} onClick={() => void perform(\"xhs-login\", () => api(\"/api/topics/xiaohongshu/browser/open\", jsonOptions(\"POST\")), \"个人小红书登录页已打开，请在 3 分钟内完成扫码；成功后自动同步\")}>连接个人小红书</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Topics.tsx",
+    "line": 199,
+    "action": "onClick={() => setShowArchived(value => !value)}",
+    "disabled": "",
+    "label": "<Button onClick={() => setShowArchived(value => !value)}><Archive size={15} />{showArchived ? \"返回当前选题\" : `已归档 ${data.archived_count || 0}`}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Topics.tsx",
+    "line": 199,
+    "action": "onClick={() => setManualOpen(true)}",
+    "disabled": "",
+    "label": "<Button onClick={() => setManualOpen(true)}>手动创建选题</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Topics.tsx",
+    "line": 199,
+    "action": "onClick={() => void perform(`recommend-${recommendationAgent}`, () => api(\"/api/topics/recommend\", jsonOptions(\"POST\", { agent: recommendationAgent })), \"选题 Agent 已加入后台，正在分析真实快照\")}",
+    "disabled": "disabled={!!busy}",
+    "label": "<Button variant=\"primary\" disabled={!!busy} onClick={() => void perform(`recommend-${recommendationAgent}`, () => api(\"/api/topics/recommend\", jsonOptions(\"POST\", { agent: recommendationAgent })), \"选题 Agent 已加入后台，正在分析真实快照\")}>生成今日推荐</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Topics.tsx",
+    "line": 200,
+    "action": "onClick={() => setDouyinView(view.id)}",
+    "disabled": "",
+    "label": "<button type=\"button\" className={`topic-filter ${douyinView === view.id ? \"active\" : \"\"}`} aria-pressed={douyinView === view.id} key={view.id} onClick={() => setDouyinView(view.id)}>{view.label}{view.id === \"hot\" ? ` · 实际 ${data.hot_count || 0}/20` : \"\"}</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Topics.tsx",
+    "line": 201,
+    "action": "onClick={() => setXiaohongshuView(view.id)}",
+    "disabled": "",
+    "label": "<button type=\"button\" className={`topic-filter ${xiaohongshuView === view.id ? \"active\" : \"\"}`} aria-pressed={xiaohongshuView === view.id} key={view.id} onClick={() => setXiaohongshuView(view.id)}>{view.label}{` · ${data.sources?.[`xhs_${view.id}`]?.length || 0}`}</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Topics.tsx",
+    "line": 202,
+    "action": "onClick={() => void refresh()}",
+    "disabled": "",
+    "label": "<Button size=\"small\" onClick={() => void refresh()}>重新读取</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Topics.tsx",
+    "line": 203,
+    "action": "onClick={() => setActionError(\"\")}",
+    "disabled": "",
+    "label": "<Button size=\"small\" onClick={() => setActionError(\"\")}>关闭错误详情</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Topics.tsx",
+    "line": 204,
+    "action": "onClick={() => void perform(\"industry\", () => api(\"/api/topics/industry\", jsonOptions(\"POST\", { agent: \"industry\" })), \"行业热点与推荐已加入后台\")}",
+    "disabled": "disabled={!!busy}",
+    "label": "<Button disabled={!!busy} onClick={() => void perform(\"industry\", () => api(\"/api/topics/industry\", jsonOptions(\"POST\", { agent: \"industry\" })), \"行业热点与推荐已加入后台\")}><RefreshCw size={14} />同步行业热点</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Topics.tsx",
+    "line": 204,
+    "action": "onClick={() => void perform(\"sync\", () => api(\"/api/topics/sync\", jsonOptions(\"POST\")), \"抖音快照同步已加入后台，此阶段不下载视频\")}",
+    "disabled": "disabled={!!busy}",
+    "label": "<Button disabled={!!busy} onClick={() => void perform(\"sync\", () => api(\"/api/topics/sync\", jsonOptions(\"POST\")), \"抖音快照同步已加入后台，此阶段不下载视频\")}><RefreshCw size={14} />同步快照</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Topics.tsx",
+    "line": 204,
+    "action": "onClick={() => void perform(\"xhs-sync\", () => api(\"/api/topics/xiaohongshu/sync\", jsonOptions(\"POST\")), \"个人小红书已配置的收藏夹开始同步，此阶段不下载媒体\")}",
+    "disabled": "disabled={!!busy}",
+    "label": "<Button disabled={!!busy} onClick={() => void perform(\"xhs-sync\", () => api(\"/api/topics/xiaohongshu/sync\", jsonOptions(\"POST\")), \"个人小红书已配置的收藏夹开始同步，此阶段不下载媒体\")}><RefreshCw size={14} />同步收藏夹</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Topics.tsx",
+    "line": 222,
+    "action": "onClick={() => void perform(`legacy-${topic.id}`, () => api<Task>(\"/api/tasks\", jsonOptions(\"POST\", { topic_id: Number(topic.id) })), \"已根据候选选题创建任务\").then(task => { if (task) navigate(`/tasks/${task.content_id}`); })}",
+    "disabled": "disabled={!!busy}",
+    "label": "<Button size=\"small\" disabled={!!busy} onClick={() => void perform(`legacy-${topic.id}`, () => api<Task>(\"/api/tasks\", jsonOptions(\"POST\", { topic_id: Number(topic.id) })), \"已根据候选选题创建任务\").then(task => { if (task) navigate(`/tasks/${task.content_id}`); })}>选此题并创建任务</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Topics.tsx",
+    "line": 224,
+    "action": "type=\"submit\"",
+    "disabled": "disabled={!!busy}",
+    "label": "<Button type=\"submit\" variant=\"primary\" disabled={!!busy}>{busy === \"manual\" ? \"正在创建…\" : \"创建任务并进入脚本\"}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Topics.tsx",
+    "line": 226,
+    "action": "onClick={() => void refreshDetail()}",
+    "disabled": "",
+    "label": "<Button size=\"small\" onClick={() => void refreshDetail()}>刷新详情</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Topics.tsx",
+    "line": 226,
+    "action": "onClick={downloadDetail}",
+    "disabled": "",
+    "label": "<Button size=\"small\" className=\"topic-json-download\" onClick={downloadDetail}><Download size={13} />下载拆解详情</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Welcome.tsx",
+    "line": 16,
+    "action": "onClick={()=>setStep(index)}",
+    "disabled": "",
+    "label": "<button key={label} aria-current={step===index?'step':undefined} onClick={()=>setStep(index)}>{index+1}. {label}{data?.onboarding.steps.includes(steps[index])?' ✓':''}</button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Welcome.tsx",
+    "line": 17,
+    "action": "onClick={()=>void save('storage')}",
+    "disabled": "disabled={busy||!data}",
+    "label": "<Button disabled={busy||!data} variant=\"primary\" onClick={()=>void save('storage')}>使用当前本地目录</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Welcome.tsx",
+    "line": 17,
+    "action": "onClick={()=>void check()}",
+    "disabled": "",
+    "label": "<Button onClick={()=>void check()}>重新检测</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Welcome.tsx",
+    "line": 17,
+    "action": "onClick={()=>void save('environment')}",
+    "disabled": "disabled={busy||!env}",
+    "label": "<Button disabled={busy||!env} onClick={()=>void save('environment')}>已了解检测结果，继续</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Welcome.tsx",
+    "line": 17,
+    "action": "onClick={()=>void save('capabilities')}",
+    "disabled": "disabled={busy}",
+    "label": "<Button disabled={busy} onClick={()=>void save('capabilities')}>按需配置，继续</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Welcome.tsx",
+    "line": 17,
+    "action": "onClick={()=>void project()}",
+    "disabled": "disabled={busy||!data||(data.mode==='required'&&data.status!=='valid')}",
+    "label": "<Button disabled={busy||!data||(data.mode==='required'&&data.status!=='valid')} variant=\"primary\" onClick={()=>void project()}>{busy?'正在打开…':data?.onboarding.projectId?'继续我的第一条视频':'使用示例稿进入映序'}</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Welcome.tsx",
+    "line": 18,
+    "action": "onClick={()=>void articleSample()}",
+    "disabled": "disabled={busy||!data||(data.mode==='required'&&data.status!=='valid')}",
+    "label": "<Button disabled={busy||!data||(data.mode==='required'&&data.status!=='valid')} onClick={()=>void articleSample()}>创建文章规范样例</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/pages/Welcome.tsx",
+    "line": 19,
+    "action": "onClick={()=>void save('complete')}",
+    "disabled": "disabled={busy}",
+    "label": "<Button disabled={busy} onClick={()=>void save('complete')}>结束入门提示，进入工作台</Button>",
+    "verification": "静态绑定检查；非逐按钮真实外部服务验收"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 27,
+    "event": "click",
+    "action": "function(event){onNavigate('projects')}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 27,
+    "event": "click",
+    "action": "function(event){onNavigate('new-project')}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 27,
+    "event": "click",
+    "action": "function(event){downloadProject()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 27,
+    "event": "click",
+    "action": "function(event){goStage(i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 28,
+    "event": "click",
+    "action": "function(event){modal('reference')}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 28,
+    "event": "click",
+    "action": "function(event){modal('rewrite')}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 28,
+    "event": "click",
+    "action": "function(event){focusShot(i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 28,
+    "event": "click",
+    "action": "function(event){generateStoryboard()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 28,
+    "event": "click",
+    "action": "function(event){modal('template')}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 28,
+    "event": "change",
+    "action": "function(event){selectAll(this.checked)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 28,
+    "event": "click",
+    "action": "function(event){addShot()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 28,
+    "event": "click",
+    "action": "function(event){modal('template')}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 28,
+    "event": "click",
+    "action": "function(event){trial()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 28,
+    "event": "click",
+    "action": "function(event){goStage(2)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 29,
+    "event": "click",
+    "action": "function(event){focusShot(i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 29,
+    "event": "change",
+    "action": "function(event){toggleShot(i,this.checked)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 29,
+    "event": "click",
+    "action": "function(event){acceptPendingText(i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 29,
+    "event": "change",
+    "action": "function(event){sourceChange(i,this.value)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 29,
+    "event": "change",
+    "action": "function(event){durationChange(i,this.value)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 29,
+    "event": "click",
+    "action": "function(event){uploadShot(i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 29,
+    "event": "click",
+    "action": "function(event){modal('pickAsset',i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 29,
+    "event": "click",
+    "action": "function(event){modal('shot',i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 29,
+    "event": "click",
+    "action": "function(event){modal('shot',i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 30,
+    "event": "click",
+    "action": "function(event){page='settings';render()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 30,
+    "event": "click",
+    "action": "function(event){goStage(0)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 30,
+    "event": "click",
+    "action": "function(event){generateAll()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 30,
+    "event": "click",
+    "action": "function(event){s.source==='人工上传'?uploadShot(i):modal('generate',i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 30,
+    "event": "click",
+    "action": "function(event){page='brand';render()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 30,
+    "event": "click",
+    "action": "function(event){goStage(2)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 31,
+    "event": "click",
+    "action": "function(event){uploadAudio()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 31,
+    "event": "click",
+    "action": "function(event){modal('voice')}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 31,
+    "event": "click",
+    "action": "function(event){uploadBgm()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 31,
+    "event": "click",
+    "action": "function(event){state.bgm=t;invalidReview();save();render();toast('已选择示例曲目；正式使用需接入已授权音源')}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 31,
+    "event": "change",
+    "action": "function(event){state.ducking=this.checked;save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 31,
+    "event": "change",
+    "action": "function(event){state.volume=this.value;save();$('#volume').textContent=this.value+'%'}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 31,
+    "event": "click",
+    "action": "function(event){goStage(1)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 31,
+    "event": "click",
+    "action": "function(event){goStage(3)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 32,
+    "event": "click",
+    "action": "function(event){renderNative(false)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 32,
+    "event": "click",
+    "action": "function(event){runReview()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 32,
+    "event": "click",
+    "action": "function(event){playPreview()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 32,
+    "event": "click",
+    "action": "function(event){goStage(1)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 32,
+    "event": "click",
+    "action": "function(event){goStage(0)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 32,
+    "event": "click",
+    "action": "function(event){goStage(4)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 33,
+    "event": "click",
+    "action": "function(event){goStage(1)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 34,
+    "event": "click",
+    "action": "function(event){downloadProject()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 34,
+    "event": "change",
+    "action": "function(event){editDraft(p,'title',this.value)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 34,
+    "event": "change",
+    "action": "function(event){editDraft(p,'body',this.value)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 34,
+    "event": "click",
+    "action": "function(event){fillDraft(p)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 34,
+    "event": "click",
+    "action": "function(event){goStage(3)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 35,
+    "event": "click",
+    "action": "function(event){modal('reference')}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 35,
+    "event": "click",
+    "action": "function(event){applyTemplate(t)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 36,
+    "event": "click",
+    "action": "function(event){chooseUploadTarget()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 36,
+    "event": "click",
+    "action": "function(event){modal('pickTarget',i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 37,
+    "event": "click",
+    "action": "function(event){save();toast('品牌资料已保存至本机')}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 37,
+    "event": "change",
+    "action": "function(event){state.brand.name=this.value;invalidReview();save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 37,
+    "event": "change",
+    "action": "function(event){state.brand[k]=this.value;invalidReview();save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 37,
+    "event": "click",
+    "action": "function(event){chooseUploadTarget()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 38,
+    "event": "click",
+    "action": "function(event){save();toast('模型偏好已保存；Demo 未连接外部服务')}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 38,
+    "event": "change",
+    "action": "function(event){state.models[k]=this.value;save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 38,
+    "event": "change",
+    "action": "function(event){state.budget=Math.max(1,Number(this.value));save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 38,
+    "event": "change",
+    "action": "function(event){state.retry=this.value;save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 58,
+    "event": "click",
+    "action": "function(event){pickLive(arg,false)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 58,
+    "event": "click",
+    "action": "function(event){pickLive(arg,true)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 58,
+    "event": "input",
+    "action": "function(event){state.shots[arg].motion=this.value;save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 58,
+    "event": "click",
+    "action": "function(event){saveLiveTask(arg)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 60,
+    "event": "click",
+    "action": "function(event){state.audience=$('#brief-audience').value;state.goal=$('#brief-goal').value;save();closeModal();toast('创作简报已保存')}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 61,
+    "event": "click",
+    "action": "function(event){uploadReference()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 61,
+    "event": "click",
+    "action": "function(event){showAnalysis(true)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 61,
+    "event": "click",
+    "action": "function(event){showAnalysis(false)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 62,
+    "event": "click",
+    "action": "function(event){saveTemplate()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 63,
+    "event": "click",
+    "action": "function(event){applyTemplate(t)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 64,
+    "event": "click",
+    "action": "function(event){$('#rewrite-text').value='给忙碌的日常，留一点慢下来的时间。让自然的气息，陪你回到自己的节奏。'}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 64,
+    "event": "click",
+    "action": "function(event){$('#rewrite-text').value='把山野带回家，让日常慢下来。'}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 64,
+    "event": "click",
+    "action": "function(event){state.shots[state.focus].text=$('#rewrite-text').value;state.shots[state.focus].dirty=true;invalidReview();closeModal();render();toast('文案已采用，可更新对应分镜')}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 65,
+    "event": "click",
+    "action": "function(event){rebuildStoryboard()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 66,
+    "event": "click",
+    "action": "function(event){simulateGeneration(window.pendingIds)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 67,
+    "event": "click",
+    "action": "function(event){state.shots[arg].motion=$('#motion-prompt').value;simulateGeneration([arg])}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 67,
+    "event": "click",
+    "action": "function(event){state.shots[arg].motion=$('#motion-prompt').value;simulateGeneration([arg],true)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 68,
+    "event": "click",
+    "action": "function(event){moveShot(arg,-1)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 68,
+    "event": "click",
+    "action": "function(event){moveShot(arg,1)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 68,
+    "event": "click",
+    "action": "function(event){deleteShot(arg)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 68,
+    "event": "click",
+    "action": "function(event){saveShot(arg)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 69,
+    "event": "click",
+    "action": "function(event){useAsset(arg,i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 70,
+    "event": "click",
+    "action": "function(event){useAsset(i,arg)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 71,
+    "event": "click",
+    "action": "function(event){closeModal();onNavigate('settings')}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 73,
+    "event": "click",
+    "action": "function(event){closeModal()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 73,
+    "event": "click",
+    "action": "function(event){closeModal()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 110,
+    "event": "change",
+    "action": "function(event){state.format=this.value;invalidReview();render()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 110,
+    "event": "change",
+    "action": "function(event){state.rhythm=this.value;invalidReview();render()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 110,
+    "event": "click",
+    "action": "function(event){uploadBgm()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 110,
+    "event": "click",
+    "action": "function(event){uploadAudio()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 110,
+    "event": "change",
+    "action": "function(event){state.beats=this.value;if(state.musicAnalysis)state.musicAnalysis.corrected=true;invalidReview();save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 110,
+    "event": "change",
+    "action": "function(event){state.sfx=this.value;invalidReview();save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 110,
+    "event": "click",
+    "action": "function(event){goStage(1)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 111,
+    "event": "change",
+    "action": "function(event){state.codeModel=this.value;save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 111,
+    "event": "change",
+    "action": "function(event){state.videoEnabled=this.checked;save();render()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 111,
+    "event": "change",
+    "action": "function(event){state.videoProvider=this.value;save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 111,
+    "event": "change",
+    "action": "function(event){state.videoModel=this.value;save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 116,
+    "event": "click",
+    "action": "function(event){renderNative(true)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 116,
+    "event": "click",
+    "action": "function(event){planSample()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 116,
+    "event": "click",
+    "action": "function(event){state.sampleApproved=true;save();render()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 116,
+    "event": "click",
+    "action": "function(event){routeTask(i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 116,
+    "event": "click",
+    "action": "function(event){renderNative(true,i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 116,
+    "event": "click",
+    "action": "function(event){goStage(1)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 116,
+    "event": "click",
+    "action": "function(event){goStage(3)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 135,
+    "event": "click",
+    "action": "function(event){goStage(1)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 136,
+    "event": "click",
+    "action": "function(event){chooseScene(i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 136,
+    "event": "change",
+    "action": "function(event){state.topic=this.value;invalidReview();save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 136,
+    "event": "change",
+    "action": "function(event){state.audience=this.value;invalidReview();save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 136,
+    "event": "change",
+    "action": "function(event){state.goal=this.value;invalidReview();save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 136,
+    "event": "change",
+    "action": "function(event){state.structure=this.value;invalidReview();save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 139,
+    "event": "click",
+    "action": "function(event){pickMusicFolder(true)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 139,
+    "event": "click",
+    "action": "function(event){pickMusicFolder(false)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 139,
+    "event": "input",
+    "action": "function(event){filterMusic(this.value)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 139,
+    "event": "change",
+    "action": "function(event){state.onlineTrack=this.value;save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 139,
+    "event": "change",
+    "action": "function(event){state.musicSource=this.value;save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 139,
+    "event": "change",
+    "action": "function(event){state.musicLicense=this.value;save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 140,
+    "event": "click",
+    "action": "function(event){useMusic(i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 154,
+    "event": "click",
+    "action": "function(event){openLibrary('methods')}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 154,
+    "event": "click",
+    "action": "function(event){chooseEffect(i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 154,
+    "event": "change",
+    "action": "function(event){state.effectPrompt=this.value;invalidReview();save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 156,
+    "event": "click",
+    "action": "function(event){page='project';state.stage=0;render()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 156,
+    "event": "click",
+    "action": "function(event){chooseEffect(i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 157,
+    "event": "click",
+    "action": "function(event){recordFeedback()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 157,
+    "event": "click",
+    "action": "function(event){modal('shot',i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 157,
+    "event": "click",
+    "action": "function(event){planRevision(i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 184,
+    "event": "click",
+    "action": "function(event){analyzeMusic(state.bgmUrl,state.bgmFile)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 185,
+    "event": "click",
+    "action": "function(event){analyzeMusic(state.bgmUrl,state.bgmFile)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 192,
+    "event": "click",
+    "action": "function(event){searchReferences()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 192,
+    "event": "click",
+    "action": "function(event){saveReferenceLink()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 192,
+    "event": "click",
+    "action": "function(event){openReferenceEditor(i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 196,
+    "event": "click",
+    "action": "function(event){closeModal()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 196,
+    "event": "change",
+    "action": "function(event){previewReferenceVideo(this.files[0])}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 196,
+    "event": "click",
+    "action": "function(event){saveReferenceNotes(i,false)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 196,
+    "event": "click",
+    "action": "function(event){saveReferenceNotes(i,true)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 211,
+    "event": "keydown",
+    "action": "function(event){if(event.key==='Enter')runDiscoverySearch()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 211,
+    "event": "change",
+    "action": "function(event){discoveryPlatform=this.value;render()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 211,
+    "event": "click",
+    "action": "function(event){runDiscoverySearch()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 211,
+    "event": "change",
+    "action": "function(event){discoverySort=this.value;render()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 211,
+    "event": "click",
+    "action": "function(event){discoveryQuery=v;render()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 211,
+    "event": "click",
+    "action": "function(event){showDiscovery(r.id)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 211,
+    "event": "click",
+    "action": "function(event){collectDiscovery(r.id)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 211,
+    "event": "click",
+    "action": "function(event){startDiscoveryTask(r.id)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 211,
+    "event": "click",
+    "action": "function(event){showDiscovery(r.id)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 211,
+    "event": "click",
+    "action": "function(event){(t.status==='演示完成'?showDiscovery:startDiscoveryTask)(id)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 215,
+    "event": "click",
+    "action": "function(event){closeModal()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 215,
+    "event": "click",
+    "action": "function(event){collectDiscovery(id);closeModal()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 215,
+    "event": "click",
+    "action": "function(event){topicFromReference(id)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 215,
+    "event": "click",
+    "action": "function(event){saveReferenceMethod(id)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 219,
+    "event": "change",
+    "action": "function(event){state.format=this.value;invalidReview();render()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 220,
+    "event": "change",
+    "action": "function(event){state.rhythm=this.value;invalidReview();render()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 220,
+    "event": "click",
+    "action": "function(event){uploadAudio()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 220,
+    "event": "click",
+    "action": "function(event){removeSound(\"voice\")}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 220,
+    "event": "click",
+    "action": "function(event){openMusicPicker()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 220,
+    "event": "click",
+    "action": "function(event){removeSound(\"bgm\")}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 220,
+    "event": "change",
+    "action": "function(event){updateBeats(this.value)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 220,
+    "event": "change",
+    "action": "function(event){state.sfx=this.value;invalidReview();save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 221,
+    "event": "click",
+    "action": "function(event){closeModal()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 221,
+    "event": "click",
+    "action": "function(event){closeModal();uploadBgm()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 224,
+    "event": "click",
+    "action": "function(event){closeModal()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 224,
+    "event": "click",
+    "action": "function(event){uploadShot(i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 226,
+    "event": "click",
+    "action": "function(event){addTopic()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 226,
+    "event": "change",
+    "action": "function(event){linkTopic(this.value)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 226,
+    "event": "click",
+    "action": "function(event){importManuscript()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 226,
+    "event": "input",
+    "action": "function(event){editManuscript('title',this.value)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 226,
+    "event": "input",
+    "action": "function(event){editManuscript('text',this.value)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 226,
+    "event": "click",
+    "action": "function(event){saveManuscriptVersion()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 226,
+    "event": "click",
+    "action": "function(event){exportManuscript()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 226,
+    "event": "input",
+    "action": "function(event){state.manuscript.prompt=this.value;save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 226,
+    "event": "click",
+    "action": "function(event){draftManuscript()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 226,
+    "event": "click",
+    "action": "function(event){adoptManuscript()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 226,
+    "event": "click",
+    "action": "function(event){restoreManuscript(i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 226,
+    "event": "click",
+    "action": "function(event){continueManuscript()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 227,
+    "event": "click",
+    "action": "function(event){onNavigate('topics')}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 241,
+    "event": "click",
+    "action": "function(event){goStage(-1)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 241,
+    "event": "click",
+    "action": "function(event){goStage(-1)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 241,
+    "event": "click",
+    "action": "function(event){manuscriptToShots()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 245,
+    "event": "click",
+    "action": "function(event){closeModal()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 246,
+    "event": "click",
+    "action": "function(event){goStage(-1)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 246,
+    "event": "click",
+    "action": "function(event){openLibrary(k)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 247,
+    "event": "click",
+    "action": "function(event){saveLibraryTopic()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 247,
+    "event": "change",
+    "action": "function(event){state.topics[i].title=this.value;save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 247,
+    "event": "change",
+    "action": "function(event){state.topics[i].angle=this.value;save()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 247,
+    "event": "click",
+    "action": "function(event){render();toast('选题已保存')}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 247,
+    "event": "click",
+    "action": "function(event){writeTopic(i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 247,
+    "event": "click",
+    "action": "function(event){showDiscovery(t.referenceId)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 247,
+    "event": "click",
+    "action": "function(event){openArchivedManuscript(i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 254,
+    "event": "click",
+    "action": "function(event){previewMethod(i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 254,
+    "event": "click",
+    "action": "function(event){applySavedMethod(i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 255,
+    "event": "click",
+    "action": "function(event){closeModal()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 255,
+    "event": "click",
+    "action": "function(event){applyConfiguredMethod(i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 258,
+    "event": "click",
+    "action": "function(event){saveWorkSnapshot()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 258,
+    "event": "click",
+    "action": "function(event){reuseWork(i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 258,
+    "event": "click",
+    "action": "function(event){methodFromWork(i)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 265,
+    "event": "click",
+    "action": "function(event){selectBrowserPlatform(p)}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 265,
+    "event": "click",
+    "action": "function(event){reloadPlatformFrame()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 265,
+    "event": "keydown",
+    "action": "function(event){if(event.key==='Enter')openPlatformAddress()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 265,
+    "event": "click",
+    "action": "function(event){openPlatformAddress()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 265,
+    "event": "click",
+    "action": "function(event){collectBrowserUrl()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 279,
+    "event": "click",
+    "action": "function(event){submitHandoff()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  },
+  {
+    "file": "webapp/src/migration/yingxu-runtime.js",
+    "line": 279,
+    "event": "click",
+    "action": "function(event){onOpenPublisher()}",
+    "verification": "直接函数绑定；六阶段及代表性模态框另有交互测试"
+  }
+]

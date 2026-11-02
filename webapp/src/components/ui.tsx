@@ -7,7 +7,7 @@ import { clsx } from "clsx";
 export const cn = (...values: Parameters<typeof clsx>) => twMerge(clsx(...values));
 
 export function Button({ className, variant = "default", size = "default", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "primary" | "danger" | "ghost"; size?: "default" | "small" }) {
-  return <button className={cn("button", `button-${variant}`, size === "small" && "button-small", className)} {...props} />;
+  return <button type="button" className={cn("button", `button-${variant}`, size === "small" && "button-small", className)} {...props} />;
 }
 
 export function Card({ className, ...props }: HTMLAttributes<HTMLElement>) {
@@ -41,8 +41,8 @@ export function Busy({ label = "正在读取真实数据…" }: { label?: string
   return <div className="busy"><LoaderCircle className="spin" size={18} />{label}</div>;
 }
 
-export function Modal({ open, onOpenChange, title, description, children, wide = false }: { open: boolean; onOpenChange: (open: boolean) => void; title: string; description?: string; children: ReactNode; wide?: boolean }) {
-  return <Dialog.Root open={open} onOpenChange={onOpenChange}><Dialog.Portal><Dialog.Overlay className="modal-overlay" /><Dialog.Content className={cn("modal", wide && "modal-wide")}><div className="modal-head"><div><Dialog.Title>{title}</Dialog.Title>{description && <Dialog.Description>{description}</Dialog.Description>}</div><Dialog.Close className="icon-button" aria-label="关闭"><X size={18} /></Dialog.Close></div><div className="modal-body">{children}</div></Dialog.Content></Dialog.Portal></Dialog.Root>;
+export function Modal({ open, onOpenChange, title, description, children, wide = false, side = false }: { open: boolean; onOpenChange: (open: boolean) => void; title: string; description?: string; children: ReactNode; wide?: boolean; side?: boolean }) {
+  return <Dialog.Root open={open} onOpenChange={onOpenChange}><Dialog.Portal><Dialog.Overlay className="modal-overlay" /><Dialog.Content className={cn("modal", wide && "modal-wide", side && "modal-drawer")}><div className="modal-head"><div><Dialog.Title>{title}</Dialog.Title>{description && <Dialog.Description>{description}</Dialog.Description>}</div><Dialog.Close className="icon-button" aria-label="关闭"><X size={18} /></Dialog.Close></div><div className="modal-body">{children}</div></Dialog.Content></Dialog.Portal></Dialog.Root>;
 }
 
 export function Progress({ value }: { value: number }) {

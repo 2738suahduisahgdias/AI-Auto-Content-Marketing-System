@@ -60,5 +60,5 @@ def overview(db_path, worker):
         topic_jobs=[row for row in jobs if row['kind'].startswith(('topic.','topics.','research.','collection.'))]
         group('topics', '选题 Agent', topic_jobs)
         group('jobs', '其他 Agent 执行任务', [row for row in jobs if row not in topic_jobs])
-    return {'generated_at': utcnow(), 'groups': groups, 'worker': {'running': alive, 'allowed_kinds': allowed},
+    return {'generated_at': utcnow(), 'groups': groups, 'worker': {'running': alive, 'allowed_kinds': allowed, 'error': getattr(worker,'last_error',None)},
             'boundary': '按原记录只读汇总。内容、审核项、平台发布项和执行任务分别计数，不相加为项目总数；每组最多显示最近 100 条。未自动调用模型或执行发布。'}

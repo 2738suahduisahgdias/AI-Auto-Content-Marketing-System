@@ -7,7 +7,7 @@
 1. 打开 DMG，将「映序工作台.app」复制到 Applications。
 2. 首次启动选择一个新的空工作区文件夹，建议放外置硬盘。选择已恢复的工作区目录可继续原项目。
 3. 应用准备本地 Remotion 运行目录后打开 localhost 页面；在原授权页获取申请码并完成离线激活。
-4. 后续打开可以选择上次工作区或另一个已有工作区。外置硬盘断开时不自动在系统盘另建工作区。
+4. 后续打开默认复用上次工作区。切换请到设置 → 本地媒体 → 项目备份与换电脑 → 切换到已有工作区，选择恢复后的完整目录。外置硬盘断开时不自动在系统盘另建工作区。
 5. 模型 CLI 登录、平台登录和可选 WhisperX/OpenVoice 环境继续通过原设置页配置。安装包自带 Python/Pillow、Node、FFmpeg、FFprobe、OpenSSL 和 Remotion/Headless Chrome；不包含模型账户。
 
 原数据、缓存、运行目录、日志、临时文件都写入所选工作区；用户 Library 下仅保存所选路径。公开发布不在后台自动执行，最终由用户在平台审核并点击。
@@ -34,3 +34,9 @@ python desktop/build.py --output /Volumes/EXTERNAL_USB/builds/mac --public-keys 
 依据：[PyInstaller 打包说明](https://pyinstaller.org/en/stable/operating-mode.html)、[Apple Mac 分发签名](https://developer.apple.com/documentation/xcode/creating-distribution-signed-code-for-the-mac/)。
 
 `--assemble-only` 仅供复用已构建 Python 引擎、调整启动器或 Remotion 资源时使用；修改 app.py、entry.py 或 Python 模块后必须执行完整构建。
+
+## 客户本地模型环境
+
+设置 → 本地媒体 → 本地模型环境位置，可选择字幕 Python、音色 Python 和 OpenVoice 模型目录。路径保存在客户工作区 config/media-tools.json。默认路径为 tools/whisper/bin/python、tools/openvoice/bin/python、tools/OpenVoice。保存位置只检查文件路径，不代表生成能力通过；必须运行对应真实测试。当前没有一键安装全部模型的能力，未安装时使用上传录音、上传 SRT 和系统音色。新电脑需要重新选择本机环境，不能直接继承另一台电脑的绝对路径。
+
+当前 0.1.3 为 Intel Mac 本地测试包，未经过 Developer ID 签名公证；不得当作已完成干净客户机器验收的发行包。

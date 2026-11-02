@@ -64,7 +64,7 @@ export default function Knowledge() {
   }
 
   return <>
-    <PageHeader eyebrow="GROWTH MEMORY" title="增长工作台的记忆大脑" description="记住有效内容、适用场景与失败经验，为选题 Agent 提供可追溯的推荐依据。原有知识关系、采集经验和发布规则继续保留。" actions={<Button variant="primary" disabled={!!busy} onClick={() => void backfill()}><RefreshCw size={14} />{busy === "backfill" ? "正在回填…" : "同步现有数据到知识库"}</Button>} />
+    <PageHeader eyebrow="GROWTH MEMORY" title="增长工作台的记忆大脑" description="记住有效内容、适用场景与失败经验，为选题 Agent 提供可追溯的推荐依据。" actions={<Button variant="primary" disabled={!!busy} onClick={() => void backfill()}><RefreshCw size={14} />{busy === "backfill" ? "正在回填…" : "同步现有数据到知识库"}</Button>} />
     <nav className="knowledge-tabs" aria-label="知识库视图"><Link className="active" to="/knowledge">增长记忆</Link><Link to="/knowledge/collection">采集知识库</Link><Link to="/knowledge/publishing">发布知识库</Link></nav>
     {loadError && <ErrorBox>{loadError}<br /><Button size="small" onClick={() => void refresh()}>重新读取</Button></ErrorBox>}
     {actionError && <ErrorBox>{actionError}<br /><Button size="small" onClick={() => setActionError("")}>关闭错误详情</Button></ErrorBox>}
@@ -77,7 +77,7 @@ export default function Knowledge() {
       <Card><h2>编辑与审批规则</h2><p className="knowledge-filter-note">由账号策略初始化，供文章、选题和审核共同复用。</p>{rules.length ? <ul className="knowledge-rules">{rules.map(rule => <li key={rule.id}>{rule.name}</li>)}</ul> : <Empty title="还没有编辑规则" description="同步现有数据后会从真实账号策略初始化。" />}</Card>
     </div><aside>{selected ? <Card className="knowledge-detail"><div className="knowledge-detail-head"><div><Badge tone="green">{selected.type}</Badge><h2>{selected.name}</h2></div><Button size="small" variant="ghost" aria-label="关闭实体详情" onClick={() => setSelectedId(null)}><X size={15} /></Button></div><p className="knowledge-detail-summary">{selected.summary || "暂无摘要"}</p><pre className="knowledge-properties">{JSON.stringify(selected.properties || {}, null, 2)}</pre><h3 className="knowledge-relations-title">关系与证据 · {selectedRelations.length}</h3>{selectedRelations.length ? selectedRelations.map(relation => {
       const url = evidenceUrl(relation, entities) || evidenceUrl(relation, resources?.knowledge.entities || []);
-      return <article className="knowledge-relation" key={relation.id}><div className="knowledge-relation-flow"><strong>{entityName(relation.source_type, relation.source_id)}</strong><b>→ {relation.predicate} →</b><strong>{entityName(relation.target_type, relation.target_id)}</strong></div><pre>{JSON.stringify(relation.evidence || {}, null, 2)}</pre>{url && <a className="knowledge-evidence-link" href={url} target="_blank" rel="noreferrer">打开来源证据 <ExternalLink size={12} /></a>}</article>;
+      return <article className="knowledge-relation" key={relation.id}><div className="knowledge-relation-flow"><strong>{entityName(relation.source_type, relation.source_id)}</strong><b>→ {relation.predicate} →</b><strong>{entityName(relation.target_type, relation.target_id)}</strong></div><details><summary>查看来源证据</summary><pre>{JSON.stringify(relation.evidence || {}, null, 2)}</pre></details>{url && <a className="knowledge-evidence-link" href={url} target="_blank" rel="noreferrer">打开来源证据 <ExternalLink size={12} /></a>}</article>;
     }) : <p className="knowledge-detail-summary">该实体尚无关系。回填只会创建有真实来源支撑的关系。</p>}</Card> : <Card className="knowledge-help"><h2>查看实体详情</h2><p>选择左侧实体，查看它与受众、痛点、平台、证据及内容任务的关系。</p><p>自动回填使用稳定 ID，同一数据重复同步不会重复创建实体或相同证据关系。</p></Card>}</aside></div>
     </details>
   </>;

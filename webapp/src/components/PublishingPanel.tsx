@@ -1,3 +1,4 @@
+import {useContentDraft} from "@/lib/contentDraft";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink, LoaderCircle, LogIn, RotateCcw, Save, Send, ShieldAlert, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -55,13 +56,6 @@ function targetDefaults(source: PublishingSource, platform: string, definitions:
   };
 }
 
-function payloadHash(value: unknown) {
-  const text = JSON.stringify(value);
-  let hash = 0;
-  for (let index = 0; index < text.length; index += 1) hash = ((hash << 5) - hash + text.charCodeAt(index)) | 0;
-  return (hash >>> 0).toString(16).padStart(8, "0");
-}
-
 function statusTone(status: string): "neutral" | "green" | "orange" | "red" | "blue" {
   if (status === "published") return "green";
   if (["failed", "unknown_remote"].includes(status)) return "red";
@@ -80,8 +74,8 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
   const fieldsFor = useCallback((platform: string): Json[] => contracts[`${platform}:${kind}`]?.fields || [], [contracts, kind]);
   const [batch, setBatch] = useState<PublishBatch | null>(null);
   const [fieldJobs, setFieldJobs] = useState<Job[]>([]);
-  const [generationPrompt, setGenerationPrompt] = useState("");
-  const [forms, setForms] = useState<Record<string, TargetForm>>(() => source ? Object.fromEntries(platforms.map(platform => [platform, targetDefaults(source, platform, fieldsFor(platform))])) : {});
+  const [generationPrompt, setGenerationPrompt,promptSaveError] = useContentDraft(`publishing:${kind}:${source?.id}:${source?.fileId||0}:prompt`, "");
+  const [forms, setForms,formsSaveError] = useContentDraft<Record<string, TargetForm>>(`publishing:${kind}:${source?.id}:${source?.fileId||0}:forms`, source ? Object.fromEntries(platforms.map(platform => [platform, targetDefaults(source, platform, fieldsFor(platform))])) : {});
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState("");
@@ -89,7 +83,8 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [dirtyPlatforms, setDirtyPlatforms] = useState<Set<string>>(new Set());
   const dirty = useRef(new Set<string>());
-  const appliedJob = useRef("");
+  const [appliedSaved,setAppliedSaved] = useContentDraft(`publishing:${kind}:${source?.id}:${source?.fileId||0}:applied-job`, "");
+  const appliedJob = useRef(appliedSaved);
   const sourceId = source?.id || "";
   const sourceFileId = source?.fileId;
   const sourceTitle = source?.title || "";
@@ -107,7 +102,7 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
       setForms(current => Object.fromEntries(platforms.map(platform => {
         const target = data.batch?.targets.find(item => item.platform === platform);
         const fallback = targetDefaults(currentSource, platform, fieldsFor(platform), target);
-        return [platform, dirty.current.has(platform) && current[platform] ? current[platform] : fallback];
+        return [platform, (dirty.current.has(platform) || localStorage.getItem(`yingxu:content-draft:v1:publishing:${kind}:${sourceId}:${sourceFileId||0}:forms`)) && current[platform] ? current[platform] : fallback];
       })));
       setLoadError("");
     } catch (error) {
@@ -146,7 +141,8 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
       const values = Object.fromEntries(Object.entries(generated).filter(([name]) => allowed.has(name)));
       return [platform, { ...form, values: { ...form.values, ...values } }];
     })));
-    notify("发布字段已回填，尚未保存或发布；请逐平台检查后保存批次");
+    setAppliedSaved(generationJob.id);
+    notify("发布字段已回填并自动保存本机草稿；请检查后保存正式批次，不会自动发布");
   }, [fieldsFor, generationJob, notify, platforms]);
 
   const update = (platform: string, patch: Partial<TargetForm>) => {
@@ -187,17 +183,19 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
       source_file_id: source.fileId,
       platforms: generatablePlatforms,
       prompt: generationPrompt,
-    })), "字段生成任务已提交，不会自动保存或发布") as Job | null;
+    })), "字段生成任务已提交，结果自动保留，不会自动发布") as Job | null;
     if (job?.id) setFieldJobs(current => current.some(item => item.id === job.id) ? current : [job, ...current]);
   };
 
-  const saveBatch = async () => {
+  const saveBatch = async (sync = false) => {
     if (!source) return;
     const targets = platforms.filter(platform => {
       const target = batch?.targets.find(item => item.platform === platform);
       const supported = platform in platformNames;
       return forms[platform]?.enabled && supported && !lockedStatuses.has(target?.status || "draft");
-    }).map(platform => ({ platform, payload: { ...forms[platform].values } }));
+    }).map(platform => ({ platform, payload: { ...Object.fromEntries(fieldsFor(platform)
+      .filter(field => !["settings", "advanced"].includes(field.group))
+      .map(field => [field.name, forms[platform].values[field.name]])), ...(["wechat_official_account","wechat_channels"].includes(platform) ? {manual_transfer:true} : {}) } }));
     if (!targets.length) {
       notify("至少选择一个可编辑的发布平台；待人工核对和已发布平台不能重复提交", true);
       return;
@@ -211,6 +209,11 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
     if (saved) {
       targets.forEach(target => dirty.current.delete(target.platform));
       setDirtyPlatforms(new Set(dirty.current));
+      if (sync) {
+        const automatic = targets.filter(t => !["wechat_official_account", "wechat_channels"].includes(t.platform)).map(t => t.platform);
+        if (automatic.length) await execute("prepare", () => api(`/api/publishing/batches/${(saved as PublishBatch).id}/prepare`, jsonOptions("POST", {platforms:automatic})), "同步任务已提交，请在平台后台审核后发布");
+        if (automatic.length < targets.length) notify("微信平台请使用卡片中的复制内容和手动打开后台入口，内容已保存");
+      }
     }
   };
 
@@ -227,10 +230,7 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
   };
 
   const selectedReady = batch?.targets.filter(target => target.status === "ready" && forms[target.platform]?.enabled) || [];
-  const selectedPreparable = batch?.targets.filter(target => ["draft", "failed"].includes(target.status) && forms[target.platform]?.enabled) || [];
   const hasDirtySelection = platforms.some(platform => forms[platform]?.enabled && dirtyPlatforms.has(platform));
-  const previewPayload = useMemo(() => platforms.filter(platform => forms[platform]?.enabled).map(platform => ({ platform, ...forms[platform].values })), [forms, platforms]);
-  const previewHash = payloadHash(previewPayload);
 
   if (!source) {
     return <Empty title={kind === "article" ? "没有可发布的已批准文章" : "没有可发布的已批准视频"} description={kind === "article" ? "先保存正文并完成人工审批；文章发布不会读取视频任务。" : "先完成 MP4、五项质检和人工最终审核；视频发布不会读取文章正文。"} action={<Link className="button button-primary" to={kind === "article" ? "/articles" : "/tasks"}>{kind === "article" ? "前往文章任务" : "前往视频任务"}</Link>} />;
@@ -241,12 +241,12 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
       <div><p className="eyebrow">{kind === "article" ? "ARTICLE DISTRIBUTION" : "VIDEO DISTRIBUTION"}</p><h2>{kind === "article" ? "文章发布批次" : "视频发布批次"}</h2><p>{source.title} · 来源 {source.id}</p></div>
       <Badge tone="orange">预览不等于已发布</Badge>
     </div>
-    {loadError && <ErrorBox>{loadError}<br />请检查本地服务后重试；不会把读取失败当作发布结果。</ErrorBox>}
+    {(formsSaveError||promptSaveError)&&<ErrorBox>{formsSaveError||promptSaveError}</ErrorBox>}{loadError && <ErrorBox>{loadError}<br />请检查本地服务后重试；不会把读取失败当作发布结果。</ErrorBox>}
     {loading && <p className="publishing-loading"><LoaderCircle className="spin" size={15} />正在读取真实发布批次…</p>}
     <Card className="publishing-generator">
-      <div className="publishing-generator-head"><div><h3><Sparkles size={17} />发布 Agent 字段生成</h3><p>根据当前已批准内容，分别生成选中平台的标题、{kind === "article" ? "正文、作者和摘要" : "简介和标签"}。</p></div><Badge tone={dirtyPlatforms.size ? "orange" : "neutral"}>{dirtyPlatforms.size ? `${dirtyPlatforms.size} 个平台未保存` : "字段可编辑"}</Badge></div>
-      <Field label="补充要求（选填，最多 2000 字）"><Textarea value={generationPrompt} disabled={Boolean(busy) || generationActive} maxLength={2000} placeholder="例如：标题面向企业主，少用术语；保留原文事实，不增加案例和数字。" onChange={event => setGenerationPrompt(event.target.value)} /></Field>
-      <div className="publishing-generator-actions"><p>只回填文本；{kind === "article" ? "封面、原创和评论选项" : "封面与视频"}由你处理。生成后不会自动保存或发布。</p><Button variant="primary" disabled={Boolean(busy) || generationActive || !generatablePlatforms.length} title={!generatablePlatforms.length ? "先勾选至少一个可编辑平台" : "生成后会覆盖选中平台的当前文本字段，请检查后保存"} onClick={() => void generateFields()}><Sparkles size={15} />{busy === "generate-fields" ? "正在提交…" : generationActive ? "发布 Agent 生成中…" : "发布 Agent 生成选中平台字段"}</Button></div>
+      <div className="publishing-generator-head"><div><h3><Sparkles size={17} />发布 Agent 字段生成</h3><p>根据已审核内容，生成各平台的标题、正文和话题。</p></div><Badge tone={dirtyPlatforms.size ? "orange" : "neutral"}>{dirtyPlatforms.size ? `${dirtyPlatforms.size} 个平台未保存` : "字段可编辑"}</Badge></div>
+      <details className="publishing-secondary"><summary>补充生成要求（选填）</summary><Field label="补充要求（选填，最多 2000 字）"><Textarea value={generationPrompt} disabled={Boolean(busy) || generationActive} maxLength={2000} placeholder="例如：标题面向企业主，少用术语；保留原文事实，不增加案例和数字。" onChange={event => setGenerationPrompt(event.target.value)} /></Field></details>
+      <div className="publishing-generator-actions"><p>只回填文本；{kind === "article" ? "封面、原创和评论选项" : "封面与视频"}由你处理。生成后请检查，再一键同步到后台。</p><Button variant="primary" disabled={Boolean(busy) || generationActive || !generatablePlatforms.length} title={!generatablePlatforms.length ? "先勾选至少一个可编辑平台" : "生成后会覆盖选中平台的当前文本字段，请检查后保存"} onClick={() => void generateFields()}><Sparkles size={15} />{busy === "generate-fields" ? "正在提交…" : generationActive ? "发布 Agent 生成中…" : "发布 Agent 生成选中平台字段"}</Button></div>
       {generationActive && <p className="publishing-loading"><LoaderCircle className="spin" size={15} />正在生成 {generatablePlatforms.map(platform => platformNames[platform]).join("、")} 的字段，页面可保留打开。</p>}
       {generationJob?.status === "failed" && <ErrorBox><strong>字段生成失败：{String(generationJob.error?.code || "MODEL_GENERATION_FAILED")}</strong><br />{String(generationJob.error?.message || "模型没有完成字段生成")}{generationJob.error?.action && <><br />怎么改：{String(generationJob.error.action)}</>}</ErrorBox>}
     </Card>
@@ -258,41 +258,43 @@ function PublishingPanelEditor({ kind, source }: { kind: ContentKind; source: Pu
         const supported = platform in platformNames;
         const locked = lockedStatuses.has(status) || !supported;
         const definitions = fieldsFor(platform);
-        const media = contracts[`${platform}:${kind}`]?.media;
-        const targetError = target?.error && Object.keys(target.error).length ? target.error : null;
+        const rawError = target?.error;
+        const targetError = rawError && Object.keys(rawError).length ? ((rawError as any).error || rawError) : null;
         return <Card className={`publishing-target${target ? " has-batch" : ""}`} key={platform}>
           <div className="publishing-target-head">
             <label className="publishing-check"><input type="checkbox" checked={form.enabled} disabled={locked || Boolean(busy)} onChange={event => update(platform, { enabled: event.target.checked })} /><strong>{platformNames[platform]}{kind === "article" && platform === "xiaohongshu" ? "长文" : ""}</strong></label>
-            <Badge tone={statusTone(status)}>{publishStatusNames[status] || status}</Badge>
+            <Badge tone={["wechat_channels","wechat_official_account"].includes(platform) && status !== "published" ? "neutral" : statusTone(status)}>{["wechat_channels","wechat_official_account"].includes(platform) && status !== "published" ? "需手动发布" : publishStatusNames[status] || status}</Badge>
           </div>
-          <Button size="small" variant="ghost" disabled={Boolean(busy)} onClick={() => void execute(`login:${platform}`, () => api(`/api/publishing/connections/${platform}/login`, jsonOptions("POST")), "登录页面已打开；登录后重新生成预览")}><LogIn size={14} />{["wechat_channels", "wechat_official_account"].includes(platform) ? "在已登录 Chrome 中打开" : "打开专用登录窗口"}</Button>
-          {media?.evidence && <p className="publishing-media-rules">{media.evidence}</p>}
+          {["wechat_channels", "wechat_official_account"].includes(platform) ? <p>此平台请手动发布：复制文案、下载素材后，在平台后台完成审核与上传。</p> : <Button size="small" variant="ghost" disabled={Boolean(busy)} onClick={() => void execute(`login:${platform}`, () => api(`/api/publishing/connections/${platform}/login`, jsonOptions("POST")), "登录窗口已提交，请完成本人扫码")}><LogIn size={14} />打开 Chrome 登录</Button>}
+          <div className="button-row"><Button size="small" onClick={async()=>{const text=[form.values.title,form.values.short_title,form.values.body || form.values.description,form.values.summary,form.values.tags].filter(Boolean).join("\n\n");try{await navigator.clipboard.writeText(text);notify("已复制当前内容，请到平台后台粘贴并审核");}catch{notify("复制权限不可用，请展开手动复制并选择文本",true);}}}>复制发布内容</Button><a className="button button-small" href={({douyin:"https://creator.douyin.com/",xiaohongshu:"https://creator.xiaohongshu.com/",wechat_channels:"https://channels.weixin.qq.com/",wechat_official_account:"https://mp.weixin.qq.com/"} as Record<string,string>)[platform]} target="_blank" rel="noreferrer">手动打开后台</a>{source.previewUrl && <a className="button button-small" href={source.previewUrl} download>下载视频</a>}{kind === "article" && <Link className="button button-small" to={`/articles/${source.id}`}>下载文章配图／长图</Link>}</div>
+          <details><summary>手动复制内容（剪贴板不可用时）</summary><Textarea readOnly value={[form.values.title,form.values.body || form.values.description,form.values.summary,form.values.tags].filter(Boolean).join("\n\n")} /></details>
           {Object.entries(groupNames).map(([group, groupName]) => {
-            const groupFields = definitions.filter(definition => definition.group === group);
+            const groupFields = definitions.filter(definition => definition.group === group && definition.agent_generated);
             if (!groupFields.length) return null;
             return <section className={`publishing-field-group publishing-field-group-${group}`} key={group}><h3>{groupName}</h3>{groupFields.map(definition => {
               const dependency = definition.depends_on;
               const active = !dependency || form.values[dependency.field] === dependency.equals;
               const fieldError = targetError?.field === definition.name ? `${targetError?.message || "字段校验失败"}${targetError?.action ? `；怎么改：${targetError?.action}` : ""}` : undefined;
-              return <PlatformField key={definition.name} definition={definition} value={form.values[definition.name]} disabled={locked || Boolean(busy)} active={active} assetName={busy === `cover:${platform}:${definition.name}` ? "正在上传图片…" : form.assetNames[definition.name]} error={fieldError} sourceId={source.id} onChange={value => updateValue(platform, definition.name, value)} onUpload={file => void uploadCover(platform, definition.name, file)} />;
+              const input = <PlatformField key={definition.name} compact definition={definition} value={form.values[definition.name]} disabled={locked || Boolean(busy)} active={active} assetName={busy === `cover:${platform}:${definition.name}` ? "正在上传图片…" : form.assetNames[definition.name]} error={fieldError} sourceId={source.id} onChange={value => updateValue(platform, definition.name, value)} onUpload={file => void uploadCover(platform, definition.name, file)} />;
+              return ["author", "summary"].includes(definition.name) ? <details key={definition.name} className="publishing-secondary"><summary>{definition.label}（选填）</summary>{input}</details> : input;
             })}</section>;
           })}
           {targetError && <ErrorBox><strong>{String(targetError.code || "发布失败")}</strong><br />{String(targetError.message || "平台步骤未完成")}{targetError.action && <><br />怎么改：{String(targetError.action)}</>}</ErrorBox>}
           {status === "unknown_remote" && <><div className="publishing-unknown"><ShieldAlert size={17} /><p><strong>禁止直接重试</strong>平台点击后的结果无法确认。请先在平台后台核实是否已公开，避免重复发布。</p></div><Button size="small" disabled={Boolean(busy)} onClick={() => { const evidence = window.prompt("请填写平台后台的实际发布证据（时间、内容或真实链接）；不要只写已发布"); if (evidence) void execute(`reconcile:${target?.id}`, () => api(`/api/publishing/targets/${target?.id}/reconcile`, jsonOptions("POST", { evidence })), "平台实际发布结果已记录"); }}>已在后台核实为已发布</Button></>}
-          {target?.preview?.screenshot && <p className="publishing-evidence">预览证据：{String(target.preview.screenshot)}</p>}
-          {status === "ready" && <p className="publishing-ready">后台预填已完成，等待你审核。请检查平台窗口中的账号、实际上传与文案，然后确认发布。</p>}
+          {status === "ready" && !["wechat_channels","wechat_official_account"].includes(platform) && <p className="publishing-ready">后台预填已完成，等待你审核。请检查平台窗口中的账号、实际上传与文案，然后确认发布。</p>}
           {target?.external_url && <a className="button button-small publishing-external" href={target.external_url} target="_blank" rel="noreferrer">查看真实发布链接<ExternalLink size={13} /></a>}
-          {status === "failed" && <Button size="small" disabled={Boolean(busy) || dirtyPlatforms.has(platform)} title={dirtyPlatforms.has(platform) ? "先保存本平台的修改，再重试已保存内容" : "重新生成已保存内容的平台预览"} onClick={() => void execute(`retry:${target?.id}`, () => api(`/api/publishing/targets/${target?.id}/retry`, jsonOptions("POST")), "失败目标已重新加入预览队列")}><RotateCcw size={14} />重试失败预览</Button>}
+          {status === "failed" && !["wechat_official_account","wechat_channels"].includes(platform) && <Button size="small" disabled={Boolean(busy) || dirtyPlatforms.has(platform)} title={dirtyPlatforms.has(platform) ? "先保存本平台的修改，再重试已保存内容" : "重新生成已保存内容的平台预览"} onClick={() => void execute(`retry:${target?.id}`, () => api(`/api/publishing/targets/${target?.id}/retry`, jsonOptions("POST")), "失败目标已重新加入预览队列")}><RotateCcw size={14} />重试失败预览</Button>}
         </Card>;
       })}
     </div>
-    <section className="publishing-local-preview"><div className="publishing-local-preview-head"><div><h3>本地发布预览</h3><p>预览与提交共用 payload_hash <code>{previewHash}</code>，不是平台实时页面。</p></div></div>{source.previewUrl && <video className="publishing-source-video" controls preload="metadata" src={source.previewUrl} />}<div className="publishing-preview-grid">{previewPayload.map((item: Json) => <article key={item.platform}><Badge tone="blue">{platformNames[item.platform]}</Badge><h4>{item.title || "未填写标题"}</h4><p>{item.description || item.body || "未填写发布描述"}</p>{item.tags && <small>{item.tags}</small>}</article>)}</div></section>
+    {source.previewUrl && <details className="publishing-local-preview"><summary>查看已审核成片</summary><video className="publishing-source-video" controls preload="metadata" src={source.previewUrl} /></details>}
+    <p className="publishing-platform-note">封面、原创／AI 声明、评论、可见范围、合集、位置、定时、广告和付费选项，请在平台后台按实际内容确认。这里只同步文案与成品素材。</p>
     <div className="publishing-batch-bar">
-      <div><strong>{batch ? `批次 ${batch.id}` : "尚未创建发布批次"}</strong><p>{active ? "后台正在执行，离开页面后任务仍会保留。" : "先保存选中平台，再预览；只有预览就绪的平台可以确认公开。"}</p></div>
+      <div><strong>{batch ? "发布内容已保存" : "检查内容后同步"}</strong><p>{active ? "后台正在执行，离开页面后任务仍会保留。" : "检查内容后点击一键同步；在平台后台人工审核并发布。受限平台使用复制内容入口。"}</p></div>
       <div className="button-row">
         <Button disabled={Boolean(busy)} onClick={() => void saveBatch()}><Save size={15} />{busy === "save" ? "正在保存…" : `保存${kind === "article" ? "文章" : "视频"}批次`}</Button>
-        <Button disabled={Boolean(busy) || !batch || !selectedPreparable.length || hasDirtySelection} title={!batch ? "先保存发布批次" : hasDirtySelection ? "先保存当前修改" : !selectedPreparable.length ? "选中的平台没有待预览或失败目标" : undefined} onClick={() => void execute("prepare", () => api(`/api/publishing/batches/${batch?.id}/prepare`, jsonOptions("POST", { platforms: selectedPreparable.map(target => target.platform) })), "平台预览已加入后台队列，不会公开发布")}>{busy === "prepare" ? "正在提交…" : "打开后台并预填选中平台"}</Button>
-        <Button variant="primary" disabled={!executionEnabled || Boolean(busy) || !selectedReady.length || hasDirtySelection} title={!executionEnabled ? "当前环境未启用自动公开发布，请在平台后台人工确认" : hasDirtySelection ? "先保存修改并重新生成受影响平台预览" : !selectedReady.length ? "至少一个选中平台必须已完成真实预览" : "对所有选中的就绪平台进行一次公开确认"} onClick={() => setConfirmOpen(true)}><Send size={15} />确认公开发布{selectedReady.length ? `（${selectedReady.length}）` : ""}</Button>
+        <Button variant="primary" disabled={Boolean(busy) || generationActive || !generatablePlatforms.length} onClick={()=>void saveBatch(true)}>一键同步到后台</Button>
+        {executionEnabled && <Button variant="primary" disabled={!executionEnabled || Boolean(busy) || !selectedReady.length || hasDirtySelection} title={!executionEnabled ? "当前环境未启用自动公开发布，请在平台后台人工确认" : hasDirtySelection ? "先保存修改并重新生成受影响平台预览" : !selectedReady.length ? "至少一个选中平台必须已完成真实预览" : "对所有选中的就绪平台进行一次公开确认"} onClick={() => setConfirmOpen(true)}><Send size={15} />确认公开发布{selectedReady.length ? `（${selectedReady.length}）` : ""}</Button>}
       </div>
     </div>
     <Modal open={confirmOpen} onOpenChange={setConfirmOpen} title="一次人工确认：即将公开发布" description="这不是预览。请确认你已在各平台窗口检查账号、正文、封面、上传进度和平台提示。">

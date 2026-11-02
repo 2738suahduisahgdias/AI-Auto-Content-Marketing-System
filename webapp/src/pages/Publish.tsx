@@ -79,9 +79,8 @@ export default function Publish() {
   const handoffs=(resources?.core.tasks||[]).filter((task:any)=>task.source?.yingxu_handoff);
   return <div className="publish-page">
     <PageHeader eyebrow="PUBLISHING AGENT" title="发布 Agent 工作区" description="接收制作成果与质检结果 → 准备平台字段 → 打开后台预填 → 人工审核后发布。" />
-    <div className="publish-agent-flow">{["01 接收交付", "02 质检与人工审批", "03 平台字段与后台预填", "04 人工审核发布"].map((text,index)=><Card key={text}><small>{index===3 ? "你来确认" : "Agent 协作"}</small><h3>{text}</h3><p>{["文章 Agent 与映序视频 Agent 提交独立版本", "沿用技术预审与人工审批；统一品牌规则待接通", "保留原平台字段、登录与预填接口", "检查账号、封面、正文与媒体后明确确认"][index]}</p></Card>)}</div>
-    <div className="publish-boundary"><Info size={16}/><p>外部依赖：字段生成需要配置模型；后台预填需要本机浏览器、平台登录和执行器。当前隔离 Demo 已接通小红书后台预填；文章带配图或分页时上传本地图片。公众号待现场验收，公开发布执行器未启用。<Link to="/settings/agents">配置 Agent</Link></p></div>
-    {handoffs.length>0&&<Card><h2>视频制作交付</h2>{handoffs.map((task:any)=>{const h=task.source.yingxu_handoff;return <div className="migration-toolbar" key={task.content_id}><strong>{task.title}</strong><span>{task.content_id} · 文件 #{h.file_id} · 制作版本 {h.revision} · {h.stale?'制作已修改，需重新交付':h.status==='approved'?'已审核，待发布':h.status==='rejected'?'已驳回，返回制作修改':'等待审核，尚未发布'}</span><a className="button" href={'/api/files/'+h.file_id+'/media'} target="_blank" rel="noreferrer">查看成片</a><Link className="button" to={'/tasks/'+task.content_id}>返回制作</Link><Button disabled={!!receiving || h.stale} onClick={()=>void openReview(task.content_id)}>{receiving===task.content_id?"正在定位…":"打开对应审核"}</Button>{h.status==='approved'&&!h.stale&&h.review_item_id&&<Button onClick={()=>setSearchParams({kind:"video",id:h.review_item_id})}>准备发布字段</Button>}</div>})}</Card>}
+    <details className="publish-boundary"><summary>同步说明与连接要求</summary><p>AI 文案需模型授权；抖音、小红书同步需 Chrome 连接和本人登录。公众号、视频号使用复制内容及手动上传，最终在平台后台审核发布。<Link to="/setup">检查连接</Link></p></details>
+    {kind === "video" && handoffs.length>0&&<Card><h2>视频制作交付</h2>{handoffs.map((task:any)=>{const h=task.source.yingxu_handoff;return <div className="migration-toolbar" key={task.content_id}><strong>{task.title}</strong><span>{task.content_id} · 文件 #{h.file_id} · 制作版本 {h.revision} · {h.stale?'制作已修改，需重新交付':h.status==='approved'?'已审核，待发布':h.status==='rejected'?'已驳回，返回制作修改':'等待审核，尚未发布'}</span><a className="button" href={'/api/files/'+h.file_id+'/media'} target="_blank" rel="noreferrer">查看成片</a><Link className="button" to={'/tasks/'+task.content_id}>返回制作</Link><Button disabled={!!receiving || h.stale} onClick={()=>void openReview(task.content_id)}>{receiving===task.content_id?"正在定位…":"打开对应审核"}</Button>{h.status==='approved'&&!h.stale&&h.review_item_id&&<Button onClick={()=>setSearchParams({kind:"video",id:h.review_item_id})}>准备发布字段</Button>}</div>})}</Card>}
 
 
     {(queueError) && <ErrorBox>发布来源读取失败：{queueError}。请刷新重试；不会把连接错误当成空队列。</ErrorBox>}
@@ -100,6 +99,6 @@ export default function Publish() {
     {kind === "article" && <PublishingPanel kind={kind} source={source} />}
     <div className="publish-boundary"><Info size={16} /><p>本地预览与实际同步使用同一参数。预览就绪、同步中和公开发布是不同状态；只有平台真实链接才能标记已发布。</p></div>
 
-    <div className="publish-related"><h2>发布记录</h2><p>文章的其他真实链接可在<Link to={selectedId && kind === "article" ? `/articles/${selected?.id}` : "/articles"}>文章任务</Link>补录；视频的手动发布记录与数据在<Link to={selected ? `/tasks/${selected.delivery?.content_id || selected.id}` : "/tasks"}>视频任务</Link>继续处理。</p></div>
+    <div className="publish-related"><h2>发布记录</h2><p>文章的其他真实链接可在<Link to={selectedId && kind === "article" ? `/articles/${selected?.id}` : "/articles"}>文章任务</Link>补录；视频的手动发布记录与数据在<Link to={kind === "video" && selected ? `/tasks/${selected.delivery?.content_id || selected.id}` : "/tasks"}>视频任务</Link>继续处理。</p></div>
   </div>;
 }

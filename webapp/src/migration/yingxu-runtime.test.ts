@@ -43,3 +43,19 @@ describe('原系统中的映序编辑器',()=>{
  });
 
 });
+
+it('all video stages remain clickable without eval under strict CSP',async()=>{
+ const root=document.createElement('div');document.body.append(root);
+ root.innerHTML='<span id="crumb"></span><small id="saved"></small><div id="main"></div><div id="modal" hidden></div><div id="toast"></div><input id="upload" type="file">';
+ const blocked=vi.spyOn(globalThis,'eval').mockImplementation(()=>{throw Error('CSP forbids eval')});
+ try {
+ dispose=mountYingxu(root,vi.fn(),vi.fn(),vi.fn(),{initial:{stage:-1,workflowV3:true,authoringV1:true,topics:[],shots:[],manuscript:{title:'验收',text:'原稿',versions:[]}},onChange:vi.fn(),upload:vi.fn()});
+ await waitFor(()=>expect(root.querySelector('[data-yx-click]')).toBeNull());
+ for(const label of ['规格与节奏','文案与分镜','样片与制作','合成与检查','交付发布 Agent','选题与文案']) {
+   const button=within(root).getByRole('button',{name:new RegExp("^[1-6✓]\\s*"+label+"$")});
+   const before=root.querySelector('#main')!.innerHTML;fireEvent.click(button);
+   await waitFor(()=>expect(root.querySelector('#main')!.innerHTML).not.toBe(before));
+ }
+ expect(blocked).not.toHaveBeenCalled();
+ } finally {blocked.mockRestore()}
+});

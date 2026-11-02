@@ -86,7 +86,9 @@ class ReviewCase(unittest.TestCase):
         stream = json.dumps({"type": "assistant", "content": json.dumps(payload, ensure_ascii=False)}) + "\n"
         context = mock.Mock()
         context.run_process.return_value = (stream, "")
-        result = ReviewExecutors(self.service).ai({"input": {"batch_id": batch["id"]}}, context)
+        with mock.patch("content_workbench.providers.text.CodexCLIProvider.complete_json", return_value=payload) as provider:
+            result = ReviewExecutors(self.service).ai({"input": {"batch_id": batch["id"]}}, context)
+        provider.assert_called_once()
         self.assertEqual(1, result["items"])
         risk = self.service.get_batch(batch["id"])["items"][0]["ai_risk"]
         self.assertEqual("只有技术报告", risk["evidence_scope"])

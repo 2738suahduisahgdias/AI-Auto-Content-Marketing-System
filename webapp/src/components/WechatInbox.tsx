@@ -1,7 +1,8 @@
+import {useContentDraft} from "@/lib/contentDraft";
 import { useEffect, useState, type FormEvent } from "react";
 import { Archive, ArchiveRestore, ExternalLink, FileText, Plus } from "lucide-react";
 import { useApp } from "@/AppContext";
-import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Modal, Textarea } from "@/components/ui";
+import { Badge, Button, Empty, ErrorBox, Field, Input, Modal, Textarea } from "@/components/ui";
 import { api, errorText, jsonOptions } from "@/lib/api";
 import type { Json } from "@/lib/types";
 
@@ -26,16 +27,19 @@ export interface WechatMessage {
 const categories = [
   { id: "unclassified", label: "待分类" },
   { id: "featured", label: "精选" },
-  { id: "competitor", label: "竞品" },
+  { id: "competitor", label: "竞对" },
   { id: "high_praise", label: "高赞" },
   { id: "industry", label: "行业" },
 ] as const;
 
-export default function WechatInbox({ messages, connection, onCreateTask }: { messages: WechatMessage[]; connection?: Json; onCreateTask: (researchItemId: string) => void }) {
+export default function WechatInbox({ messages, onCreateTask, manualOpen, onManualOpenChange }: { manualOpen?: boolean; onManualOpenChange?: (open: boolean) => void; messages: WechatMessage[]; connection?: Json; onCreateTask: (researchItemId: string) => void }) {
   const { refresh, notify } = useApp();
+  const [localManualOpen, setLocalManualOpen] = useState(false);
+  const showManual = manualOpen ?? localManualOpen;
+  const changeManual = onManualOpenChange || setLocalManualOpen;
   const [category, setCategory] = useState("unclassified");
   const [editing, setEditing] = useState<WechatMessage | null>(null);
-  const [manual, setManual] = useState({ text: "", original_url: "" });
+  const [manual, setManual,manualSaveError] = useContentDraft("wechat:manual",{ text: "", original_url: "" });
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const visible = messages.filter(item => category === "archived" ? item.archived : !item.archived && item.category === category);
@@ -62,7 +66,7 @@ export default function WechatInbox({ messages, connection, onCreateTask }: { me
   async function submitManual(event: FormEvent) {
     event.preventDefault();
     const saved = await perform("manual", () => api("/api/topics/wechat/messages", jsonOptions("POST", manual)), "已保存到待分类");
-    if (saved) { setManual({ text: "", original_url: "" }); setCategory("unclassified"); }
+    if (saved) { setManual({ text: "", original_url: "" }); setCategory("unclassified"); changeManual(false); }
   }
 
   async function saveEdit(event: FormEvent) {
@@ -83,29 +87,27 @@ export default function WechatInbox({ messages, connection, onCreateTask }: { me
   }
 
   return <div className="wechat-inbox">
-    <div className="wechat-inbox-grid">
-      <Card className="wechat-connection-card"><div className="wechat-connection-head"><div><Badge tone={connection?.status === "connected" ? "green" : "orange"}>{connection?.label || "本机入库可用，OpenClaw 待接入"}</Badge><h3>微信随手记，后台再分类</h3></div><a className="button button-small" href="https://docs.openclaw.ai/channels/wechat" target="_blank" rel="noreferrer">接入文档 <ExternalLink size={13} /></a></div><p>{connection?.detail || "当前可用手动录入；微信插件完成真实消息验收后才显示已连接。"}</p><ol className="topic-guide"><li>微信里直接发送链接、视频或一句想法，不需要输入分类标签。</li><li>所有消息先进入待分类，你在后台修改标题、备注和分类。</li><li>原始消息只读；保存成功才回执，不自动下载或发布。</li></ol></Card>
-      <Card><form onSubmit={submitManual}><h3>手动记录一条想法</h3><p className="topic-boundary">先验证后台流程；保存后默认进入待分类。</p><Field label="原始链接（可选）"><Input type="url" value={manual.original_url} onChange={event => setManual({ ...manual, original_url: event.target.value })} placeholder="https://" /></Field><Field label="内容或当时的想法"><Textarea required maxLength={12000} value={manual.text} onChange={event => setManual({ ...manual, text: event.target.value })} placeholder="例如：这个开头很好，可以做成一期企业AI案例" /></Field><Button variant="primary" type="submit" disabled={!!busy}><Plus size={14} />{busy === "manual" ? "正在保存…" : "保存到待分类"}</Button></form></Card>
-    </div>
+    {manualOpen === undefined && <div className="wechat-compact-actions"><Button size="small" onClick={() => changeManual(true)}>手动记录</Button></div>}
+    <Modal open={showManual} onOpenChange={changeManual} title="手动记录" description="保存到待分类，保留原始链接和当时的想法。"><form onSubmit={submitManual}>{manualSaveError&&<ErrorBox>{manualSaveError}</ErrorBox>}{error && <ErrorBox>{error}</ErrorBox>}<Field label="原始链接（可选）"><Input type="url" value={manual.original_url} onChange={event => setManual({ ...manual, original_url: event.target.value })} placeholder="https://" /></Field><Field label="内容或当时的想法"><Textarea required maxLength={12000} value={manual.text} onChange={event => setManual({ ...manual, text: event.target.value })} placeholder="记录想法，稍后整理成选题" /></Field><Button variant="primary" type="submit" disabled={!!busy}><Plus size={14} />{busy === "manual" ? "正在保存…" : "保存到待分类"}</Button></form></Modal>
     {error && <ErrorBox>{error}</ErrorBox>}
     <nav className="topic-subtabs wechat-category-tabs" aria-label="微信消息分类">{[...categories, { id: "archived", label: "已归档" }].map(item => <button type="button" key={item.id} className={`topic-filter ${category === item.id ? "active" : ""}`} aria-pressed={category === item.id} onClick={() => setCategory(item.id)}>{item.label}{item.id === "archived" ? ` ${messages.filter(message => message.archived).length}` : ` ${messages.filter(message => !message.archived && message.category === item.id).length}`}</button>)}</nav>
     <div className="section-heading"><h2>{category === "archived" ? "已归档" : categories.find(item => item.id === category)?.label}</h2><p>{visible.length} 条 · 原始消息与后台编辑分开保存</p></div>
     {visible.length ? <div className="wechat-message-list topic-grid topic-video-grid-compact">{visible.map(item => <article className="wechat-message-card" key={item.id}>
-      <div className="wechat-snapshot-cover">
+      {item.original_url && <div className="wechat-snapshot-cover">
         {item.snapshot_status === "succeeded" && item.snapshot.cover_url ? <img src={item.snapshot.cover_url} alt="链接封面" loading="lazy" /> : <span className="wechat-snapshot-placeholder">{!item.original_url ? "文本想法" : item.snapshot_status === "failed" ? "解析失败" : item.snapshot_status === "succeeded" ? "公开页无封面" : "等待快照"}</span>}
         <div className="wechat-snapshot-cover-meta"><Badge tone="orange">{item.snapshot.platform_label || item.snapshot.site_name || item.category_name}</Badge><span>{item.message_type}</span></div>
         <span className="wechat-snapshot-mark">{item.snapshot_status === "succeeded" ? "已解析" : item.snapshot_status === "failed" ? "解析失败" : ["queued", "running"].includes(item.snapshot_status) ? "解析中" : "仅链接"}</span>
-      </div>
+      </div>}
       <div className="wechat-message-main">
         <button type="button" className="wechat-message-title" onClick={() => setEditing(item)}>{item.title}</button>
         {item.snapshot.title && <h4 className="wechat-snapshot-title">{item.snapshot.title}</h4>}
         <div className="wechat-snapshot-source"><span>{String(item.snapshot.author || item.snapshot.site_name || item.source_name).slice(0, 1)}</span><div><strong>{item.snapshot.author || item.snapshot.site_name || item.source_name}</strong><small>{item.snapshot.author_followers ? `粉丝 ${item.snapshot.author_followers}` : item.snapshot.captured_at || item.received_at}{item.snapshot.published_at ? ` · 发布 ${item.snapshot.published_at}` : ""}{item.snapshot.limited ? " · 公开页信息有限" : ""}</small></div></div>
-        {(item.snapshot.description || item.snapshot.excerpt) && <p className="wechat-snapshot-description">{item.snapshot.description || item.snapshot.excerpt}</p>}
+        {(item.snapshot.description || item.snapshot.excerpt) && <details><summary>{String(item.snapshot.description || item.snapshot.excerpt).slice(0,100)}…</summary><p className="wechat-snapshot-description">{item.snapshot.description || item.snapshot.excerpt}</p></details>}
         <p className="wechat-message-note"><strong>我的想法：</strong>{item.note || "还没有备注"}</p>
         {item.snapshot_status === "failed" && <p className="wechat-snapshot-error">{item.snapshot_error || "公开页面未能读取"}</p>}
         {item.snapshot.dynamic_error && <p className="wechat-snapshot-error">{item.snapshot.dynamic_error}</p>}
         <div className="wechat-message-meta"><Badge>{item.category_name}</Badge><span>{item.source_name}</span></div>
-        <div className="wechat-message-actions">{item.original_url && <a className="button button-small" href={item.original_url} target="_blank" rel="noreferrer"><ExternalLink size={13} />原链接</a>}<Button size="small" onClick={() => setEditing(item)}><FileText size={13} />整理</Button>{!item.archived && <Button size="small" variant="primary" onClick={() => onCreateTask(item.research_item_id)}>转为内容任务</Button>}{item.snapshot_status === "failed" || item.snapshot_status === "not_started" ? <Button size="small" disabled={!!busy} onClick={() => void refreshSnapshot(item)}>{item.snapshot_status === "failed" ? "重新解析" : "生成快照"}</Button> : null}<Button size="small" variant="ghost" onClick={() => void archive(item)}>{item.archived ? <><ArchiveRestore size={13} />恢复</> : <><Archive size={13} />归档</>}</Button></div>
+        <div className="wechat-message-actions">{item.original_url && <a className="button button-small" href={item.original_url} target="_blank" rel="noreferrer"><ExternalLink size={13} />原链接</a>}<Button size="small" onClick={() => setEditing(item)}><FileText size={13} />整理</Button>{!item.archived && <Button size="small" variant="primary" onClick={() => onCreateTask(item.research_item_id)}>转为内容任务</Button>}{item.original_url && (item.snapshot_status === "failed" || item.snapshot_status === "not_started") ? <Button size="small" disabled={!!busy} onClick={() => void refreshSnapshot(item)}>{item.snapshot_status === "failed" ? "重新解析" : "生成快照"}</Button> : null}<Button size="small" variant="ghost" onClick={() => void archive(item)}>{item.archived ? <><ArchiveRestore size={13} />恢复</> : <><Archive size={13} />归档</>}</Button></div>
       </div>
     </article>)}</div> : <Empty title={category === "archived" ? "没有已归档消息" : "这个分类还没有消息"} description={category === "unclassified" ? "使用上方表单保存一条想法，或等待微信私聊接入后自动入库。" : "切换到其他分类查看，或在待分类中整理消息。"} />}
 

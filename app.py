@@ -118,6 +118,7 @@ def infer_error_details(error):
     if field and action:
         return message, field, action, getattr(error, "item", None)
     rules = [
+        (("Remotion", "渲染环境"), "settings", "到设置 → 本地媒体重新运行视频构建测试；资源 404 表示本地渲染素材未同步，不是文案必填项问题。"),
         (("授权", "licensed"), "licensed", "逐项上传真实素材、填写来源、关联文件并勾选本人授权；AI建议不能代替授权。"),
         (("母稿", "脚本版本", "五个版本", "脚本"), "scripts", "在脚本页补齐母稿、抖音、视频号、小红书和公众号版本，保存后再确认。"),
         (("SRT", "字幕", "srt"), "srt", "上传或编辑有效 SRT，检查序号、起止时间格式和字幕文本后重试。"),
@@ -288,7 +289,7 @@ def init_db():
                     conn.execute("UPDATE video_variants SET approved_at=? WHERE id=?", (task["final_approved_at"], variant_id))
 
 
-def run_process(arguments, timeout, output_limit=MAX_CLI_OUTPUT, label="Kimi CLI", cwd=None):
+def run_process(arguments, timeout, output_limit=MAX_CLI_OUTPUT, label="Codex CLI", cwd=None):
     process = subprocess.Popen(arguments, cwd=str(cwd or ROOT), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                text=True, encoding="utf-8", errors="replace")
     try:
@@ -313,23 +314,23 @@ def agent_runtime(agent_id):
 
 
 def find_kimi():
-    discovered = shutil.which("kimi")
-    candidate = Path(discovered).expanduser() if discovered else Path.home() / ".kimi-code" / "bin" / "kimi"
-    if candidate.is_file() and os.access(candidate, os.X_OK):
-        return candidate.resolve()
-    return None
+    engine = agent_runtime("script_agent")["engine"]
+    name = "kimi" if engine == "kimi_cli" else "codex"
+    from content_workbench.providers.text import discover_cli
+    candidate = discover_cli(name)
+    return Path(candidate) if candidate else None
 
 
 def detect_kimi():
     binary = find_kimi()
     if not binary:
-        return {"installed": False, "version": None, "binary": None, "detection_error": "未找到 Kimi CLI"}
+        return {"installed": False, "version": None, "binary": None, "detection_error": "未找到所选 CLI，请在 Agent 配置中选择已安装并登录的 Codex 或 Kimi"}
     try:
         stdout, _ = run_process([str(binary), "--version"], 10, 65536)
         lines = [line.strip() for line in stdout.splitlines() if line.strip()]
         version = lines[-1][:100] if lines else None
         if not version:
-            raise ApiError(502, "Kimi CLI 未返回版本号")
+            raise ApiError(502, "Codex CLI 未返回版本号")
         return {"installed": True, "version": version, "binary": str(binary), "detection_error": None}
     except ApiError as error:
         return {"installed": True, "version": None, "binary": str(binary), "detection_error": error.message}
@@ -365,7 +366,7 @@ def get_ai_status():
              and settings.get("ai_ready_binary") == detection["binary"])
     return {"installed": detection["installed"], "version": detection["version"], "ready": bool(ready),
             "last_success": settings.get("ai_last_success") or None,
-            "model": "使用 Kimi CLI 当前默认模型，不固定模型 ID",
+            "model": "使用 {} 当前默认模型".format(agent_runtime("script_agent")["engine"]),
             "last_error": detection["detection_error"] or settings.get("ai_last_error") or None,
             "oauth_status": "真实连接已验证" if ready else "尚未通过真实连接测试"}
 
@@ -387,7 +388,7 @@ def parse_kimi_json(stdout, agent_name="Agent"):
         if isinstance(content, str) and content.strip():
             assistant_contents.append(content.strip())
     if not assistant_contents:
-        raise ApiError(502, "Kimi CLI 未返回助手内容")
+        raise ApiError(502, "Codex CLI 未返回助手内容")
     try:
         return json.loads(assistant_contents[-1])
     except json.JSONDecodeError:
@@ -409,18 +410,32 @@ def parse_kimi_output(stdout):
 
 
 def run_kimi_agent_json(agent_path, prompt, timeout=600, detection=None):
-    detection = detection or detect_kimi()
-    if not detection["installed"]:
-        raise ApiError(503, "未找到 Kimi CLI，请先安装并登录")
-    if detection["detection_error"]:
-        raise ApiError(503, detection["detection_error"])
-    if not agent_path.is_file():
-        raise ApiError(500, "缺少 {}".format(agent_path.name))
+    # Keep the original call sites and result validation; use the shared Codex provider.
+    from content_workbench.providers.text import CodexCLIProvider, KimiCLIProvider
     if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > MAX_ASSET_PROMPT:
         raise ApiError(400, "Agent 输入为空或超过 60000 字符限制")
-    stdout, _ = run_process([detection["binary"], "--agent-file", str(agent_path), "-p", prompt,
-                             "--output-format", "stream-json"], timeout)
-    return parse_kimi_json(stdout, agent_path.stem)
+    class Context:
+        def run_process(self, arguments, timeout, stage, cwd):
+            result = subprocess.run(arguments, cwd=cwd, capture_output=True, text=True, timeout=timeout)
+            if result.returncode:
+                raise ApiError(502, "所选 CLI 执行失败：" + result.stderr[-500:])
+            return result.stdout, result.stderr
+    try:
+        agent_id = "asset_planning_agent" if agent_path == ASSET_AGENT_PATH else "script_agent"
+        engine = agent_runtime(agent_id)["engine"]
+        provider = KimiCLIProvider(ROOT) if engine == "kimi_cli" else CodexCLIProvider()
+        if agent_id == "asset_planning_agent":
+            # This existing agent contract is an array of shots, not a JSON object.
+            text = provider.complete_text(prompt, Context(), agent_path, timeout=timeout).strip()
+            if text.startswith("```") and text.endswith("```"):
+                text = "\n".join(text.splitlines()[1:-1]).strip()
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                raise ApiError(502, "素材规划 Agent 未返回合法 JSON 分镜数组")
+        return provider.complete_json(prompt, Context(), agent_path, timeout=timeout)
+    except DomainError as error:
+        raise ApiError(error.status, error.message)
 
 
 def run_kimi_prompt(prompt, timeout, detection=None):
@@ -441,7 +456,7 @@ def test_ai_connection():
 
 def get_asset_ai_status():
     settings = ai_settings()
-    ready = get_ai_status()["ready"] and settings.get("asset_ai_ready") == "1"
+    ready = settings.get("asset_ai_ready") == "1" and settings.get("asset_ai_engine") == agent_runtime("asset_planning_agent")["engine"]
     return {"ready": bool(ready), "status": "已连接" if ready else "未测试",
             "last_success": settings.get("asset_ai_last_success") or None,
             "last_error": settings.get("asset_ai_last_error") or None}
@@ -451,6 +466,7 @@ def record_asset_ai_result(error=None):
     values = {"asset_ai_ready": "0" if error else "1", "asset_ai_last_error": error or ""}
     if not error:
         values["asset_ai_last_success"] = now()
+        values["asset_ai_engine"] = agent_runtime("asset_planning_agent")["engine"]
     write_ai_settings(values)
 
 
@@ -522,9 +538,20 @@ def path_label(path):
         return str(path)
 
 
+def load_media_tools():
+    global WHISPERX_PYTHON, OPENVOICE_PYTHON, OPENVOICE_ROOT, OPENVOICE_REFERENCE
+    from content_workbench.media.tools import config
+    configured = config(ROOT)
+    WHISPERX_PYTHON = Path(configured.get('whisper_python') or ROOT / 'tools/whisper/bin/python')
+    OPENVOICE_PYTHON = Path(configured.get('openvoice_python') or ROOT / 'tools/openvoice/bin/python')
+    OPENVOICE_ROOT = Path(configured.get('openvoice_root') or ROOT / 'tools/OpenVoice')
+    OPENVOICE_REFERENCE = OPENVOICE_ROOT / 'resources/example_reference.mp3'
+
+
 def media_ai_status():
+    load_media_tools()
     settings = ai_settings()
-    whisperx_installed = WHISPERX_PATH.is_file() and os.access(WHISPERX_PATH, os.X_OK)
+    whisperx_installed = WHISPERX_PYTHON.is_file() and os.access(WHISPERX_PYTHON, os.X_OK) and WHISPERX_WORKER.is_file()
     missing = openvoice_missing_files()
     whisperx_ready = whisperx_installed and settings.get("whisperx_ready") == "1"
     clone_ready = not missing and settings.get("clone_ready") == "1"
@@ -1052,6 +1079,32 @@ def render_yingxu(task, payload):
         raise ApiError(error.status,error.message)
 
 
+def prepare_yingxu_remotion_code(task, props):
+    from content_workbench.media.remotion_codegen import prepare_scene_code
+    from content_workbench.providers.text import CodexCLIProvider, KimiCLIProvider
+    node = shutil.which("node")
+    if not node:
+        raise ApiError(503, "缺少本地 Node.js，无法检查 Remotion 动画代码")
+    class Context:
+        def run_process(self, arguments, timeout, stage, cwd):
+            return run_process(arguments, timeout, MAX_CLI_OUTPUT, "Remotion代码生成", cwd)
+    def generate(prompt):
+        config = agent_runtime("script_agent")
+        provider = KimiCLIProvider(ROOT) if config["engine"] == "kimi_cli" else CodexCLIProvider()
+        return provider.complete_text(prompt, Context(), PROJECT_ROOT / "agents/remotion-code-agent.md",
+                                      timeout=config["timeout_seconds"], stage="remotion_codegen")
+    def validate(path):
+        return run_process([node, "scripts/validate-generated.mjs", str(path)], 30, MAX_CLI_OUTPUT,
+                           "Remotion代码检查", REMOTION_APP)
+    result = prepare_scene_code(task, props.get("appearance") or {}, REMOTION_APP, ROOT, generate, validate)
+    if result:
+        with DB_LOCK, connect() as conn:
+            add_event(conn, task["content_id"], "Remotion代码规则已应用",
+                      "remotion-best-practices · {} · {} · {}".format(result["skill_commit"][:12],
+                      result["code_sha256"][:12], "复用已有代码" if result["cache_hit"] else "生成并检查新代码"))
+    return result
+
+
 def _render_yingxu(task, payload):
     if not YINGXU_RENDER_LOCK.acquire(blocking=False):
         raise ApiError(409, "已有本地渲染正在运行，请完成后重试")
@@ -1067,7 +1120,9 @@ def _render_yingxu(task, payload):
         directory.mkdir(parents=True, exist_ok=True)
         output = directory / ("yingxu-" + uuid.uuid4().hex + ".mp4")
         try:
-            run_remotion_render(props, output, scale=0.5 if preview else 1)
+            code = prepare_yingxu_remotion_code(task, props)
+            run_remotion_render(props, output, scale=0.5 if preview else 1,
+                                entry=code["entry"] if code else None)
             info = probe_media(output, "video")
             if abs(info["duration_seconds"] - props["durationSeconds"]) > 0.15:
                 raise ApiError(502, "渲染时长与当前分镜时间线不符，结果未入库，请检查渲染日志")
@@ -1080,6 +1135,8 @@ def _render_yingxu(task, payload):
                 result = upload_file(current, "asset" if preview else "video", "yingxu-{}-v{}.mp4".format("preview" if preview else "final", version), output, studio=True)
             with DB_LOCK, connect() as conn:
                 result['media_info'].update({'yingxu_revision': version, 'yingxu_render_hash': payload_hash(props), 'yingxu_preview': preview})
+                if code:
+                    result['media_info']['remotion_codegen'] = {key: value for key, value in code.items() if key != 'entry'}
                 conn.execute("UPDATE files SET media_info_json=? WHERE id=?", (json.dumps(result['media_info']), result['id']))
                 add_event(conn, task["content_id"], "映序本地渲染完成", "制作版本 {} · 文件 #{} · {}".format(version, result["id"], "样片" if preview else "成片"))
             return result
@@ -1191,7 +1248,7 @@ def generate_scripts(task, payload=None):
     try:
         status = get_ai_status()
         if not status["ready"]:
-            raise ApiError(409, "请先在设置页完成 Kimi 真实连接测试")
+            raise ApiError(409, "请先在设置页完成 Codex 真实连接测试")
         config = agent_runtime("script_agent")
         try:
             skill_prompt, agent_snapshot = writing_context(config, PROJECT_ROOT)
@@ -1325,8 +1382,6 @@ def generate_asset_plan(task, payload):
             raise ApiError(409, "当前任务已有生成操作进行中")
         GENERATING.add(content_id)
     try:
-        if not get_ai_status()["ready"]:
-            raise ApiError(409, "请先完成 Kimi 真实连接测试")
         detection = detect_kimi()
         try:
             raw = run_kimi_agent_json(ASSET_AGENT_PATH, prompt, config["timeout_seconds"], detection)
@@ -1690,8 +1745,9 @@ def probe_media(path, kind):
 
 
 def run_whisperx(audio_path, model, directory, timeout=3600):
-    if not WHISPERX_PATH.is_file() or not os.access(WHISPERX_PATH, os.X_OK):
-        raise ApiError(503, "WhisperX 尚未安装完成：缺少 .venv-whisperx/bin/whisperx")
+    load_media_tools()
+    if not WHISPERX_PYTHON.is_file() or not os.access(WHISPERX_PYTHON, os.X_OK):
+        raise ApiError(503, "本地字幕环境缺失：需要 faster-whisper Python 环境", "settings", "安装 faster-whisper 后重新测试；也可以上传 SRT 字幕继续制作。")
     if not WHISPERX_WORKER.is_file():
         raise ApiError(503, "WhisperX 工作脚本缺失")
     output = directory / "whisperx.srt"
@@ -1850,6 +1906,7 @@ def generate_audio(task, payload):
 
 
 def run_openvoice(reference, text, directory, timeout=3600):
+    load_media_tools()
     missing = openvoice_missing_files()
     if missing:
         raise ApiError(503, "OpenVoice 尚未就绪，缺少：" + "、".join(path_label(path) for path in missing))
@@ -1861,6 +1918,7 @@ def run_openvoice(reference, text, directory, timeout=3600):
 
 
 def test_clone_voice():
+    load_media_tools()
     try:
         with tempfile.TemporaryDirectory(prefix="openvoice-test-") as directory:
             run_openvoice(OPENVOICE_REFERENCE, "本人音色克隆连接测试", Path(directory))
@@ -1957,7 +2015,11 @@ def save_voice_sample(name, filename, authorized, body):
     try:
         pending.mkdir(parents=True, exist_ok=False)
         sample = pending / ("sample" + suffix)
-        sample.write_bytes(body)
+        if isinstance(body, tuple):
+            from content_workbench.storage.uploads import stream_upload
+            stream_upload(body[0], body[1], sample)
+        else:
+            sample.write_bytes(body)
         info = probe_media(sample, "audio")
         duration = info["duration_seconds"]
         pending.rename(final_directory)
@@ -2001,7 +2063,10 @@ def upload_file(task, kind, filename, body, studio=False):
         raise ApiError(400, "文件路径无效")
     temporary = path.with_suffix(path.suffix + ".uploading")
     try:
-        if isinstance(body, Path):
+        if isinstance(body, tuple):
+            from content_workbench.storage.uploads import stream_upload
+            stream_upload(body[0], body[1], temporary)
+        elif isinstance(body, Path):
             shutil.copyfile(body, temporary)
         else:
             temporary.write_bytes(body)
@@ -2282,7 +2347,7 @@ def generate_cover(task, payload):
         return result
 
 
-def run_remotion_render(props, output, timeout=1800, composition_id="TalkingHead", on_progress=None, scale=1):
+def run_remotion_render(props, output, timeout=1800, composition_id="TalkingHead", on_progress=None, scale=1, entry=None):
     output = Path(output).resolve()
     node = shutil.which("node")
     if not node or not (REMOTION_APP / "package.json").is_file():
@@ -2296,6 +2361,8 @@ def run_remotion_render(props, output, timeout=1800, composition_id="TalkingHead
         props_path.write_text(json.dumps(props, ensure_ascii=False), encoding="utf-8")
         command = [node, "scripts/render.mjs", "--props", str(props_path), "--output", str(output),
                    "--composition-id", composition_id, "--scale", str(scale)]
+        if entry:
+            command += ["--entry", str(entry)]
         if on_progress is None:
             run_process(command, timeout, MAX_CLI_OUTPUT, "Remotion", REMOTION_APP)
         else:
@@ -2791,13 +2858,13 @@ def produce_video_task(job, context):
 
 
 def test_render_agent():
-    test_id = "_render_test"
+    test_id = "_render_test_" + uuid.uuid4().hex[:12]
     directory = REMOTION_PUBLIC / "assets" / test_id
     try:
         directory.mkdir(parents=True, exist_ok=True)
         subprocess.run(["/usr/bin/say", "-v", "Tingting", "-o", str(directory / "narration.aiff"), "视频构建连接测试"], check=True, timeout=30)
         subprocess.run([shutil.which("ffmpeg"), "-v", "error", "-y", "-i", str(directory / "narration.aiff"), str(directory / "narration.wav")], check=True, timeout=30)
-        props = {"title": "视频构建测试", "audio": "assets/_render_test/narration.wav", "durationSeconds": 2,
+        props = {"title": "视频构建测试", "audio": "assets/{}/narration.wav".format(test_id), "durationSeconds": 2,
                  "captions": [{"text": "视频构建连接测试", "startMs": 0, "endMs": 1800, "timestampMs": None, "confidence": None}],
                  "scenes": [{"id": "test", "name": "内容场景", "start_seconds": 0, "end_seconds": 2,
                              "asset_type": "own", "description": "真实 Remotion 渲染", "media": None}]}
@@ -2855,7 +2922,9 @@ class Handler(BaseHTTPRequestHandler):
         try:
             V2.authenticate(self, write=self.command in ("POST", "PUT", "PATCH", "DELETE"))
         except DomainError as error:
-            raise ApiError(error.status, error.message, error.field, error.action, error.item)
+            converted = ApiError(error.status, error.message, error.field, error.action, error.item)
+            converted.code = error.code
+            raise converted
 
     def json_response(self, data, status=200):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
@@ -2875,6 +2944,7 @@ class Handler(BaseHTTPRequestHandler):
             message, field, action, item = "服务器未能完成此操作，请修正后重试", "workflow", "查看本地服务日志定位本次异常，修正后重试；不要重复提交可能产生重复文件的请求。", None
             status = 500
         payload = {"error": message, "field": field, "action": action}
+        if getattr(error, "code", None): payload["code"] = error.code
         if item is not None:
             payload["item"] = item
         self.json_response(payload, status)
@@ -3057,7 +3127,10 @@ class Handler(BaseHTTPRequestHandler):
             self.authenticate_legacy(path)
             if V2 and V2.matches(path):
                 return V2.handle(self, "GET", path, parse_qs(parsed.query))
-            if path == "/api/yingxu-cache":
+            if path == "/api/media-tools":
+                from content_workbench.media.tools import config
+                self.json_response({'paths':config(ROOT),'status':media_ai_status()})
+            elif path == "/api/yingxu-cache":
                 self.json_response(yingxu_cache_info()[0])
             elif path == "/api/ai/status":
                 self.json_response(get_ai_status())
@@ -3139,6 +3212,26 @@ class Handler(BaseHTTPRequestHandler):
             self.authenticate_legacy(path)
             if V2 and V2.matches(path):
                 return V2.handle(self, "POST", path, parse_qs(urlsplit(self.path).query))
+            if path == "/api/media-tools":
+                from content_workbench.media.tools import save
+                try: self.json_response({'paths':save(ROOT,self.read_json()),'status':media_ai_status()})
+                except DomainError as error: raise ApiError(error.status,error.message)
+                return
+            if path == "/api/local-picker":
+                body = self.read_json()
+                kind = body.get("kind", "file")
+                if kind not in ("file", "folder"):
+                    raise ApiError(422, "无效的选择类型")
+                script = 'POSIX path of (choose folder with prompt "选择本地文件夹")' if kind == "folder" else 'POSIX path of (choose file with prompt "选择本地文件")'
+                result = subprocess.run(["/usr/bin/osascript", "-e", script], capture_output=True, text=True, timeout=120)
+                self.json_response({"path": result.stdout.strip() if result.returncode == 0 else "", "cancelled": result.returncode != 0})
+                return
+            if path == "/api/workspace/select":
+                body = self.read_json()
+                callback = globals().get("DESKTOP_SELECT_WORKSPACE")
+                if not callback: raise ApiError(409, "请从桌面 App 启动后切换工作区")
+                self.json_response(callback(body.get("path", "")))
+                return
             if path in ("/api/workspace/export", "/api/workspace/restore"):
                 from content_workbench.storage.portable import export_workspace, restore_workspace
                 body = self.read_json()
@@ -3177,9 +3270,7 @@ class Handler(BaseHTTPRequestHandler):
                     raise ApiError(400, "样本长度无效")
                 if length <= 0 or length > MAX_UPLOAD:
                     raise ApiError(413, "样本为空或超过 500MB 限制")
-                body = self.rfile.read(length)
-                if len(body) != length:
-                    raise ApiError(400, "样本上传不完整")
+                body = (self.rfile, length)
                 result = save_voice_sample(query.get("name", [""])[0], query.get("filename", [""])[0],
                                            query.get("authorized", ["false"])[0] == "true", body)
                 self.json_response(result, 201)
@@ -3299,9 +3390,7 @@ class Handler(BaseHTTPRequestHandler):
                     raise ApiError(413, "文件为空或超过当前接口 500MB 上限")
                 with connect() as conn:
                     task = get_task(conn, studio_upload.group(1))
-                body = self.rfile.read(length)
-                if len(body) != length:
-                    raise ApiError(400, "文件上传不完整")
+                body = (self.rfile, length)
                 self.json_response(upload_file(task, query.get("kind", ["asset"])[0], query.get("filename", [""])[0], body, studio=True), 201)
                 return
             handoff = re.fullmatch(r"/api/tasks/(\d{8}-\d{3})/yingxu-handoff", path)
@@ -3337,9 +3426,7 @@ class Handler(BaseHTTPRequestHandler):
                     raise ApiError(413, "文件为空或超过 500MB 限制")
                 with connect() as conn:
                     task = get_task(conn, upload.group(1))
-                body = self.rfile.read(length)
-                if len(body) != length:
-                    raise ApiError(400, "文件上传不完整")
+                body = (self.rfile, length)
                 self.json_response(upload_file(task, kind, filename, body), 201)
                 return
             action = re.fullmatch(r"/api/tasks/(\d{8}-\d{3})/actions", path)

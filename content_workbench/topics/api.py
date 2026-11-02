@@ -3,6 +3,7 @@ import re
 from content_workbench.domain.errors import DomainError
 from content_workbench.storage.db import connect, dumps
 from content_workbench.topics.wechat_inbox import WechatInboxService
+from content_workbench.topics.wechat_client import WechatClient
 
 
 class TopicAPI:
@@ -12,8 +13,17 @@ class TopicAPI:
         self.jobs = app.jobs
         self.legacy_task_creator = legacy_task_creator
         self.wechat_inbox = WechatInboxService(service.db_path, service)
+        self.wechat_client = WechatClient(service.root, self.wechat_inbox)
 
     def handle(self, handler, method, path, query, body):
+        if path == "/api/topics/wechat/client" and method == "GET":
+            return self.app.response(handler, self.wechat_client.status())
+        if path in ("/api/topics/wechat/client/login", "/api/topics/wechat/client/poll", "/api/topics/wechat/client/disconnect") and method == "POST":
+            try:
+                result = self.wechat_client.disconnect() if path.endswith("/disconnect") else self.wechat_client.begin_login() if path.endswith('/login') else self.wechat_client.poll_login((body or {}).get('code',''))
+                return self.app.response(handler, result)
+            except Exception:
+                raise DomainError("WECHAT_CONNECT_FAILED", "微信连接请求失败，请检查网络或重新获取二维码", 502, "wechat", "重试扫码连接")
         if method == "GET" and path == "/api/topics/bootstrap":
             data = self.service.bootstrap()
             data["wechat_messages"] = self.wechat_inbox.list()
@@ -60,16 +70,20 @@ class TopicAPI:
         if method == "POST" and path == "/api/topics/browser/open":
             return self.app.response(handler, self.jobs.enqueue("topics.login", {}, "source_douyin_main", resource_key="browser"), 202)
         if method == "POST" and path == "/api/topics/sync":
-            return self.app.response(handler, self.jobs.enqueue("topics.sync", {}, "source_douyin_main", resource_key="browser"), 202)
+            return self.app.response(handler, self.jobs.enqueue_active_once("topics.sync", {}, "source_douyin_main", resource_key="browser"), 202)
         if method == "POST" and path == "/api/topics/xiaohongshu/browser/open":
             return self.app.response(handler, self.jobs.enqueue("topics.xhs_login", {}, "source_xiaohongshu_main", resource_key="browser"), 202)
         if method == "POST" and path == "/api/topics/xiaohongshu/sync":
-            return self.app.response(handler, self.jobs.enqueue("topics.xhs_sync", {}, "source_xiaohongshu_main", resource_key="browser"), 202)
+            return self.app.response(handler, self.jobs.enqueue_active_once("topics.xhs_sync", {}, "source_xiaohongshu_main", resource_key="browser"), 202)
         if method == "POST" and path == "/api/topics/industry":
             return self.app.response(handler, self.jobs.enqueue("topics.industry", {"agent": "industry"}, "industry", resource_key="topics"), 202)
         if method == "POST" and path == "/api/topics/recommend":
             agent = (body or {}).get("agent", "douyin")
-            return self.app.response(handler, self.jobs.enqueue("topics.recommend", {"agent": agent}, agent, resource_key="cloud_text"), 202)
+            return self.app.response(handler, self.jobs.enqueue_active_once("topics.recommend", {"agent": agent}, agent, resource_key="cloud_text"), 202)
+        match = re.fullmatch(r"/api/topics/items/([^/]+)/cover/retry", path)
+        if method == "POST" and match:
+            item = self.service.get_item(match.group(1))
+            return self.app.response(handler, self.jobs.enqueue_active_once("topics.cover", {}, item["id"], resource_key="browser"), 202)
         match = re.fullmatch(r"/api/topics/items/([^/]+)/cover", path)
         if method == "GET" and match:
             cover = self.service.root / "covers" / "topic-research" / (match.group(1) + ".jpg")

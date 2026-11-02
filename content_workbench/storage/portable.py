@@ -11,6 +11,7 @@ from content_workbench.domain.errors import DomainError
 from content_workbench.domain.services import Workbench
 
 DIRS=('config','skills','assets','renders','voice','subtitles','covers','narration','previews','analytics','review-work','data/review-uploads')
+CONNECTION_FILES={'wechat-client.json','wechat-inbox.env'}
 MEDIA={'.mp4','.mov','.mkv','.webm','.wav','.mp3','.m4a','.aac','.flac','.png','.jpg','.jpeg','.webp','.srt','.html','.md','.txt','.json'}
 
 def fail(message):raise DomainError('PROJECT_MIGRATION',message,409)
@@ -33,7 +34,7 @@ def export_workspace(db_path,root,destination):
             folder=root/directory
             if folder.is_dir():
                 for path in folder.rglob('*'):
-                    if path.is_file() and not path.is_symlink():entries[path.relative_to(root).as_posix()]=path
+                    if path.is_file() and not path.is_symlink() and path.name not in CONNECTION_FILES and path.suffix != '.env':entries[path.relative_to(root).as_posix()]=path
         with sqlite3.connect(str(database)) as conn:
             conn.row_factory=sqlite3.Row
             tables={r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}

@@ -1,0 +1,5 @@
+Official Remotion Agent Skills
+Source: https://github.com/remotion-dev/skills
+Pinned commit: c7cb2fdcacd134fb2ccb9b7a44f9ffa44e467271
+Upstream SKILL.md and REFERENCE.md documents retained unchanged.
+Remotion licensing guidance: remotion-best-practices/remotion-license/REFERENCE.md

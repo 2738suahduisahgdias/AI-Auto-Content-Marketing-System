@@ -88,6 +88,7 @@ class TopicCase(unittest.TestCase):
             "xhs_competitor": [{"title": "小红书竞品", "canonical_url": "https://www.xiaohongshu.com/explore/competitor1"}],
             "xhs_high_praise": [{"title": "小红书高赞", "canonical_url": "https://www.xiaohongshu.com/explore/praise1"}],
         }
+        self.service.save_settings({"xhs_hot_collection": "热点收藏"})
         executor = TopicExecutors(self.service)
         with mock.patch("content_workbench.topics.executors.run_existing_browser", return_value={"status": "ok", "collections": collections, "errors": []}) as browser, \
                 mock.patch.object(self.service, "cache_cover", return_value=True):
@@ -111,6 +112,16 @@ class TopicCase(unittest.TestCase):
             self.assertIn(source, prompt)
         self.assertNotIn('"hot"', prompt)
         self.assertEqual(1, len(self.service.bootstrap()["recommendations"]["xiaohongshu"]))
+
+    def test_xhs_unconfigured_optional_folder_is_not_collected(self):
+        from unittest import mock
+        from content_workbench.topics.executors import TopicExecutors
+        self.service.save_settings({"xhs_hot_collection": ""})
+        with mock.patch("content_workbench.topics.executors.run_existing_browser", return_value={"status": "ok", "collections": {}, "errors": []}) as browser:
+            result = TopicExecutors(self.service).xhs_sync({"input": {}}, DummyContext())
+        self.assertNotIn("xhs_hot", browser.call_args.kwargs["collections"])
+        self.assertNotIn("xhs_hot", result["stats"])
+        self.assertEqual("succeeded", result["status"])
 
     def test_video_frames_ocr_and_cache(self):
         ocr_python = PROJECT_ROOT / ".venv-topics/bin/python"

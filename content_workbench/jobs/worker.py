@@ -1,4 +1,5 @@
 import os
+import logging
 import signal
 import subprocess
 import threading
@@ -62,7 +63,7 @@ class ExecutionContext:
                 raise DomainError("PROCESS_FAILED", "外部命令失败：" + " ".join(stderr.strip().split())[:500], 502,
                                   "job", "查看失败阶段和命令错误，修正后重试", retryable=False)
             return stdout, stderr
-        except JobCancelled:
+        except BaseException:
             if process.poll() is None:
                 os.killpg(process.pid, signal.SIGKILL)
                 process.communicate()
@@ -83,6 +84,7 @@ class Worker:
         self.poll_interval = poll_interval
         self.stop_event = threading.Event()
         self.thread = None
+        self.last_error = None
 
     def start(self):
         if self.thread and self.thread.is_alive():
@@ -98,11 +100,17 @@ class Worker:
 
     def run_forever(self):
         while not self.stop_event.is_set():
-            job = self.store.lease(self.owner, kinds=self.allowed_kinds)
-            if not job:
-                self.stop_event.wait(self.poll_interval)
-                continue
-            self.execute(job)
+            try:
+                job = self.store.lease(self.owner, kinds=self.allowed_kinds)
+                self.last_error = None
+                if not job:
+                    self.stop_event.wait(self.poll_interval)
+                    continue
+                self.execute(job)
+            except Exception as error:
+                self.last_error = {"code": "WORKER_STORAGE_UNAVAILABLE", "message": "任务存储暂不可用，正在自动重连"}
+                logging.exception("Worker loop failed; retrying")
+                self.stop_event.wait(max(2, self.poll_interval))
 
     def execute(self, job):
         context = ExecutionContext(self, job)
