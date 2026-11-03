@@ -60,7 +60,8 @@ class ExecutionContext:
             if len(stdout) + len(stderr) > 2 * 1024 * 1024:
                 raise DomainError("PROCESS_OUTPUT_LIMIT", "外部命令输出超过限制", 502)
             if process.returncode:
-                raise DomainError("PROCESS_FAILED", "外部命令失败：" + " ".join(stderr.strip().split())[:500], 502,
+                from content_workbench.providers.text import process_failure_message
+                raise DomainError("PROCESS_FAILED", "外部命令失败：" + process_failure_message(stderr), 502,
                                   "job", "查看失败阶段和命令错误，修正后重试", retryable=False)
             return stdout, stderr
         except BaseException:

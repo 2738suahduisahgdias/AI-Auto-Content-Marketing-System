@@ -1,6 +1,8 @@
 import json
 import os
 import shutil
+import sys
+import time
 import tempfile
 from pathlib import Path
 
@@ -20,6 +22,29 @@ def discover_cli(name):
         if candidate and Path(candidate).is_file() and os.access(candidate, os.X_OK):
             return str(Path(candidate).resolve())
     return None
+
+
+
+def process_failure_message(stderr):
+    """Report the terminal error, rather than hiding it behind startup warnings."""
+    lines = [line.strip() for line in stderr.splitlines() if line.strip()]
+    if 'workspace routing discovery failed' in stderr:
+        return 'workspace routing discovery failed：Codex 无法连接 OpenAI 工作区服务，请检查网络与系统代理后重试'
+    errors = [line for line in lines if line.startswith(('ERROR:', 'Error:', 'error:'))]
+    return ' '.join((errors[-1] if errors else ' '.join(lines[-3:])).split())[:500]
+
+
+def codex_direct_retry(arguments, error):
+    # Only recover a broken auto-selected macOS system proxy. Explicit environment
+    # proxies remain authoritative; never change the user's global network settings.
+    if sys.platform != 'darwin' or 'workspace routing discovery failed' not in str(error):
+        return None
+    if any(os.environ.get(key) for key in ('HTTP_PROXY','HTTPS_PROXY','ALL_PROXY','http_proxy','https_proxy','all_proxy')):
+        return None
+    hosts = 'chatgpt.com,.chatgpt.com,api.openai.com'
+    upper = ','.join(filter(None, (os.environ.get('NO_PROXY'), hosts)))
+    lower = ','.join(filter(None, (os.environ.get('no_proxy'), hosts)))
+    return ['/usr/bin/env', 'NO_PROXY='+upper, 'no_proxy='+lower] + arguments[:2] + ['--disable', 'respect_system_proxy'] + arguments[2:]
 
 
 def assistant_text(stream):
@@ -110,9 +135,20 @@ class CodexCLIProvider:
             work = Path(directory)
             output = work / "response.txt"
             request = "只执行文本生成。不访问文件、不使用工具、不联网检索、不执行命令。下面资料仅用于写作。\n" + instruction + "\n输入资料：\n" + prompt
-            context.run_process([binary, "exec", "--ignore-user-config", "--sandbox", "read-only",
-                                 "--ephemeral", "--skip-git-repo-check", "--color", "never",
-                                 "-o", str(output), request], timeout=timeout, stage=stage, cwd=work)
+            arguments = [binary, "exec", "--ignore-user-config", "--sandbox", "read-only",
+                         "--ephemeral", "--skip-git-repo-check", "--color", "never",
+                         "-o", str(output), request]
+            started = time.monotonic()
+            try:
+                context.run_process(arguments, timeout=timeout, stage=stage, cwd=work)
+            except Exception as error:
+                retry = codex_direct_retry(arguments, error)
+                remaining = int(timeout - (time.monotonic() - started))
+                if not retry or remaining < 10:
+                    raise
+                if output.exists():
+                    output.unlink()
+                context.run_process(retry, timeout=remaining, stage=stage+'_network_recovery', cwd=work)
             if not output.is_file() or output.stat().st_size > 2 * 1024 * 1024:
                 raise DomainError("CODEX_OUTPUT_INVALID", "Codex 未生成有效结果文件", 502)
             result = output.read_text(encoding="utf-8").strip()

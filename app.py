@@ -301,7 +301,8 @@ def run_process(arguments, timeout, output_limit=MAX_CLI_OUTPUT, label="Codex CL
     if len(stdout) + len(stderr) > output_limit:
         raise ApiError(502, "{} 输出超过安全限制".format(label))
     if process.returncode:
-        message = " ".join(stderr.strip().split())[:500]
+        from content_workbench.providers.text import process_failure_message
+        message = process_failure_message(stderr)
         raise ApiError(502, "{} 调用失败".format(label) + ("：{}".format(message) if message else "，请检查本机配置"))
     return stdout, stderr
 
