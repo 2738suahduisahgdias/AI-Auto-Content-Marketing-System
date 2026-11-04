@@ -31,6 +31,7 @@ class RecommendationProviderTest(unittest.TestCase):
         from content_workbench.topics.executors import TopicExecutors
         from unittest.mock import Mock
         executor = object.__new__(TopicExecutors)
+        executor.root = Path("/tmp")
         valid = '[{"title":"AI客服","reason":"示意资料","angle":"知识库","audience":"business_owners","pillar":"enterprise_ai"}]'
         with patch('content_workbench.providers.text.CodexCLIProvider.complete_text',return_value=valid) as provider:
             result = executor.kimi_json(Mock(), 'industry-topic-agent', 'test')

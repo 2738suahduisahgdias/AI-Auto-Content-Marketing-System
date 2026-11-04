@@ -14,6 +14,7 @@ export function isolateRenderBrowser(browser){
  const original=browser.newPage.bind(browser);
  browser.newPage=async(...args)=>{
   const page=await original(...args);const client=page._client();let origin='';
+  client.on('Runtime.exceptionThrown', event => console.error('PAGE_EXCEPTION', JSON.stringify(event.exceptionDetails)));
   const goto=page.goto.bind(page);
   page.goto=async options=>{
    const target=new URL(options.url);

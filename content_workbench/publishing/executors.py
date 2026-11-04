@@ -111,15 +111,10 @@ class PublishingExecutors:
                              "agent_supplement": config["prompt"]}, ensure_ascii=False)
         context.progress("model_generate", 0.15)
         agent = PROJECT_ROOT / "agents" / "publish-fields-agent.md"
-        if config["engine"] == "codex_cli":
-            from content_workbench.providers.text import CodexCLIProvider
-            payload = CodexCLIProvider().complete_json(prompt, context, agent, timeout=config["timeout_seconds"])
-            provider = "codex_cli"
-        else:
-            stdout, _ = context.run_process([LocalExecutors(self.service.workbench).kimi(), "--agent-file", str(agent), "-p", prompt,
-                                             "--output-format", "stream-json"], timeout=config["timeout_seconds"], stage="kimi_cli", cwd=self.root)
-            payload = self.model_payload(stdout)
-            provider = "kimi_cli"
+        from content_workbench.providers.system import provider_for
+        payload = provider_for(self.root, config["engine"]).complete_json(
+            prompt, context, agent, timeout=config["timeout_seconds"], stage=config["engine"])
+        provider = config["engine"]
         fields = self.validate_generated_fields(kind, platforms, payload)
         return {"platforms": fields, "provider": provider, "model": "unpinned", "auto_saved": False, "auto_published": False}
 

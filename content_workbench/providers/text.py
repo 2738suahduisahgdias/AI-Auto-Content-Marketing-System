@@ -90,9 +90,8 @@ class KimiCLIProvider:
         self.root = Path(root)
 
     def binary(self):
-        candidate = shutil.which("kimi")
-        path = Path(candidate) if candidate else Path.home() / ".kimi-code" / "bin" / "kimi"
-        return path if path.is_file() else None
+        candidate = discover_cli("kimi")
+        return Path(candidate) if candidate else None
 
     def status(self):
         available = self.binary() is not None
@@ -162,10 +161,14 @@ class CodexCLIProvider:
 
 class TextProviderRegistry:
     def __init__(self, root, providers=None):
-        self.providers = providers or {provider.provider_id: provider for provider in (KimiCLIProvider(root), CodexCLIProvider())}
+        from content_workbench.providers.system import ModelAPIProvider
+        self.root = Path(root)
+        self.providers = providers or {provider.provider_id: provider for provider in (KimiCLIProvider(root), CodexCLIProvider(), ModelAPIProvider(root))}
 
     def status(self):
-        return {"default": "codex_cli", "items": [provider.status() for provider in self.providers.values()]}
+        from content_workbench.providers.system import model_settings
+        return {"default": model_settings(self.root / "data/content-agent.db").get("engine", "codex_cli"),
+                "items": [provider.status() for provider in self.providers.values()]}
 
     def get(self, provider_id="codex_cli"):
         provider = self.providers.get(provider_id or "codex_cli")

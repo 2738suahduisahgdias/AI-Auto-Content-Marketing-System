@@ -207,9 +207,9 @@ class TopicExecutors:
 
     def kimi_json(self, context, agent_name, prompt, timeout=600, engine="codex_cli"):
         # Historical method name retained; the selected provider is never silently changed.
-        from content_workbench.providers.text import CodexCLIProvider, KimiCLIProvider
+        from content_workbench.providers.system import provider_for
         agent = PROJECT_ROOT / "agents" / (agent_name + ".md")
-        provider = KimiCLIProvider(self.root) if engine == "kimi_cli" else CodexCLIProvider()
+        provider = provider_for(self.root, engine)
         result = provider.complete_text(prompt, context, agent, timeout=timeout, stage=engine + "_" + agent_name)
         value = result.strip()
         if value.startswith("```") and value.endswith("```"):

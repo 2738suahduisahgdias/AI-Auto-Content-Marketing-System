@@ -17,12 +17,16 @@ def runtime_readiness(app):
     allowed = getattr(worker, 'allowed_kinds', None)
     enabled = sorted(k for k in worker.executors if running and (allowed is None or k in allowed))
     kimi = Path(shutil.which('kimi') or Path.home()/'.kimi-code/bin/kimi')
+    from content_workbench.providers.text import discover_cli
     from content_workbench.agents.registry import agent_config
     article_engine = agent_config(app.workbench.db_path, 'article_agent')['engine'] if hasattr(app, 'workbench') else 'kimi_cli'
     publish_engine = agent_config(app.workbench.db_path, 'publish_agent')['engine'] if hasattr(app, 'workbench') else 'codex_cli'
+    from content_workbench.providers.system import public_settings
+    api_config = public_settings(app.workbench.db_path if hasattr(app, 'workbench') else root / 'data/content-agent.db')
     checks = {
-        'text_cli': kimi.is_file() and os.access(kimi, os.X_OK),
-        'codex_cli': bool(shutil.which('codex')),
+        'model_api': bool(api_config.get('base_url') and api_config.get('model')),
+        'text_cli': bool(discover_cli('kimi')),
+        'codex_cli': bool(discover_cli('codex')),
         'ffmpeg': bool(shutil.which('ffmpeg') and shutil.which('ffprobe')),
         'node': bool(shutil.which('node')),
         'remotion': (resources/'remotion-app/node_modules').is_dir(),
@@ -35,11 +39,11 @@ def runtime_readiness(app):
     except Exception:
         checks['chrome_bridge'] = False
     definitions = [
-        ('文案生成', ['article.outline','article.draft'], ['codex_cli' if article_engine == 'codex_cli' else 'text_cli'], 'CLI 存在不等于模型登录有效，需真实生成验证'),
+        ('文案生成', ['article.outline','article.draft'], ['model_api' if article_engine == 'model_api' else 'codex_cli' if article_engine == 'codex_cli' else 'text_cli'], 'CLI 存在不等于模型登录有效，需真实生成验证'),
         ('文章文档导出', ['article.export'], [], '沿用已审批正文版本，导出 Markdown 与 HTML'),
         ('映序视频制作', [], ['node','ffmpeg','remotion'], '映序使用直接渲染接口；包含全片和单镜预览，需以实际项目确认画面和声音'),
         ('本地技术质检', ['review.scan','review.repair'], ['ffmpeg'], 'OCR 与 AI 审核另有依赖，不代表品牌质检全部完成'),
-        ('发布字段生成', ['publish.fields'], ['codex_cli' if publish_engine == 'codex_cli' else 'text_cli'], '只生成字段，不代表平台已登录'),
+        ('发布字段生成', ['publish.fields'], ['model_api' if publish_engine == 'model_api' else 'codex_cli' if publish_engine == 'codex_cli' else 'text_cli'], '只生成字段，不代表平台已登录'),
         ('平台登录与预填', ['publish.login','publish.prepare'], ['browser_python','chrome_bridge'], '需要本机浏览器连接服务及扩展；扫码仅确认身份，需分别验证字段和素材上传。公众号、视频号自动上传尚未通过交付验收'),
         ('公开发布', [], [], '客户端只准备草稿；最终由用户在平台后台检查并点击发布'),
     ]

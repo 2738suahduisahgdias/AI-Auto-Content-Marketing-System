@@ -68,37 +68,12 @@ class LocalExecutors:
                              "brief": item["campaign"]["brief"], "input": job["input"].get("prompt", ""),
                              "creative_plan": job["input"].get("creative_plan", {}), "writing_skills": skills_prompt, "agent_supplement": config["prompt"], "active_outline": next((r["payload"].get("text", "") for r in item["revisions"] if r["id"] == item["active_revisions"].get("outline")), "")}, ensure_ascii=False)
         agent = PROJECT_ROOT / "agents" / "content-item-agent.md"
-        if config["engine"] == "codex_cli":
-            from content_workbench.providers.text import CodexCLIProvider
-            payload = CodexCLIProvider().complete_json(prompt, context, agent, timeout=config["timeout_seconds"])
-            if not isinstance(payload.get("text"), str):
-                raise DomainError("MODEL_SCHEMA_INVALID", "Codex 必须返回 text 字符串", 502)
-            return self.save_text_result(job, payload["text"], provider="codex_cli", generation=generation)
-        stdout, _ = context.run_process([self.kimi(), "--agent-file", str(agent), "-p", prompt,
-                                         "--output-format", "stream-json"], timeout=config["timeout_seconds"], stage="kimi_cli", cwd=self.root)
-        contents = []
-        for line in stdout.splitlines():
-            try:
-                event = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if event.get("type") != "assistant" and event.get("role") != "assistant":
-                continue
-            content = event.get("content")
-            if isinstance(content, list):
-                content = "".join(part.get("text", "") for part in content if isinstance(part, dict))
-            elif isinstance(content, dict):
-                content = content.get("text", "")
-            if isinstance(content, str) and content.strip():
-                contents.append(content.strip())
-        if not contents:
-            raise DomainError("MODEL_EMPTY_RESPONSE", "Kimi CLI 未返回文本", 502, "provider", "检查 CLI 登录和输出协议")
-        try:
-            payload = json.loads(contents[-1])
-            text = payload["text"]
-        except (json.JSONDecodeError, KeyError, TypeError):
-            raise DomainError("MODEL_SCHEMA_INVALID", "模型未返回指定的 text JSON", 502, "provider", "重试一次；仍失败时人工编辑")
-        return self.save_text_result(job, text, generation=generation)
+        from content_workbench.providers.system import provider_for
+        payload = provider_for(self.root, config["engine"]).complete_json(
+            prompt, context, agent, timeout=config["timeout_seconds"], stage=config["engine"])
+        if not isinstance(payload.get("text"), str):
+            raise DomainError("MODEL_SCHEMA_INVALID", "模型必须返回 text 字符串", 502)
+        return self.save_text_result(job, payload["text"], provider=config["engine"], generation=generation)
 
     def save_asset_result(self, job, asset_id, kind, source_audio=None, metadata=None):
         item_id = job["aggregate_id"]

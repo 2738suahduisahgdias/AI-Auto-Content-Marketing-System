@@ -1,3 +1,4 @@
+import SystemModelSettings from "@/components/SystemModelSettings";
 import MediaTools from '../components/MediaTools';
 import ImageProviderSettings from "@/components/ImageProviderSettings";
 import WorkspaceTransfer from "@/components/WorkspaceTransfer";
@@ -13,7 +14,7 @@ import { Badge, Button, Card, Empty, ErrorBox, Field, Input, PageHeader, Textare
 import { api, errorText, jsonOptions } from "@/lib/api";
 import "./Settings.css";
 
-const engineLabel=(value:string)=>({codex_cli:"Codex CLI · 本机登录",kimi_cli:"Kimi CLI · 本机登录",playwright:"浏览器自动化",macos_say:"macOS 系统语音",openvoice:"OpenVoice 本地音色",remotion:"Remotion 本地渲染"} as Record<string,string>)[value]||value;
+const engineLabel=(value:string)=>({system:"跟随系统默认",model_api:"模型 API",codex_cli:"Codex CLI · 本机登录",kimi_cli:"Kimi CLI · 本机登录",playwright:"浏览器自动化",macos_say:"macOS 系统语音",openvoice:"OpenVoice 本地音色",remotion:"Remotion 本地渲染"} as Record<string,string>)[value]||value;
 interface AgentDefinition {
   name: string;
   description: string;
@@ -29,6 +30,7 @@ interface AgentDefinition {
 }
 
 interface AgentConfig {
+  follow_system?: boolean;
   enabled: boolean;
   engine: string;
   model: string;
@@ -95,7 +97,7 @@ const tests: Record<TestId, { path: string; success: string; progress: string }>
 function toDraft(config: AgentConfig): AgentDraft {
   return {
     enabled: config.enabled,
-    engine: config.engine,
+    engine: config.follow_system ? "system" : config.engine,
     model: config.model,
     prompt: config.prompt,
     timeout_seconds: config.timeout_seconds,
@@ -403,6 +405,7 @@ export default function Settings() {
         </div> : <Empty title="没有可配置的 Agent" description="后端注册表当前没有返回 Agent 定义。" />}
       </Card>}
 
+      {page === "models" && <SystemModelSettings />}
       {core && ["models", "media"].includes(page) && <section className="settings-connections" aria-label="真实连接测试">
         <div className="section-heading"><div><h2>{page === "models" ? "模型连接测试" : "本地媒体能力测试"}</h2><p>测试只使用临时自测文件，不加入内容任务，不公开发布，也不会自动启用 Agent。</p></div></div>
         <div className="settings-connection-grid">

@@ -74,7 +74,7 @@ export default function SocialData() {
   const [url, setUrl] = useState("");
   const [mediaPath, setMediaPath] = useState("");
   const [model, setModel] = useState("base");
-  const [provider, setProvider] = useState("kimi_cli");
+  const [provider, setProvider] = useState("system");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -86,8 +86,7 @@ export default function SocialData() {
   }, []);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void load(), 0);
-    return () => window.clearTimeout(timer);
+    void load();
   }, [load]);
   const hasActive = !!data?.runs.some(run => activeStatuses.includes(run.status));
   useEffect(() => {
@@ -110,7 +109,7 @@ export default function SocialData() {
     setBusy(true); setError("");
     const input = selected.kind === "search" ? { keyword } : selected.executor === "local_transcript" ? { media_path: mediaPath, model } : selected.executor === "douyin_hot" ? {} : { url };
     try {
-      const result = await api<{ run: SocialRun }>("/api/social/execute", jsonOptions("POST", { operation_id: selected.id, input, provider }));
+      const result = await api<{ run: SocialRun }>("/api/social/execute", jsonOptions("POST", { operation_id: selected.id, input, provider: provider === "system" ? data?.providers.default : provider }));
       setSelectedRunId(result.run.id);
       await load();
     } catch (reason) { setError(errorText(reason)); }
@@ -156,7 +155,7 @@ export default function SocialData() {
                 <Field label="转写模型"><select value={model} onChange={event => setModel(event.target.value)}><option value="base">base</option><option value="small">small</option></select></Field>
               </>}
               {selected.status === "supported" && !["search", "hot_list"].includes(selected.kind) && selected.executor !== "local_transcript" && <Field label="公开页面 URL"><Input required type="url" value={url} onChange={event => setUrl(event.target.value)} placeholder="https://…" /></Field>}
-              {selected.executor === "browser_model" && <Field label="结构化模型"><select value={provider} onChange={event => setProvider(event.target.value)}>{data.providers.items.map(item => <option key={item.id} value={item.id} disabled={!item.available}>{item.label}{item.available ? "" : "（未启用）"}</option>)}</select></Field>}
+              {selected.executor === "browser_model" && <Field label="结构化模型"><select value={provider} onChange={event => setProvider(event.target.value)}><option value="system">跟随系统默认</option>{data.providers.items.map(item => <option key={item.id} value={item.id} disabled={!item.available}>{item.label}{item.available ? "" : "（未启用）"}</option>)}</select></Field>}
               {selected.status === "supported" && !selected.path.endsWith("/get") && <Button type="submit" variant="primary" disabled={busy}><Play size={14} />{busy ? "正在加入本地队列…" : "执行并记录结果"}</Button>}
             </form> : <Empty title="选择一项能力" description="从左侧目录选择后要执行的本地任务。" />}
           </Card>

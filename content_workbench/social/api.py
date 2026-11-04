@@ -31,7 +31,7 @@ class SocialAPI:
             input_data = data.get("input") or {}
             if not isinstance(input_data, dict):
                 raise DomainError("SOCIAL_INPUT_INVALID", "社媒能力输入必须是 JSON 对象", 422, "input", "按能力目录提交参数")
-            provider = str(data.get("provider") or "kimi_cli")
+            provider = str(data.get("provider") or self.service.providers.status()["default"])
             run = self.service.create_run(operation_id, input_data, provider)
             resource = "local_asr" if operation["executor"] == "local_transcript" else "download" if operation["executor"] == "local_download" else "browser"
             job = self.jobs.enqueue("social.execute", {}, run["id"], handler.headers.get("Idempotency-Key"), resource_key=resource)

@@ -323,6 +323,12 @@ def find_kimi():
 
 
 def detect_kimi():
+    if agent_runtime("script_agent")["engine"] == "model_api":
+        from content_workbench.providers.system import public_settings
+        config = public_settings(DB_PATH)
+        identity = hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()
+        return {"installed": bool(config.get("base_url") and config.get("model")),
+                "version": identity, "binary": "model_api", "detection_error": None}
     binary = find_kimi()
     if not binary:
         return {"installed": False, "version": None, "binary": None, "detection_error": "未找到所选 CLI，请在 Agent 配置中选择已安装并登录的 Codex 或 Kimi"}
@@ -412,7 +418,7 @@ def parse_kimi_output(stdout):
 
 def run_kimi_agent_json(agent_path, prompt, timeout=600, detection=None):
     # Keep the original call sites and result validation; use the shared Codex provider.
-    from content_workbench.providers.text import CodexCLIProvider, KimiCLIProvider
+    from content_workbench.providers.system import provider_for
     if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > MAX_ASSET_PROMPT:
         raise ApiError(400, "Agent 输入为空或超过 60000 字符限制")
     class Context:
@@ -424,7 +430,7 @@ def run_kimi_agent_json(agent_path, prompt, timeout=600, detection=None):
     try:
         agent_id = "asset_planning_agent" if agent_path == ASSET_AGENT_PATH else "script_agent"
         engine = agent_runtime(agent_id)["engine"]
-        provider = KimiCLIProvider(ROOT) if engine == "kimi_cli" else CodexCLIProvider()
+        provider = provider_for(ROOT, engine)
         if agent_id == "asset_planning_agent":
             # This existing agent contract is an array of shots, not a JSON object.
             text = provider.complete_text(prompt, Context(), agent_path, timeout=timeout).strip()
@@ -1110,7 +1116,7 @@ def render_yingxu(task, payload):
 
 def yingxu_director_candidate(task, payload):
     from content_workbench.media.yingxu_director import generate_plan
-    from content_workbench.providers.text import CodexCLIProvider, KimiCLIProvider
+    from content_workbench.providers.system import provider_for
     revision=task.get('source',{}).get('yingxu',{}).get('revision',0)
     if payload.get('revision') != revision:raise ApiError(409,'项目已更新，请保存后重新规划')
     config=agent_runtime('asset_planning_agent')
@@ -1118,7 +1124,7 @@ def yingxu_director_candidate(task, payload):
         def run_process(self, arguments, timeout, stage, cwd):
             return run_process(arguments,timeout,MAX_CLI_OUTPUT,'Remotion编导',cwd)
     def generate(prompt):
-        provider=KimiCLIProvider(ROOT) if config['engine']=='kimi_cli' else CodexCLIProvider()
+        provider=provider_for(ROOT, config['engine'])
         return provider.complete_text(prompt,Context(),PROJECT_ROOT/'agents/remotion-director-agent.md',timeout=config['timeout_seconds'],stage='remotion_director')
     with DB_LOCK:
         if task['content_id'] in GENERATING:raise ApiError(409,'当前项目已有生成任务，请等待完成')
@@ -1131,7 +1137,7 @@ def yingxu_director_candidate(task, payload):
 
 def prepare_yingxu_remotion_code(task, props):
     from content_workbench.media.remotion_codegen import prepare_scene_code
-    from content_workbench.providers.text import CodexCLIProvider, KimiCLIProvider
+    from content_workbench.providers.system import provider_for
     node = shutil.which("node")
     if not node:
         raise ApiError(503, "缺少本地 Node.js，无法检查 Remotion 动画代码")
@@ -1140,7 +1146,7 @@ def prepare_yingxu_remotion_code(task, props):
             return run_process(arguments, timeout, MAX_CLI_OUTPUT, "Remotion代码生成", cwd)
     def generate(prompt):
         config = agent_runtime("script_agent")
-        provider = KimiCLIProvider(ROOT) if config["engine"] == "kimi_cli" else CodexCLIProvider()
+        provider = provider_for(ROOT, config["engine"])
         return provider.complete_text(prompt, Context(), PROJECT_ROOT / "agents/remotion-code-agent.md",
                                       timeout=config["timeout_seconds"], stage="remotion_codegen")
     def validate(path):
@@ -2254,11 +2260,6 @@ def fallback_render_scenes(task, duration, captions=None):
     return scenes
 
 
-def render_media_url(file_id):
-    base = os.environ.get("CONTENT_AGENT_MEDIA_BASE_URL", "http://127.0.0.1:8765").rstrip("/")
-    return "{}/api/files/{}/media".format(base, file_id)
-
-
 def prepare_render_assets(task, mode, platform):
     audio = latest_task_file(task, "audio")
     if not audio:
@@ -2284,7 +2285,7 @@ def prepare_render_assets(task, mode, platform):
     directory.mkdir(parents=True, exist_ok=True)
     if (REMOTION_PUBLIC / "assets").resolve() not in directory.resolve().parents:
         raise ApiError(400, "Remotion 素材目录无效", "file", "重新创建任务后再渲染，不要修改素材目录。")
-    audio_target = directory / "narration.wav"
+    audio_target = directory / ("narration" + audio_path.suffix.lower())
     shutil.copyfile(audio_path, audio_target)
     if srt_path:
         shutil.copyfile(srt_path, directory / "captions.srt")
@@ -2314,7 +2315,7 @@ def prepare_render_assets(task, mode, platform):
             if media_kind:
                 target = directory / "scene-{}{}".format(index, suffix)
                 shutil.copyfile(source_path, target)
-                scene["media"] = {"kind": media_kind, "src": render_media_url(row["id"])}
+                scene["media"] = {"kind": media_kind, "src": target.relative_to(REMOTION_PUBLIC).as_posix()}
                 scene["_local_path"] = str(target)
         scenes.append(scene)
     if mode in ("upload", "mixed"):
@@ -2327,7 +2328,7 @@ def prepare_render_assets(task, mode, platform):
     if mode in ("upload", "mixed") and not any(scene.get("_local_path") for scene in scenes):
         raise ApiError(409, "已授权场景中没有可渲染的视频或图片", "asset_plan",
                        "至少关联一个 MP4/MOV/WebM 视频或 PNG/JPEG/WebP 图片；其他文件请改作授权凭证，或选择全部 Remotion。")
-    props = {"title": render_card_text(task["title"], "企业 AI 落地实战", 42), "audio": render_media_url(audio["id"]),
+    props = {"title": render_card_text(task["title"], "企业 AI 落地实战", 42), "audio": audio_target.relative_to(REMOTION_PUBLIC).as_posix(),
              "presentationMode":"project", "captions": captions, "durationSeconds": duration,
              "scenes": [{key: value for key, value in scene.items() if not key.startswith("_")} for scene in scenes]}
     return build_storyboard(props, task["content_id"]), scenes, duration

@@ -4,6 +4,7 @@ import {createHash} from 'node:crypto';
 import {existsSync} from 'node:fs';
 import {mkdir, readFile, readdir} from 'node:fs/promises';
 import path from 'node:path';
+import net from 'node:net';
 import {isolateRenderBrowser} from './render-isolation.mjs';
 import {prepareRenderAssets} from './render-assets.mjs';
 
@@ -34,7 +35,10 @@ const walk = async directory => {
 
 const sourceFiles = [...await walk(path.join(root, 'src')), ...(entry===path.join(root,'src/index.ts')?[]:await walk(path.dirname(entry))), path.join(root, 'remotion.config.ts'), path.join(root, 'package-lock.json')].sort();
 const hash = createHash('sha256');
-hash.update('selective-assets-v2').update(entry);
+hash.update('selective-assets-v4').update(entry);
+for (const name of ['remotion', '@remotion/renderer', '@remotion/bundler', '@remotion/media']) {
+  hash.update(await readFile(path.join(root, 'node_modules', name, 'package.json')));
+}
 for (const file of sourceFiles) hash.update(file).update(await readFile(file));
 const bundleDir = path.join(root, 'out', 'bundle-cache', hash.digest('hex').slice(0, 20));
 const bundleExists = existsSync(path.join(bundleDir, 'index.html'));
@@ -44,7 +48,7 @@ const serveUrl = bundleExists ? bundleDir : await bundle({
   entryPoint: entry,
   outDir: bundleDir,
   publicDir: emptyPublic,
-  enableCaching: true,
+  enableCaching: false,
   onProgress: progress => console.log(JSON.stringify({stage: 'bundle', progress})),
 });
 
@@ -52,16 +56,21 @@ const serveUrl = bundleExists ? bundleDir : await bundle({
 const props = JSON.parse(await readFile(propsPath, 'utf8'));
 await prepareRenderAssets(root, bundleDir, props);
 
+const port = await new Promise((resolve, reject) => {
+ const server = net.createServer();
+ server.on('error', reject);
+ server.listen(0, '127.0.0.1', () => {const value=server.address().port; server.close(() => resolve(value));});
+});
 const browser = isolateRenderBrowser(await openBrowser('chrome'));
 try {
-const composition = await selectComposition({puppeteerInstance:browser,serveUrl, id: compositionId, inputProps: props, timeoutInMilliseconds: 120000});
+const composition = await selectComposition({port,puppeteerInstance:browser,serveUrl, id: compositionId, inputProps: props, onBrowserLog: log => console.error(JSON.stringify(log)), timeoutInMilliseconds: 120000});
 await mkdir(path.dirname(output), {recursive: true});
 if (output.endsWith('.png')) {
-  await renderStill({puppeteerInstance:browser,composition, serveUrl, output, inputProps: props, frame: Math.min(45, composition.durationInFrames - 1), scale});
+  await renderStill({port,puppeteerInstance:browser,composition, serveUrl, output, inputProps: props, frame: Math.min(45, composition.durationInFrames - 1), scale});
   console.log(JSON.stringify({stage: 'completed', bundle_reused: bundleExists, bundle_dir: bundleDir, output, kind: 'still'}));
 } else {
 await renderMedia({
-  puppeteerInstance:browser,
+  port,puppeteerInstance:browser,
   composition,
   serveUrl,
   timeoutInMilliseconds: 120000,

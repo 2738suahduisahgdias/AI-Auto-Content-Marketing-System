@@ -63,24 +63,12 @@ app=out/'映序工作台.app';contents=app/'Contents';(contents/'MacOS').mkdir(p
 clone(out/'engine/YingxuService',contents/'Resources/engine')
 # A native launcher can be sealed as a Mac application; shell entry points cannot.
 launcher=contents/'MacOS/launcher'
-launcher_source=out/'launcher.c'
-launcher_source.write_text(r'''#include <mach-o/dyld.h>
-#include <limits.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-int main(int argc, char **argv) {
- char raw[PATH_MAX], resolved[PATH_MAX], target[PATH_MAX]; uint32_t size=sizeof(raw);
- if (_NSGetExecutablePath(raw,&size)!=0 || !realpath(raw,resolved)) return 1;
- char *slash=strrchr(resolved,'/'); if (!slash) return 1; *slash=0;
- snprintf(target,sizeof(target),"%s/../Resources/engine/YingxuService",resolved);
- argv[0]=target; execv(target,argv); perror("Yingxu launch"); return 1;
-}
-''')
-subprocess.run(['/usr/bin/clang','-Os',str(launcher_source),'-o',str(launcher)],check=True)
+launcher_source = repo / 'desktop/launcher.m'
+subprocess.run(['/usr/bin/clang', '-fobjc-arc', '-framework', 'Cocoa', '-Os',
+                str(launcher_source), '-o', str(launcher)], check=True)
+shutil.copyfile(repo/'desktop/browser.py', contents/'Resources/open-workbench.py')
 shutil.copyfile(repo/'desktop/assets/Workbench.icns',contents/'Resources/Workbench.icns')
-with (contents/'Info.plist').open('wb') as f:plistlib.dump({'CFBundleExecutable':'launcher','CFBundleIconFile':'Workbench.icns','CFBundleIdentifier':'com.yingxu.workbench','CFBundleName':'映序工作台','CFBundleVersion':'0.1.3.5','CFBundleShortVersionString':'0.1.3.5','NSAppleEventsUsageDescription':'用于找到并唤起已有的 Chrome 工作台标签，避免重复打开页面。','CFBundlePackageType':'APPL','LSMinimumSystemVersion':subprocess.check_output(['sw_vers','-productVersion'],text=True).strip().split('.')[0]+'.0'},f)
+with (contents/'Info.plist').open('wb') as f:plistlib.dump({'CFBundleExecutable':'launcher','CFBundleIconFile':'Workbench.icns','CFBundleIdentifier':'com.yingxu.workbench','CFBundleName':'映序工作台','CFBundleVersion':'0.1.3.6','CFBundleShortVersionString':'0.1.3.6','NSAppleEventsUsageDescription':'用于找到并唤起已有的 Chrome 工作台标签，避免重复打开页面。','CFBundlePackageType':'APPL','LSMinimumSystemVersion':subprocess.check_output(['sw_vers','-productVersion'],text=True).strip().split('.')[0]+'.0'},f)
 subprocess.run(['codesign','--force','--deep','--sign','-',str(app)],check=True)
 volume=out/'volume';volume.mkdir(exist_ok=True)
 clone(app,volume/app.name)

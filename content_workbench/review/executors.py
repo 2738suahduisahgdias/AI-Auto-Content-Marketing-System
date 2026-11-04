@@ -82,8 +82,8 @@ class ReviewExecutors:
         prompt = json.dumps({"operation": "短视频风险证据分析，逐条返回结果，不得声称看到了未提供的画面或事实",
                              "items": items, "agent_supplement": config["prompt"]}, ensure_ascii=False)
         agent = PROJECT_ROOT / "agents/video-review-agent.md"
-        from content_workbench.providers.text import CodexCLIProvider, KimiCLIProvider
-        provider = KimiCLIProvider(self.root) if config["engine"] == "kimi_cli" else CodexCLIProvider()
+        from content_workbench.providers.system import provider_for
+        provider = provider_for(self.root, config["engine"])
         payload = provider.complete_json(prompt, context, agent, timeout=config["timeout_seconds"], stage=config["engine"] + "_video_review")
         try:
             risks = payload["items"]

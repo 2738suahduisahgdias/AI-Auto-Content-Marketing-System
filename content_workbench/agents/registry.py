@@ -22,6 +22,10 @@ AGENTS = {
     "video_review_agent": {"name": "短视频审核Agent", "description": "批量技术预审与风险证据整理", "engines": ["codex_cli", "kimi_cli"], "engine": "codex_cli", "model": "default_unpinned", "timeout": 600, "attempts": 2, "concurrency": 1, "prompt": True, "connected": True},
     "schedule_agent": {"name": "发布调度Agent", "description": "批量定时、间隔与发布队列管理", "engines": ["scheduler"], "engine": "scheduler", "model": "interval_queue", "timeout": 60, "attempts": 3, "concurrency": 1, "prompt": False, "connected": True},
 }
+for definition in AGENTS.values():
+    if "codex_cli" in definition["engines"]:
+        definition["engines"] = ["system", *definition["engines"], "model_api"]
+
 DEFAULT_PROMPTS = {
     "industry_topic_agent": "优先真实业务、流程改造、验收和可复用方法。",
     "douyin_topic_agent": "热点只作场景，优先差异化、真实证据和账号定位。",
@@ -49,6 +53,14 @@ def agent_config(db_path, agent_id):
         row = conn.execute("SELECT value FROM settings WHERE key='agent_configs'").fetchone()
     stored = loads(row[0], {}) if row else {}
     config = {**default_config(agent_id), **stored.get(agent_id, {})}
+    if "system" in AGENTS[agent_id]["engines"]:
+        saved = stored.get(agent_id, {})
+        # Existing explicit configurations are preserved until the user selects follow-system.
+        follows = saved.get("follow_system", saved.get("engine", "codex_cli") == "codex_cli" and saved.get("model", "default_unpinned") == "default_unpinned")
+        config["follow_system"] = follows
+        if follows:
+            from content_workbench.providers.system import model_settings
+            config["engine"] = model_settings(db_path).get("engine", "codex_cli")
     definition = AGENTS[agent_id]
     if config["engine"] not in definition["engines"]:
         config["engine"] = definition["engine"]
@@ -71,6 +83,11 @@ def save_agent_config(db_path, agent_id, values):
         for key in ("enabled", "engine", "model", "prompt", "timeout_seconds", "max_attempts", "concurrency", "custom"):
             if key in values:
                 updated[key] = values[key]
+        if "system" in definition["engines"] and "engine" in values:
+            updated["follow_system"] = values["engine"] == "system"
+            if updated["follow_system"]:
+                from content_workbench.providers.system import model_settings
+                updated["engine"] = model_settings(db_path).get("engine", "codex_cli")
         if updated["engine"] not in definition["engines"]:
             raise DomainError("INVALID_AGENT_ENGINE", "该 Agent 不支持这个执行引擎", 422, "engine", "从页面提供的引擎列表选择")
         if updated["enabled"] and not definition["connected"]:
