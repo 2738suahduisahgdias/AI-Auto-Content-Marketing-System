@@ -305,6 +305,30 @@ class EnrichTest(unittest.TestCase):
             browser.assert_not_called()
             service.cache_cover.assert_called_once_with("item-1")
 
+    def test_unexpected_cover_error_is_not_silently_ignored(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="enrich-test-") as directory:
+            service = mock.Mock()
+            service.cache_cover.side_effect = ValueError("unexpected")
+            service.get_item.return_value = {
+                "url": "https://example.com/video/1",
+                "metadata": {
+                    "cover_url": "https://example.com/cover.jpg",
+                    "author_name": "真实作者",
+                    "author_followers": "1.2万",
+                    "like_count": "3456",
+                    "comment_count": "789",
+                },
+            }
+            executor = TopicExecutors.__new__(TopicExecutors)
+            executor.service = service
+            executor.root = Path(directory)
+            with (
+                mock.patch.object(executor, "browser") as browser,
+                self.assertRaisesRegex(ValueError, "unexpected"),
+            ):
+                executor.enrich("item-1", mock.Mock())
+            browser.assert_not_called()
+
     def test_cached_cover_does_not_skip_missing_author_and_engagement(self) -> None:
         with tempfile.TemporaryDirectory(prefix="enrich-test-") as directory:
             service = mock.Mock()

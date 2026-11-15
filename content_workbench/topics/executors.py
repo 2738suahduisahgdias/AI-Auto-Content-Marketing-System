@@ -149,7 +149,7 @@ class TopicExecutors:
             if details_complete and self.service.cache_cover(item_id):
                 self.service.update_metadata(item_id, {"cover_error": ""})
                 return self.service.get_item(item_id)["metadata"]
-        except Exception:
+        except OSError:
             pass
         result = self.browser(
             context,

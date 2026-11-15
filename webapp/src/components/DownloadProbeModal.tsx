@@ -1,6 +1,7 @@
 import { Badge, Busy, Button, Empty, ErrorBox, Modal } from "@/components/ui";
-const activeJobStatuses = ["queued", "leased", "running", "retry_wait"];
 import type { Job, Json, TopicItem } from "@/lib/types";
+
+const activeJobStatuses = ["queued", "leased", "running", "retry_wait"];
 
 export default function DownloadProbeModal({ item, jobs, busy, onChoose, onClose }: { item: TopicItem; jobs: Job[]; busy: boolean; onChoose: (mode: string) => void; onClose: () => void }) {
   const job = jobs.find(candidate => candidate.kind === "research.probe" && (candidate as Json).aggregate_id === item.id);

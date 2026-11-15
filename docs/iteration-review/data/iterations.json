@@ -416,14 +416,19 @@
       "POST /transcript 提交 project.transcript 后台任务，GET /transcript-jobs/:id 返回真实状态。",
       "small/base 按模型复用常驻 faster-whisper worker，避免每次重新初始化。",
       "开始识别立即上报 8% 起点，之后按真实分段推进；页面显示阶段、百分比和已用秒数。",
-      "沿用原项目、文件和 snapshot，不覆盖旧字幕或业务数据。"
+      "沿用原项目、文件和 snapshot，不覆盖旧字幕或业务数据。",
+      "构建排除 AppleDouble 元数据；桌面服务关闭时也清理复用的 Whisper worker。"
     ],
     "verification": [
       "8765 项目 20261115-001 使用 17.85 秒真人中文语音；复用后两次任务耗时 12.450 秒和 6.997 秒。",
       "后台实测出现 model_loading、transcribing 8% 和 succeeded；页面显示转写中 8%、已用 4 秒。",
       "连续任务复用 worker PID 54422；证据 evidence/transcript-progress.png。",
       "Python 相关 10 项、React 相关 15 项、生产构建、相关 Ruff 和语法检查通过。",
-      "最终 Python 相关 12 项、React 相关 15 项、生产构建、相关 Ruff 和语法检查通过；真实 worker 55503 调用 stop() 后返回码 0。"
+      "最终 Python 相关 12 项、React 相关 15 项、生产构建、相关 Ruff 和语法检查通过；真实 worker 55503 调用 stop() 后返回码 0。",
+      "完整后端在 Python 3.12 + OpenSSL 3 下 434 项通过、1 项跳过；完整前端并行轮次 124 项通过、1 项高负载超时，单 worker 复验 44 个文件、125 项全部通过；worker 覆盖率 91%。",
+      "最终精简 DMG 的原生窗口完成真实转写 job_5011282586ed4cffb913，66 个词/片段；模型就绪后转写约 10 秒。",
+      "精简版主服务 66954 与 worker 67213 均退出，运行后签名有效；DMG VALID，SHA-256 ff9f5acfbea9ddf1d4cf6dd2f8876069249cf0a55f0f40a335538ba2f49a5c0e。",
+      "桌面入口、构建元数据及转写相关 27 项测试通过。"
     ],
     "unverified": [
       "长音频、大量并发、其他硬件性能和安装版覆盖升级未验证。",
@@ -439,34 +444,44 @@
       "tests/test_project_transcript.py",
       "webapp/src/pages/videoProjects/VideoProjects.test.tsx",
       "docs/acceptance/transcript-progress.png",
-      "iterations/2026-11-15-transcript-progress.md"
+      "iterations/2026-11-15-transcript-progress.md",
+      "desktop/entry.py",
+      "desktop/build.py",
+      "desktop/runtime_bundle.py",
+      "tests/test_desktop_entry.py",
+      "tests/test_desktop_runtime_refresh.py",
+      "docs/acceptance/transcript-slim-native.jpg",
+      "docs/acceptance/transcript-real-results.json"
     ]
   },
   {
     "id": "2026-11-16-xiaohongshu-download-acceptance",
     "date": "2026-11-16",
     "title": "小红书真实视频与图文下载验收",
-    "summary": "修复 Python 3.9 兼容和探测终态丢失，使用固定 Chrome 读取实际媒体并完成一个真实视频与一组真实图文的下载、路径和系统操作验收。",
+    "summary": "修复 Python 3.9 兼容和探测终态丢失，使用固定 Chrome 读取实际媒体并完成一个真实视频与一组真实图文的下载、路径和系统操作验收。\n\n补充：补充收尾自检：封面缓存只忽略预期的系统或网络异常，未知错误保留并新增回归测试。",
     "changes": [
       "P06-C10-F01/F02 命令行无公开结果时由 Kimi CLI 在固定 Chrome 读取同作品实际媒体；不导出 Cookie，未知档位字段留空。",
       "P06-C10-F04 TopicService.bootstrap.jobs 补入 research.probe，成功和失败终态均能到达下载弹窗。",
       "修复 xiaohongshu_download.py 在 Python 3.9 导入时的类型标注错误，并修复下载 Skill 对 null 探测结果的异常。",
       "P06-C05-F02/F03 视频显示真实路径、大小和时长；图文显示全部文件数、整组大小和目录，复制地址与打开文件夹已实际操作。",
       "保留 26 个页面单元、316 条功能说明及全部并行版本，新增独立验收记录，不改写历史。",
-      "功能文档迭代深链接只显示目标记录，返回迭代记录时恢复全部历史；Obsidian 与仓库 HTML 均已实际操作验证。"
+      "功能文档迭代深链接只显示目标记录，返回迭代记录时恢复全部历史；Obsidian 与仓库 HTML 均已实际操作验证。",
+      "P06 收尾自检将封面缓存异常忽略范围收窄到 OSError，未知错误不再被吞掉；整理下载弹窗导入顺序。"
     ],
     "verification": [
       "精选视频 job_a362718caf414e8fb9bf 下载成功：31.881066 秒、1080×1920、15,972,890 字节，FFprobe 与本地读取通过。",
       "高赞图文 job_ae14e24ebe124597b53e 下载成功：9 张 1080×1440 WebP，合计 1,141,506 字节，逐张 Pillow 校验通过。",
       "视频和图文的复制地址均与系统剪贴板一致，打开所在文件夹调用成功；截图 evidence/xiaohongshu-video-download.png 与 evidence/xiaohongshu-image-set-download.png。",
       "Python 3.9 小红书测试 7 项通过；指定 OpenSSL 环境下完整后端 429 项通过、1 项跳过。",
-      "小红书页面 6 项测试、下载弹窗 2 项测试、相关 ESLint 和生产构建通过；前端全量单轮 126/127，Tasks 单独复测通过，不宣称单轮全绿。"
+      "小红书页面 6 项测试、下载弹窗 2 项测试、相关 ESLint 和生产构建通过；前端全量单轮 126/127，Tasks 单独复测通过，不宣称单轮全绿。",
+      "新增未知封面异常不可静默忽略的回归测试；相关后端 19 项、下载弹窗前端 2 项测试及 Ruff、ESLint 通过。"
     ],
     "unverified": [
       "只实际验收兼容优先，画质优先和速度优先未执行真实下载。",
       "竞对收藏夹真实为空，没有竞对作品可执行下载验收。",
       "未重新打包 DMG；安装版、干净客户机器、Windows 和 Apple Silicon 未验证。",
-      "全量前端 ESLint 既有 319 errors、18 warnings，未在本次大范围处理；未执行公开发布。"
+      "全量前端 ESLint 既有 319 errors、18 warnings，未在本次大范围处理；未执行公开发布。",
+      "Git 本地提交 34daa58 已完成；推送时本机无法解析 github.com，未形成远端同步。"
     ],
     "files": [
       "agents/xiaohongshu-download-agent.md",
@@ -479,7 +494,10 @@
       "docs/CHECKS.md",
       "evidence/xiaohongshu-video-download.png",
       "evidence/xiaohongshu-image-set-download.png",
-      "iterations/2026-11-16-xiaohongshu-download-acceptance.md"
+      "iterations/2026-11-16-xiaohongshu-download-acceptance.md",
+      "content_workbench/topics/executors.py",
+      "tests/test_kimi_browser_collection.py",
+      "webapp/src/components/DownloadProbeModal.tsx"
     ]
   }
 ]
