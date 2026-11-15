@@ -1,0 +1,5465 @@
+{
+  "title": "映序逐页功能评审与迭代记录",
+  "baseline": "2026-11-11",
+  "scope": "当前新版主要路由、旧视频编辑器与旧版入口；未挂载的历史组件不计为当前页面。",
+  "pages": [
+    {
+      "id": "global",
+      "order": 1,
+      "title": "全局导航与数据层",
+      "route": "全部新版页面",
+      "purpose": "理解整套工作台的导航、数据加载和精简资源准备",
+      "dependencies": "本地服务与授权状态；精简版另需下载资源",
+      "screenshot": "assets/screenshots/today.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "侧栏与移动导航",
+          "task": "切换真实路由；展开只改变菜单；旧版进入 `/legacy`"
+        },
+        {
+          "order": 2,
+          "card": "全局数据层",
+          "task": "聚合各模块真实数据，失败显示错误，不以空数据冒充成功"
+        },
+        {
+          "order": 3,
+          "card": "精简资源下载卡",
+          "task": "下载九组运行资源；运行中不可关闭提示"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P01-C01",
+          "title": "侧栏与移动导航",
+          "rows": [
+            {
+              "element": "页面导航、选题／视频／设置展开按钮、旧版入口",
+              "description": "切换真实路由；展开只改变菜单；旧版进入 `/legacy`",
+              "technology": "React Router `BrowserRouter(basename=/demo)`；`App.tsx` 懒加载；`AppShell.tsx` 共享导航",
+              "id": "P01-C01-F01"
+            }
+          ]
+        },
+        {
+          "id": "P01-C02",
+          "title": "全局数据层",
+          "rows": [
+            {
+              "element": "页面数据刷新、加载与错误提示",
+              "description": "聚合各模块真实数据，失败显示错误，不以空数据冒充成功",
+              "technology": "`AppContext.tsx` 并发请求 core/topics/agents/accounts/articles/knowledge；`api.ts` 处理 CSRF、会话恢复和错误",
+              "id": "P01-C02-F01"
+            }
+          ]
+        },
+        {
+          "id": "P01-C03",
+          "title": "精简资源下载卡",
+          "rows": [
+            {
+              "element": "下载全部、失败重试、稍后再下载",
+              "description": "下载九组运行资源；运行中不可关闭提示",
+              "technology": "`/api/slim-dependencies`；`desktop/slim_download.py`；资源写入工作区 `tools/cache/runtime`，不写回签名 APP",
+              "id": "P01-C03-F01"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "本地服务与授权状态；精简版另需下载资源"
+        }
+      ],
+      "checklist": [
+        "核对“侧栏与移动导航”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“全局数据层”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“精简资源下载卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "Today.tsx、AppShell.tsx、WorkOverview.tsx"
+        ],
+        [
+          "接口",
+          "/api/topics/recommend、/api/v2/work-overview、/api/tasks"
+        ],
+        [
+          "数据",
+          "tasks、wb_content_items、review_items、publish_targets、增长记忆"
+        ]
+      ]
+    },
+    {
+      "id": "today",
+      "order": 2,
+      "title": "今天",
+      "route": "/demo/",
+      "purpose": "生成并选择今日推荐，继续文章、视频、审核和发布准备",
+      "dependencies": "推荐生成需要真实来源和模型；其他区域只读汇总",
+      "screenshot": "assets/screenshots/today.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "今日推荐卡",
+          "task": "后台结合真实来源和增长记忆生成跨平台推荐；活动任务防重复"
+        },
+        {
+          "order": 2,
+          "card": "待继续创作·文章",
+          "task": "继续编辑、审核或交给发布 Agent"
+        },
+        {
+          "order": 3,
+          "card": "待继续创作·视频",
+          "task": "继续制作；交付过期或已送审时提示对应下一步"
+        },
+        {
+          "order": 4,
+          "card": "待审核卡",
+          "task": "查看技术预审和人工审核"
+        },
+        {
+          "order": 5,
+          "card": "待同步到平台卡",
+          "task": "打开发布工作区检查字段与状态"
+        },
+        {
+          "order": 6,
+          "card": "候选选题卡",
+          "task": "展开全部候选；从原候选创建视频任务"
+        },
+        {
+          "order": 7,
+          "card": "空状态与错误区",
+          "task": "无快照时先采集；模型失败保留已有推荐"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P02-C01",
+          "title": "今日推荐卡",
+          "rows": [
+            {
+              "element": "“生成今日推荐”",
+              "description": "后台结合真实来源和增长记忆生成跨平台推荐；活动任务防重复",
+              "technology": "POST `/api/topics/recommend {agent:all}` → `wb_jobs` → `TopicExecutors.recommend` → 配置的 Kimi/Codex/API 与 `KnowledgeService`",
+              "id": "P02-C01-F01"
+            },
+            {
+              "element": "推荐条目、理由与证据切换",
+              "description": "切换当前推荐，显示对应证据，不创建任务",
+              "technology": "React 本地选择状态；推荐和证据来自 `TopicService.bootstrap`",
+              "id": "P02-C01-F02"
+            },
+            {
+              "element": "“制作视频／打开视频任务”",
+              "description": "创建或继续视频项目，保留推荐依据",
+              "technology": "POST `/api/topics/candidates/:id/create-task`；旧 `tasks` 项目与 `source_json` 来源关联",
+              "id": "P02-C01-F03"
+            },
+            {
+              "element": "“写文章／改做视频”",
+              "description": "创建文章或把文章型推荐转为视频",
+              "technology": "POST `/api/articles` 或候选 create-task；文章使用 `wb_campaigns/wb_content_items`，视频使用 `tasks`",
+              "id": "P02-C01-F04"
+            }
+          ]
+        },
+        {
+          "id": "P02-C02",
+          "title": "待继续创作·文章",
+          "rows": [
+            {
+              "element": "文章条目与继续按钮",
+              "description": "继续编辑、审核或交给发布 Agent",
+              "technology": "GET `/api/v2/work-overview`；`overview.py` 只读查询 `wb_content_items/wb_campaigns` 并生成原路由",
+              "id": "P02-C02-F01"
+            }
+          ]
+        },
+        {
+          "id": "P02-C03",
+          "title": "待继续创作·视频",
+          "rows": [
+            {
+              "element": "视频条目与继续按钮",
+              "description": "继续制作；交付过期或已送审时提示对应下一步",
+              "technology": "同上，只读查询 `tasks.source_json.yingxu_handoff`；链接到项目或审核批次",
+              "id": "P02-C03-F01"
+            }
+          ]
+        },
+        {
+          "id": "P02-C04",
+          "title": "待审核卡",
+          "rows": [
+            {
+              "element": "审核条目",
+              "description": "查看技术预审和人工审核",
+              "technology": "`overview.py` 查询 `review_items`，链接 `review_batches`；不改审核状态",
+              "id": "P02-C04-F01"
+            }
+          ]
+        },
+        {
+          "id": "P02-C05",
+          "title": "待同步到平台卡",
+          "rows": [
+            {
+              "element": "发布条目",
+              "description": "打开发布工作区检查字段与状态",
+              "technology": "`overview.py` 联查 `publish_targets/publish_batches`；状态不是公开结果",
+              "id": "P02-C05-F01"
+            }
+          ]
+        },
+        {
+          "id": "P02-C06",
+          "title": "候选选题卡",
+          "rows": [
+            {
+              "element": "“查看历史／开始创作”",
+              "description": "展开全部候选；从原候选创建视频任务",
+              "technology": "React 本地展开；POST `/api/tasks {topic_id}` 写入 `tasks`，保留原候选关联",
+              "id": "P02-C06-F01"
+            }
+          ]
+        },
+        {
+          "id": "P02-C07",
+          "title": "空状态与错误区",
+          "rows": [
+            {
+              "element": "去选题中心、失败原因和重试提示",
+              "description": "无快照时先采集；模型失败保留已有推荐",
+              "technology": "`TopicService` 真实快照和 `wb_jobs.error_json`；不生成演示推荐",
+              "id": "P02-C07-F01"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "推荐生成需要真实来源和模型；其他区域只读汇总"
+        }
+      ],
+      "checklist": [
+        "核对“今日推荐卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“待继续创作·文章”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“待继续创作·视频”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“待审核卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“待同步到平台卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“候选选题卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“空状态与错误区”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "Today.tsx、AppShell.tsx、WorkOverview.tsx"
+        ],
+        [
+          "接口",
+          "/api/topics/recommend、/api/v2/work-overview、/api/tasks"
+        ],
+        [
+          "数据",
+          "tasks、wb_content_items、review_items、publish_targets、增长记忆"
+        ]
+      ]
+    },
+    {
+      "id": "industry",
+      "order": 3,
+      "title": "行业热点",
+      "route": "/demo/topics/industry",
+      "purpose": "同步公开行业资讯，收藏推荐并转为文章或视频",
+      "dependencies": "网络与公开资讯来源；推荐生成需要模型",
+      "screenshot": "assets/screenshots/industry.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "页头操作区",
+          "task": "获取公开行业资讯并形成研究快照"
+        },
+        {
+          "order": 2,
+          "card": "行业资讯快照卡",
+          "task": "打开真实资讯、保存候选或归档"
+        },
+        {
+          "order": 3,
+          "card": "推荐卡",
+          "task": "按推荐格式创建对应任务"
+        },
+        {
+          "order": 4,
+          "card": "作品卡",
+          "task": "打开真实作品来源"
+        },
+        {
+          "order": 5,
+          "card": "同步记录抽屉",
+          "task": "查看部分成功与失败原因，手动重试"
+        },
+        {
+          "order": 6,
+          "card": "直接创建视频任务弹窗",
+          "task": "输入选题并直接进入文案；标题必填且最多 200 字"
+        },
+        {
+          "order": 7,
+          "card": "研究详情弹窗",
+          "task": "读取当前真实条目并导出下载 JSON，不伪造成拆解报告"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P03-C01",
+          "title": "页头操作区",
+          "rows": [
+            {
+              "element": "“同步内容”",
+              "description": "获取公开行业资讯并形成研究快照",
+              "technology": "POST `/api/topics/industry` → `TopicExecutors.industry` → `industry_connector.fetch_industry`；结果写入 TopicService 快照",
+              "id": "P03-C01-F01"
+            }
+          ]
+        },
+        {
+          "id": "P03-C02",
+          "title": "行业资讯快照卡",
+          "rows": [
+            {
+              "element": "原链接、转选题、归档",
+              "description": "打开真实资讯、保存候选或归档",
+              "technology": "`TopicService.upsert_item/save_candidates/archive`；SQLite 研究条目和候选，不用静态示例",
+              "id": "P03-C02-F01"
+            }
+          ]
+        },
+        {
+          "id": "P03-C03",
+          "title": "推荐卡",
+          "rows": [
+            {
+              "element": "写文章、制作视频、改做视频",
+              "description": "按推荐格式创建对应任务",
+              "technology": "`/api/articles` 或 `/api/tasks`；保留 evidence_ids 和推荐依据",
+              "id": "P03-C03-F01"
+            }
+          ]
+        },
+        {
+          "id": "P03-C04",
+          "title": "作品卡",
+          "rows": [
+            {
+              "element": "原链接",
+              "description": "打开真实作品来源",
+              "technology": "卡片 `canonical_url`；浏览器新标签，不经过模拟详情页",
+              "id": "P03-C04-F01"
+            },
+            {
+              "element": "“转为选题／创建任务”",
+              "description": "收藏候选或创建视频任务",
+              "technology": "`/api/topics/items/:id` 或 `/create-task`；`TopicService` + `tasks.source_json`",
+              "id": "P03-C04-F02"
+            },
+            {
+              "element": "“归档／恢复”",
+              "description": "改变条目归档状态，不删除来源",
+              "technology": "POST `/api/topics/items/:id/archive`；SQLite 保留原始快照",
+              "id": "P03-C04-F03"
+            }
+          ]
+        },
+        {
+          "id": "P03-C05",
+          "title": "同步记录抽屉",
+          "rows": [
+            {
+              "element": "任务状态、错误详情、重试同步",
+              "description": "查看部分成功与失败原因，手动重试",
+              "technology": "`wb_jobs`、执行日志与对应 sync API；旧有效快照不被空结果覆盖",
+              "id": "P03-C05-F01"
+            }
+          ]
+        },
+        {
+          "id": "P03-C06",
+          "title": "直接创建视频任务弹窗",
+          "rows": [
+            {
+              "element": "标题、支柱、人群、痛点、收藏夹、内容切入",
+              "description": "输入选题并直接进入文案；标题必填且最多 200 字",
+              "technology": "POST `/api/tasks`；`tasks` 与 `source_json` 保存分类和来源",
+              "id": "P03-C06-F01"
+            }
+          ]
+        },
+        {
+          "id": "P03-C07",
+          "title": "研究详情弹窗",
+          "rows": [
+            {
+              "element": "刷新详情、导出下载信息",
+              "description": "读取当前真实条目并导出下载 JSON，不伪造成拆解报告",
+              "technology": "GET `/api/topics/items/:id`；本地下载当前详情",
+              "id": "P03-C07-F01"
+            },
+            {
+              "element": "本地素材、完整路径、文件大小和资产索引",
+              "description": "已下载时显示真实视频或全部图文文件信息，未下载时显示真实状态",
+              "technology": "`DownloadDetail`；`metadata.download_status/download_path/download_media_kind`",
+              "id": "P03-C07-F02"
+            },
+            {
+              "element": "打开所在文件夹、复制本地地址",
+              "description": "调用系统文件管理器或剪贴板处理已下载路径",
+              "technology": "POST `/download/reveal`、`/download/copy`；没有真实文件时不显示成功状态",
+              "id": "P03-C07-F03"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "网络与公开资讯来源；推荐生成需要模型"
+        }
+      ],
+      "checklist": [
+        "核对“页头操作区”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“行业资讯快照卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“推荐卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“作品卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“同步记录抽屉”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“直接创建视频任务弹窗”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“研究详情弹窗”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "Topics.tsx、TopicCard.tsx、WechatInbox.tsx"
+        ],
+        [
+          "服务",
+          "TopicService、TopicExecutors、WechatInboxService、专用 Chrome"
+        ],
+        [
+          "数据",
+          "研究快照、候选、tasks.source_json、wb_jobs、本地媒体资产"
+        ]
+      ]
+    },
+    {
+      "id": "douyin",
+      "order": 4,
+      "title": "抖音选题",
+      "route": "/demo/topics/douyin",
+      "purpose": "同步抖音热点与个人收藏，拆解视频并转成内容任务",
+      "dependencies": "专用 Chrome、本人抖音登录、收藏夹名称；下载与模型按需",
+      "screenshot": "assets/screenshots/douyin.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "页头操作区",
+          "task": "先核对登录；未登录时等待本人操作最多 5 分钟，再同步热点及个人收藏，活动任务复用"
+        },
+        {
+          "order": 2,
+          "card": "来源标签卡",
+          "task": "切换不同收藏来源，热点显示实际数量"
+        },
+        {
+          "order": 3,
+          "card": "采集与自动化抽屉",
+          "task": "设置检索与推荐补充规则；必填，单项最长 12000 字符"
+        },
+        {
+          "order": 4,
+          "card": "作品卡",
+          "task": "打开真实作品来源"
+        },
+        {
+          "order": 5,
+          "card": "媒体研究区",
+          "task": "由 Kimi CLI 下载真实视频并保存本地地址，不执行拆解"
+        },
+        {
+          "order": 6,
+          "card": "作者与互动数据区",
+          "task": "打开真实作品页补齐作者与互动信息；读不到时保留未读取，不猜数字"
+        },
+        {
+          "order": 7,
+          "card": "同步记录抽屉",
+          "task": "查看部分成功与失败原因，手动重试"
+        },
+        {
+          "order": 8,
+          "card": "直接创建视频任务弹窗",
+          "task": "输入选题并直接进入文案；标题必填且最多 200 字"
+        },
+        {
+          "order": 9,
+          "card": "研究详情弹窗",
+          "task": "读取当前真实条目并导出下载 JSON，不伪造成拆解报告"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P04-C01",
+          "title": "页头操作区",
+          "rows": [
+            {
+              "element": "“同步内容”",
+              "description": "先核对登录；未登录时等待本人操作最多 5 分钟，再同步热点及个人收藏，活动任务复用",
+              "technology": "POST `/api/topics/sync` → `wb_jobs` → `TopicExecutors.sync` → `KimiBrowserCollector` → Kimi CLI／`douyin-collection-agent` 通过 `chrome-persistent` 操作固定 Chrome",
+              "id": "P04-C01-F01"
+            }
+          ]
+        },
+        {
+          "id": "P04-C02",
+          "title": "来源标签卡",
+          "rows": [
+            {
+              "element": "热点、精选、竞对、高赞",
+              "description": "切换不同收藏来源，热点显示实际数量",
+              "technology": "`TopicService.bootstrap` 读取分类快照；本地 `douyinView` 状态",
+              "id": "P04-C02-F01"
+            }
+          ]
+        },
+        {
+          "id": "P04-C03",
+          "title": "采集与自动化抽屉",
+          "rows": [
+            {
+              "element": "行业范围、三类 Agent 提示词",
+              "description": "设置检索与推荐补充规则；必填，单项最长 12000 字符",
+              "technology": "POST `/api/topics/settings` → `TopicService.save_settings`；SQLite `settings`，裁剪到 12000 并校验非空",
+              "id": "P04-C03-F01"
+            },
+            {
+              "element": "精选／竞对／高赞收藏夹",
+              "description": "保存与本人账号一致的收藏夹名称",
+              "technology": "同上；执行时 `KimiBrowserCollector.collect` 通过 Kimi CLI 在真实页面定位收藏夹",
+              "id": "P04-C03-F02"
+            },
+            {
+              "element": "每日时间、启用每日任务",
+              "description": "设置 `HH:MM` 定时采集并保存",
+              "technology": "`TopicService.save_settings` 校验 00～23 时、00～59 分；`topics/scheduler.configure_schedule`",
+              "id": "P04-C03-F03"
+            },
+            {
+              "element": "“连接抖音采集窗口”",
+              "description": "已登录时直接确认；未登录时在同一固定窗口等待本人操作，最长 5 分钟，超时保留页面与旧数据",
+              "technology": "POST `/api/topics/browser/open` → `topics.login` → `KimiBrowserCollector.ensure_login(300)`；Kimi CLI 通过 `chrome-persistent` 核对真实页面，不读取或导出 Cookie",
+              "id": "P04-C03-F04"
+            }
+          ]
+        },
+        {
+          "id": "P04-C04",
+          "title": "作品卡",
+          "rows": [
+            {
+              "element": "原链接",
+              "description": "打开真实作品来源",
+              "technology": "卡片 `canonical_url`；浏览器新标签，不经过模拟详情页",
+              "id": "P04-C04-F01"
+            },
+            {
+              "element": "“转为选题／创建任务”",
+              "description": "收藏候选或创建视频任务",
+              "technology": "`/api/topics/items/:id` 或 `/create-task`；`TopicService` + `tasks.source_json`",
+              "id": "P04-C04-F02"
+            },
+            {
+              "element": "“归档／恢复”",
+              "description": "改变条目归档状态，不删除来源",
+              "technology": "POST `/api/topics/items/:id/archive`；SQLite 保留原始快照",
+              "id": "P04-C04-F03"
+            }
+          ]
+        },
+        {
+          "id": "P04-C05",
+          "title": "媒体研究区",
+          "rows": [
+            {
+              "element": "“下载视频／重新下载”",
+              "description": "由 Kimi CLI 下载真实视频并保存本地地址，不执行拆解",
+              "technology": "POST `/api/topics/items/:id/analyze` → `research.analyze` → `douyin_download`；真实文件写入本地资产库",
+              "id": "P04-C05-F01"
+            },
+            {
+              "element": "“详情／查看下载”",
+              "description": "查看真实下载文件、大小和本地地址",
+              "technology": "GET `/api/topics/items/:id`；`DownloadDetail` 与 `wb_assets`",
+              "id": "P04-C05-F02"
+            },
+            {
+              "element": "“重新获取封面”",
+              "description": "重试封面读取和本地缓存",
+              "technology": "POST `/api/topics/items/:id/cover/retry`；`TopicExecutors.retry_cover/cache_cover`",
+              "id": "P04-C05-F03"
+            }
+          ]
+        },
+        {
+          "id": "P04-C06",
+          "title": "作者与互动数据区",
+          "rows": [
+            {
+              "element": "作者名称、作者粉丝数、点赞数、评论数",
+              "description": "打开真实作品页补齐作者与互动信息；读不到时保留未读取，不猜数字",
+              "technology": "`TopicExecutors.enrich` → `KimiBrowserCollector.collect(\"details\")` → Kimi CLI 读取作品页与作者页；规范化顶层或条目内 `details` 后写入 `wb_research_items.metadata`",
+              "id": "P04-C06-F01"
+            }
+          ]
+        },
+        {
+          "id": "P04-C07",
+          "title": "同步记录抽屉",
+          "rows": [
+            {
+              "element": "任务状态、错误详情、重试同步",
+              "description": "查看部分成功与失败原因，手动重试",
+              "technology": "`wb_jobs`、执行日志与对应 sync API；旧有效快照不被空结果覆盖",
+              "id": "P04-C07-F01"
+            }
+          ]
+        },
+        {
+          "id": "P04-C08",
+          "title": "直接创建视频任务弹窗",
+          "rows": [
+            {
+              "element": "标题、支柱、人群、痛点、收藏夹、内容切入",
+              "description": "输入选题并直接进入文案；标题必填且最多 200 字",
+              "technology": "POST `/api/tasks`；`tasks` 与 `source_json` 保存分类和来源",
+              "id": "P04-C08-F01"
+            }
+          ]
+        },
+        {
+          "id": "P04-C09",
+          "title": "研究详情弹窗",
+          "rows": [
+            {
+              "element": "刷新详情、导出下载信息",
+              "description": "读取当前真实条目并导出下载 JSON，不伪造成拆解报告",
+              "technology": "GET `/api/topics/items/:id`；本地下载当前详情",
+              "id": "P04-C09-F01"
+            },
+            {
+              "element": "本地素材、完整路径、文件大小和资产索引",
+              "description": "已下载时显示真实视频或全部图文文件信息，未下载时显示真实状态",
+              "technology": "`DownloadDetail`；`metadata.download_status/download_path/download_media_kind`",
+              "id": "P04-C09-F02"
+            },
+            {
+              "element": "打开所在文件夹、复制本地地址",
+              "description": "调用系统文件管理器或剪贴板处理已下载路径",
+              "technology": "POST `/download/reveal`、`/download/copy`；没有真实文件时不显示成功状态",
+              "id": "P04-C09-F03"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "专用 Chrome、本人抖音登录、收藏夹名称；下载与模型按需"
+        }
+      ],
+      "checklist": [
+        "核对“页头操作区”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“来源标签卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“采集与自动化抽屉”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“作品卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“媒体研究区”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“作者与互动数据区”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“同步记录抽屉”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“直接创建视频任务弹窗”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“研究详情弹窗”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "Topics.tsx、TopicCard.tsx、WechatInbox.tsx"
+        ],
+        [
+          "服务",
+          "TopicService、TopicExecutors、WechatInboxService、专用 Chrome"
+        ],
+        [
+          "数据",
+          "研究快照、候选、tasks.source_json、wb_jobs、本地媒体资产"
+        ]
+      ]
+    },
+    {
+      "id": "wechat",
+      "order": 5,
+      "title": "微信选题",
+      "route": "/demo/topics/wechat",
+      "purpose": "保存和整理微信消息，生成研究快照并转内容任务",
+      "dependencies": "微信 Bot 或手动记录；公开链接解析受目标页面限制",
+      "screenshot": "assets/screenshots/wechat.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "分类标签卡",
+          "task": "筛选消息并显示分类数量"
+        },
+        {
+          "order": 2,
+          "card": "手动记录弹窗",
+          "task": "保存一条待分类消息；正文必填最多 12000 字"
+        },
+        {
+          "order": 3,
+          "card": "消息卡",
+          "task": "修改后台标题、备注、分类；原文只读"
+        },
+        {
+          "order": 4,
+          "card": "微信 Bot 连接卡",
+          "task": "获取真实二维码并供本人扫码"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P05-C01",
+          "title": "分类标签卡",
+          "rows": [
+            {
+              "element": "待分类、精选、竞对、高赞、行业、归档",
+              "description": "筛选消息并显示分类数量",
+              "technology": "`WechatInboxService` 读取 SQLite 原始消息与后台分类；React 本地筛选",
+              "id": "P05-C01-F01"
+            }
+          ]
+        },
+        {
+          "id": "P05-C02",
+          "title": "手动记录弹窗",
+          "rows": [
+            {
+              "element": "原始链接、内容或想法",
+              "description": "保存一条待分类消息；正文必填最多 12000 字",
+              "technology": "POST `/api/topics/wechat/messages`；`WechatInboxService.create`；不自动访问链接",
+              "id": "P05-C02-F01"
+            }
+          ]
+        },
+        {
+          "id": "P05-C03",
+          "title": "消息卡",
+          "rows": [
+            {
+              "element": "整理、归档／恢复",
+              "description": "修改后台标题、备注、分类；原文只读",
+              "technology": "POST `/api/topics/wechat/messages/:id`；标题最多 200、备注最多 12000，原始消息不变",
+              "id": "P05-C03-F01"
+            },
+            {
+              "element": "生成快照／重新解析",
+              "description": "解析链接公开信息，形成研究快照",
+              "technology": "POST `/api/topics/wechat/messages/:id/snapshot` → `WechatSnapshotExecutor/link_snapshot`",
+              "id": "P05-C03-F02"
+            },
+            {
+              "element": "转为内容任务",
+              "description": "从研究条目创建视频项目",
+              "technology": "`TopicAPI` create-task；`tasks.source_json` 保留研究条目 ID",
+              "id": "P05-C03-F03"
+            }
+          ]
+        },
+        {
+          "id": "P05-C04",
+          "title": "微信 Bot 连接卡",
+          "rows": [
+            {
+              "element": "生成二维码、打开扫码页",
+              "description": "获取真实二维码并供本人扫码",
+              "technology": "`/api/topics/wechat/client/login`；`wechat_client.py` 官方连接流程，二维码与连接状态分开",
+              "id": "P05-C04-F01"
+            },
+            {
+              "element": "配对码、检查连接",
+              "description": "需要时输入官方配对码并轮询连接",
+              "technology": "POST `/api/topics/wechat/client/poll {code}`；仅 `need_verifycode` 使用",
+              "id": "P05-C04-F02"
+            },
+            {
+              "element": "断开并重新连接",
+              "description": "确认后停止接收新消息，不删除选题",
+              "technology": "POST `/api/topics/wechat/client/disconnect`；原始消息和研究数据独立保存",
+              "id": "P05-C04-F03"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "微信 Bot 或手动记录；公开链接解析受目标页面限制"
+        }
+      ],
+      "checklist": [
+        "核对“分类标签卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“手动记录弹窗”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“消息卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“微信 Bot 连接卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "Topics.tsx、TopicCard.tsx、WechatInbox.tsx"
+        ],
+        [
+          "服务",
+          "TopicService、TopicExecutors、WechatInboxService、专用 Chrome"
+        ],
+        [
+          "数据",
+          "研究快照、候选、tasks.source_json、wb_jobs、本地媒体资产"
+        ]
+      ]
+    },
+    {
+      "id": "xiaohongshu",
+      "order": 6,
+      "title": "小红书选题",
+      "route": "/demo/topics/xiaohongshu",
+      "purpose": "同步个人收藏，查看笔记研究并转为内容任务",
+      "dependencies": "专用 Chrome、本人小红书登录、收藏夹名称与网络",
+      "screenshot": "assets/screenshots/xiaohongshu.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "采集与自动化抽屉",
+          "task": "保存三类个人收藏夹映射；平台热点不读取个人收藏夹"
+        },
+        {
+          "order": 2,
+          "card": "作品卡",
+          "task": "打开真实作品来源"
+        },
+        {
+          "order": 3,
+          "card": "同步记录抽屉",
+          "task": "查看部分成功与失败原因，手动重试"
+        },
+        {
+          "order": 4,
+          "card": "直接创建视频任务弹窗",
+          "task": "输入选题并直接进入文案；标题必填且最多 200 字"
+        },
+        {
+          "order": 5,
+          "card": "研究详情弹窗",
+          "task": "读取当前真实条目并导出下载 JSON，不伪造成拆解报告"
+        },
+        {
+          "order": 6,
+          "card": "平台热点卡",
+          "task": "显示真实热点顺序、数量和原链接；普通推荐 feed 不作为热点"
+        },
+        {
+          "order": 7,
+          "card": "精选收藏卡",
+          "task": "切换并显示精选个人收藏的真实作品"
+        },
+        {
+          "order": 8,
+          "card": "竞对收藏卡",
+          "task": "切换并显示竞对收藏；真实空收藏保持空状态"
+        },
+        {
+          "order": 9,
+          "card": "高赞收藏卡",
+          "task": "切换并显示高赞个人收藏的真实作品"
+        },
+        {
+          "order": 10,
+          "card": "素材探测下载弹窗",
+          "task": "先读取作品类型与可用档位；探测本身不下载文件"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P06-C01",
+          "title": "采集与自动化抽屉",
+          "rows": [
+            {
+              "element": "精选／竞对／高赞收藏夹",
+              "description": "保存三类个人收藏夹映射；平台热点不读取个人收藏夹",
+              "technology": "POST `/api/topics/settings`；`xhs_featured/competitor/high_praise_collection`；`TopicExecutors.xhs_sync`",
+              "id": "P06-C01-F01"
+            },
+            {
+              "element": "“连接个人小红书”",
+              "description": "通过 Kimi CLI 在固定 Chrome 核对真实个人登录；打开窗口不等于登录成功",
+              "technology": "POST `/api/topics/xiaohongshu/browser/open` → `topics.xhs_login` → `XHSBrowserCollector`；复用持久化资料，不读取或导出 Cookie",
+              "id": "P06-C01-F02"
+            }
+          ]
+        },
+        {
+          "id": "P06-C02",
+          "title": "作品卡",
+          "rows": [
+            {
+              "element": "原链接",
+              "description": "打开真实作品来源",
+              "technology": "卡片 `canonical_url`；浏览器新标签，不经过模拟详情页",
+              "id": "P06-C02-F01"
+            },
+            {
+              "element": "“转为选题／创建任务”",
+              "description": "收藏候选或创建视频任务",
+              "technology": "`/api/topics/items/:id` 或 `/create-task`；`TopicService` + `tasks.source_json`",
+              "id": "P06-C02-F02"
+            },
+            {
+              "element": "“归档／恢复”",
+              "description": "改变条目归档状态，不删除来源",
+              "technology": "POST `/api/topics/items/:id/archive`；SQLite 保留原始快照",
+              "id": "P06-C02-F03"
+            }
+          ]
+        },
+        {
+          "id": "P06-C03",
+          "title": "同步记录抽屉",
+          "rows": [
+            {
+              "element": "任务状态、错误详情、重试同步",
+              "description": "查看部分成功与失败原因，手动重试",
+              "technology": "`wb_jobs`、执行日志与对应 sync API；旧有效快照不被空结果覆盖",
+              "id": "P06-C03-F01"
+            }
+          ]
+        },
+        {
+          "id": "P06-C04",
+          "title": "直接创建视频任务弹窗",
+          "rows": [
+            {
+              "element": "标题、支柱、人群、痛点、收藏夹、内容切入",
+              "description": "输入选题并直接进入文案；标题必填且最多 200 字",
+              "technology": "POST `/api/tasks`；`tasks` 与 `source_json` 保存分类和来源",
+              "id": "P06-C04-F01"
+            }
+          ]
+        },
+        {
+          "id": "P06-C05",
+          "title": "研究详情弹窗",
+          "rows": [
+            {
+              "element": "刷新详情、导出下载信息",
+              "description": "读取当前真实条目并导出下载 JSON，不伪造成拆解报告",
+              "technology": "GET `/api/topics/items/:id`；本地下载当前详情",
+              "id": "P06-C05-F01"
+            },
+            {
+              "element": "本地素材、完整路径、文件大小和资产索引",
+              "description": "已下载时显示真实视频或全部图文文件信息，未下载时显示真实状态",
+              "technology": "`DownloadDetail`；`metadata.download_status/download_path/download_media_kind`",
+              "id": "P06-C05-F02"
+            },
+            {
+              "element": "打开所在文件夹、复制本地地址",
+              "description": "调用系统文件管理器或剪贴板处理已下载路径",
+              "technology": "POST `/download/reveal`、`/download/copy`；没有真实文件时不显示成功状态",
+              "id": "P06-C05-F03"
+            }
+          ]
+        },
+        {
+          "id": "P06-C06",
+          "title": "平台热点卡",
+          "rows": [
+            {
+              "element": "热点选题标签、排名列表",
+              "description": "显示真实热点顺序、数量和原链接；普通推荐 feed 不作为热点",
+              "technology": "`xiaohongshuView=hot`；`TopicService.bootstrap.sources.xhs_hot`",
+              "id": "P06-C06-F01"
+            },
+            {
+              "element": "热点同步与快照字段",
+              "description": "只保存排名、热度、标题和真实链接，不进入作者互动补全",
+              "technology": "`TopicExecutors.xhs_sync` → `XHSBrowserCollector` → `xhs_public_hot`；研究快照 `metadata`",
+              "id": "P06-C06-F02"
+            }
+          ]
+        },
+        {
+          "id": "P06-C07",
+          "title": "精选收藏卡",
+          "rows": [
+            {
+              "element": "精选标签、数量与列表",
+              "description": "切换并显示精选个人收藏的真实作品",
+              "technology": "`xiaohongshuView=featured`；`sources.xhs_featured`",
+              "id": "P06-C07-F01"
+            },
+            {
+              "element": "作者、粉丝、点赞、评论、封面",
+              "description": "逐条补全并展示实际读取结果；缺字段不猜测",
+              "technology": "`XHSBrowserCollector` 读取作品与作者；`wb_research_items.metadata`",
+              "id": "P06-C07-F02"
+            },
+            {
+              "element": "收藏夹配置与同步状态",
+              "description": "按配置的精选收藏夹执行，保留部分完成和具体错误",
+              "technology": "`xhs_featured_collection`；`favorite_featured_completed`、`xhs_last_sync`",
+              "id": "P06-C07-F03"
+            }
+          ]
+        },
+        {
+          "id": "P06-C08",
+          "title": "竞对收藏卡",
+          "rows": [
+            {
+              "element": "竞对标签、数量与列表",
+              "description": "切换并显示竞对收藏；真实空收藏保持空状态",
+              "technology": "`xiaohongshuView=competitor`；`sources.xhs_competitor`",
+              "id": "P06-C08-F01"
+            },
+            {
+              "element": "作者、粉丝、点赞、评论、封面",
+              "description": "逐条补全并展示实际读取结果；缺字段不猜测",
+              "technology": "`XHSBrowserCollector` 读取作品与作者；`wb_research_items.metadata`",
+              "id": "P06-C08-F02"
+            },
+            {
+              "element": "收藏夹配置与同步状态",
+              "description": "按配置的竞对收藏夹执行，不能用其他收藏内容填充",
+              "technology": "`xhs_competitor_collection`；`favorite_competitor_completed`、真实错误记录",
+              "id": "P06-C08-F03"
+            }
+          ]
+        },
+        {
+          "id": "P06-C09",
+          "title": "高赞收藏卡",
+          "rows": [
+            {
+              "element": "高赞标签、数量与列表",
+              "description": "切换并显示高赞个人收藏的真实作品",
+              "technology": "`xiaohongshuView=high_praise`；`sources.xhs_high_praise`",
+              "id": "P06-C09-F01"
+            },
+            {
+              "element": "作者、粉丝、点赞、评论、封面",
+              "description": "逐条补全并展示实际读取结果；缺字段不猜测",
+              "technology": "`XHSBrowserCollector` 读取作品与作者；`wb_research_items.metadata`",
+              "id": "P06-C09-F02"
+            },
+            {
+              "element": "收藏夹配置与同步状态",
+              "description": "按配置的高赞收藏夹执行，保留部分完成和具体错误",
+              "technology": "`xhs_high_praise_collection`；`favorite_high_praise_completed`、`xhs_last_sync`",
+              "id": "P06-C09-F03"
+            }
+          ]
+        },
+        {
+          "id": "P06-C10",
+          "title": "素材探测下载弹窗",
+          "rows": [
+            {
+              "element": "下载素材、真实探测",
+              "description": "先读取作品类型与可用档位；探测本身不下载文件",
+              "technology": "POST `/download/probe` → `research.probe` → `probe_xiaohongshu_media`；Kimi CLI + video-downloader；命令行无公开结果时由固定 Chrome 读取同作品实际媒体，不导出 Cookie",
+              "id": "P06-C10-F01"
+            },
+            {
+              "element": "视频／图文类型与档位",
+              "description": "视频显示实际尺寸、时长和来源，未知大小或码率留空；图文明确显示图片组，不虚构视频档位",
+              "technology": "`research.probe.result.media_kind/formats`；`DownloadProbeModal`；固定 Chrome 当前流标记 `source=fixed_chrome`",
+              "id": "P06-C10-F02"
+            },
+            {
+              "element": "画质优先、速度优先、兼容优先",
+              "description": "用户选择后才提交对应下载任务；下载后核验真实文件",
+              "technology": "POST `/analyze {mode:quality/speed/compat}` → `research.analyze` → `download_xiaohongshu_media`；视频 FFprobe，图文逐文件检查并保存全部实际图片",
+              "id": "P06-C10-F03"
+            },
+            {
+              "element": "执行中、失败与无素材状态",
+              "description": "显示真实进度和终态错误；没有素材信息时不创建下载任务",
+              "technology": "`TopicService.bootstrap.jobs` 包含 `research.probe`；`wb_jobs.status/stage/error`；`DownloadProbeModal` 终态不再持续显示读取中",
+              "id": "P06-C10-F04"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "专用 Chrome、本人小红书登录、收藏夹名称与网络"
+        }
+      ],
+      "checklist": [
+        "核对“采集与自动化抽屉”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“作品卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“同步记录抽屉”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“直接创建视频任务弹窗”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“研究详情弹窗”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“平台热点卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“精选收藏卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“竞对收藏卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“高赞收藏卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“素材探测下载弹窗”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "Topics.tsx、TopicCard.tsx、WechatInbox.tsx"
+        ],
+        [
+          "服务",
+          "TopicService、TopicExecutors、WechatInboxService、专用 Chrome"
+        ],
+        [
+          "数据",
+          "研究快照、候选、tasks.source_json、wb_jobs、本地媒体资产"
+        ]
+      ]
+    },
+    {
+      "id": "articles",
+      "order": 7,
+      "title": "文章任务列表",
+      "route": "/demo/articles",
+      "purpose": "搜索、筛选、新建并打开文章",
+      "dependencies": "本地 SQLite；新建只创建任务，不自动生成",
+      "screenshot": "assets/screenshots/articles.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "全部文章卡",
+          "task": "按标题与状态筛选，每页 10 篇"
+        },
+        {
+          "order": 2,
+          "card": "创建表单",
+          "task": "标题必填最多 200 字；只创建本地文章"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P07-C01",
+          "title": "全部文章卡",
+          "rows": [
+            {
+              "element": "搜索、状态筛选、分页",
+              "description": "按标题与状态筛选，每页 10 篇",
+              "technology": "`ArticlesAPI.bootstrap`；`Workbench` 查询 `wb_campaigns/wb_content_items`；前端本地筛选",
+              "id": "P07-C01-F01"
+            },
+            {
+              "element": "文章条目",
+              "description": "打开独立文章路由",
+              "technology": "`/articles/:id`；按稳定文章 ID 读取，不复制项目",
+              "id": "P07-C01-F02"
+            }
+          ]
+        },
+        {
+          "id": "P07-C02",
+          "title": "创建表单",
+          "rows": [
+            {
+              "element": "文章主题、初始要求、创建／取消",
+              "description": "标题必填最多 200 字；只创建本地文章",
+              "technology": "POST `/api/articles` → `Workbench.create`；`wb_campaigns/wb_content_items`",
+              "id": "P07-C02-F01"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "本地 SQLite；新建只创建任务，不自动生成"
+        }
+      ],
+      "checklist": [
+        "核对“全部文章卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“创建表单”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "Articles.tsx、ArticleCreativePlan.tsx、ArticleImageTools.tsx"
+        ],
+        [
+          "服务",
+          "Workbench、ArticleExecutors、ProviderRegistry、Workbench.export_article"
+        ],
+        [
+          "数据",
+          "wb_campaigns、wb_content_items、wb_revisions、wb_approvals、wb_assets"
+        ]
+      ]
+    },
+    {
+      "id": "article-editor",
+      "order": 8,
+      "title": "文章编辑器",
+      "route": "/demo/articles/:id",
+      "purpose": "完成写作要求、大纲、正文、图片、审核和导出",
+      "dependencies": "模型、真实图片、Pillow／Remotion 导出环境；审批绑定版本",
+      "screenshot": "assets/screenshots/article-editor.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "顶部导航与版本信息",
+          "task": "切换文章并显示当前版本；草稿保存失败时提醒"
+        },
+        {
+          "order": 2,
+          "card": "工作区标签",
+          "task": "切换同一文章工作区"
+        },
+        {
+          "order": 3,
+          "card": "主要平台与写作目的卡",
+          "task": "选择公众号／小红书；把目的追加到生成要求，不启动生成"
+        },
+        {
+          "order": 4,
+          "card": "文章要求卡",
+          "task": "设置本次 AI 生成附加要求"
+        },
+        {
+          "order": 5,
+          "card": "论证大纲卡",
+          "task": "生成或手写大纲；保存正式版本供正文使用"
+        },
+        {
+          "order": 6,
+          "card": "完整正文卡",
+          "task": "依正式大纲生成或手写正文；修改后旧审批失效"
+        },
+        {
+          "order": 7,
+          "card": "人工审核区",
+          "task": "审批绑定当前正文 manifest；退回保留草稿"
+        },
+        {
+          "order": 8,
+          "card": "配图计划卡",
+          "task": "规划搜索、AI 或自有图片的位置，不直接产生图片"
+        },
+        {
+          "order": 9,
+          "card": "搜索工具卡",
+          "task": "搜索候选，下载后绑定素材"
+        },
+        {
+          "order": 10,
+          "card": "AI 插画卡",
+          "task": "生成 SVG 插画并本地渲染 PNG，绑定当前位置"
+        },
+        {
+          "order": 11,
+          "card": "本地图片卡",
+          "task": "选择已有图片或引用 PNG／JPEG／WebP 原图"
+        },
+        {
+          "order": 12,
+          "card": "交付形式卡",
+          "task": "选择正文、分页图或图文包"
+        },
+        {
+          "order": 13,
+          "card": "导出卡",
+          "task": "生成 HTML、Markdown、ZIP 和所选分页 PNG"
+        },
+        {
+          "order": 14,
+          "card": "下载区",
+          "task": "下载实际生成的文件"
+        },
+        {
+          "order": 15,
+          "card": "继续制作区",
+          "task": "以当前正式正文版本创建视频"
+        },
+        {
+          "order": 16,
+          "card": "发布入口",
+          "task": "打开当前文章的发布准备"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P08-C01",
+          "title": "顶部导航与版本信息",
+          "rows": [
+            {
+              "element": "返回、切换文章、版本详情",
+              "description": "切换文章并显示当前版本；草稿保存失败时提醒",
+              "technology": "React Router；`useContentDraft` 本机草稿；正式版本来自 `wb_revisions`",
+              "id": "P08-C01-F01"
+            }
+          ]
+        },
+        {
+          "id": "P08-C02",
+          "title": "工作区标签",
+          "rows": [
+            {
+              "element": "写文案、配图片、排版交付",
+              "description": "切换同一文章工作区",
+              "technology": "React 本地 `workspace`；共享同一文章和 revision",
+              "id": "P08-C02-F01"
+            }
+          ]
+        },
+        {
+          "id": "P08-C03",
+          "title": "主要平台与写作目的卡",
+          "rows": [
+            {
+              "element": "平台、目的、加入写作要求",
+              "description": "选择公众号／小红书；把目的追加到生成要求，不启动生成",
+              "technology": "`ArticleCreativePlan` 本地计划；随正文 revision 保存 `creative_plan`",
+              "id": "P08-C03-F01"
+            }
+          ]
+        },
+        {
+          "id": "P08-C04",
+          "title": "文章要求卡",
+          "rows": [
+            {
+              "element": "补充要求",
+              "description": "设置本次 AI 生成附加要求",
+              "technology": "POST `/api/articles/:id/generate` 时传入 prompt；不自动成为正文",
+              "id": "P08-C04-F01"
+            }
+          ]
+        },
+        {
+          "id": "P08-C05",
+          "title": "论证大纲卡",
+          "rows": [
+            {
+              "element": "生成大纲、编辑、确认大纲",
+              "description": "生成或手写大纲；保存正式版本供正文使用",
+              "technology": "POST `/generate {operation:article.outline}`；POST `/revisions`；`Workbench.save_revision + ProviderRegistry + wb_revisions`",
+              "id": "P08-C05-F01"
+            }
+          ]
+        },
+        {
+          "id": "P08-C06",
+          "title": "完整正文卡",
+          "rows": [
+            {
+              "element": "生成正文、编辑、保存正式版本",
+              "description": "依正式大纲生成或手写正文；修改后旧审批失效",
+              "technology": "`article.draft` → `ArticleExecutors`；`Workbench.save_revision` 版本与 CAS",
+              "id": "P08-C06-F01"
+            }
+          ]
+        },
+        {
+          "id": "P08-C07",
+          "title": "人工审核区",
+          "rows": [
+            {
+              "element": "提交审核、批准、退回",
+              "description": "审批绑定当前正文 manifest；退回保留草稿",
+              "technology": "POST `/api/articles/:id/actions`；`wb_approvals` + manifest hash + active revision",
+              "id": "P08-C07-F01"
+            }
+          ]
+        },
+        {
+          "id": "P08-C08",
+          "title": "配图计划卡",
+          "rows": [
+            {
+              "element": "添加／移除位置、用途、获取方式",
+              "description": "规划搜索、AI 或自有图片的位置，不直接产生图片",
+              "technology": "`ArticleCreativePlan.pictures` 随 `creative_plan` 保存到 revision",
+              "id": "P08-C08-F01"
+            },
+            {
+              "element": "画面描述、插入段落",
+              "description": "设置提示词和插入位置；段落最小 0",
+              "technology": "同上；导出按空行分段和 `after_paragraph` 处理",
+              "id": "P08-C08-F02"
+            }
+          ]
+        },
+        {
+          "id": "P08-C09",
+          "title": "搜索工具卡",
+          "rows": [
+            {
+              "element": "搜索图片、下载并采用",
+              "description": "搜索候选，下载后绑定素材",
+              "technology": "`/api/articles/images/search`、`/adopt`；`articles/images.py` 搜索服务 + `wb_assets`",
+              "id": "P08-C09-F01"
+            }
+          ]
+        },
+        {
+          "id": "P08-C10",
+          "title": "AI 插画卡",
+          "rows": [
+            {
+              "element": "生成图片",
+              "description": "生成 SVG 插画并本地渲染 PNG，绑定当前位置",
+              "technology": "`/api/articles/images/generate`；Kimi CLI → SVG 安全校验 → Remotion 本地 PNG → `wb_assets`",
+              "id": "P08-C10-F01"
+            }
+          ]
+        },
+        {
+          "id": "P08-C11",
+          "title": "本地图片卡",
+          "rows": [
+            {
+              "element": "素材选择、图片路径、导入并采用",
+              "description": "选择已有图片或引用 PNG／JPEG／WebP 原图",
+              "technology": "`/api/v2/local-assets`；`Workbench.import_local_asset` 校验路径与 MIME；图片 ID 写入创作计划",
+              "id": "P08-C11-F01"
+            }
+          ]
+        },
+        {
+          "id": "P08-C12",
+          "title": "交付形式卡",
+          "rows": [
+            {
+              "element": "公众号／小红书格式选择",
+              "description": "选择正文、分页图或图文包",
+              "technology": "`creative_plan.format`；`articles/page_worker.py` + Pillow／中文字体",
+              "id": "P08-C12-F01"
+            }
+          ]
+        },
+        {
+          "id": "P08-C13",
+          "title": "导出卡",
+          "rows": [
+            {
+              "element": "导出当前正文",
+              "description": "生成 HTML、Markdown、ZIP 和所选分页 PNG",
+              "technology": "POST `/api/articles/:id/export`；仅已批准 revision；`Workbench.export_article` + `wb_assets`",
+              "id": "P08-C13-F01"
+            }
+          ]
+        },
+        {
+          "id": "P08-C14",
+          "title": "下载区",
+          "rows": [
+            {
+              "element": "HTML／Markdown／ZIP／分页图下载",
+              "description": "下载实际生成的文件",
+              "technology": "本地导出目录与文件下载接口；ZIP 含正文和原图，Markdown 不内嵌图片",
+              "id": "P08-C14-F01"
+            }
+          ]
+        },
+        {
+          "id": "P08-C15",
+          "title": "继续制作区",
+          "rows": [
+            {
+              "element": "从已保存正文制作视频",
+              "description": "以当前正式正文版本创建视频",
+              "technology": "POST `/api/tasks {article_id,article_revision_id}`；`tasks.source_json` 保存版本来源",
+              "id": "P08-C15-F01"
+            }
+          ]
+        },
+        {
+          "id": "P08-C16",
+          "title": "发布入口",
+          "rows": [
+            {
+              "element": "前往发布中心",
+              "description": "打开当前文章的发布准备",
+              "technology": "`/publish?kind=article&id=...`；`PublishingService.source(\"article\")` 校验当前批准版本",
+              "id": "P08-C16-F01"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "模型、真实图片、Pillow／Remotion 导出环境；审批绑定版本"
+        }
+      ],
+      "checklist": [
+        "核对“顶部导航与版本信息”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“工作区标签”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“主要平台与写作目的卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“文章要求卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“论证大纲卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“完整正文卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“人工审核区”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“配图计划卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“搜索工具卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“AI 插画卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“本地图片卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“交付形式卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“导出卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“下载区”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“继续制作区”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“发布入口”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "Articles.tsx、ArticleCreativePlan.tsx、ArticleImageTools.tsx"
+        ],
+        [
+          "服务",
+          "Workbench、ArticleExecutors、ProviderRegistry、Workbench.export_article"
+        ],
+        [
+          "数据",
+          "wb_campaigns、wb_content_items、wb_revisions、wb_approvals、wb_assets"
+        ]
+      ]
+    },
+    {
+      "id": "projects",
+      "order": 9,
+      "title": "视频项目首页",
+      "route": "/demo/projects",
+      "purpose": "搜索、筛选、新建和继续原创／对标项目",
+      "dependencies": "本地项目记录；旧项目 ID 与交付状态保留",
+      "screenshot": "assets/screenshots/projects.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "页头操作区",
+          "task": "进入对应首屏，不立即创建项目"
+        },
+        {
+          "order": 2,
+          "card": "项目工具卡",
+          "task": "按名称／ID 和类型过滤"
+        },
+        {
+          "order": 3,
+          "card": "项目卡",
+          "task": "继续原项目，显示继续创作／已关联／需重新交付"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P09-C01",
+          "title": "页头操作区",
+          "rows": [
+            {
+              "element": "新建原创、新建对标",
+              "description": "进入对应首屏，不立即创建项目",
+              "technology": "React Router；`CreateOriginal/CreateBenchmark` 组件",
+              "id": "P09-C01-F01"
+            }
+          ]
+        },
+        {
+          "id": "P09-C02",
+          "title": "项目工具卡",
+          "rows": [
+            {
+              "element": "搜索、项目类型筛选、新建视频",
+              "description": "按名称／ID 和类型过滤",
+              "technology": "`AppContext.core.tasks` + `projectType(task.source.project_type)`；本地筛选",
+              "id": "P09-C02-F01"
+            }
+          ]
+        },
+        {
+          "id": "P09-C03",
+          "title": "项目卡",
+          "rows": [
+            {
+              "element": "项目类型、ID、交付状态、打开",
+              "description": "继续原项目，显示继续创作／已关联／需重新交付",
+              "technology": "`tasks.source_json.yingxu_handoff`；原项目 ID 与 revision，无示例 ID 写死",
+              "id": "P09-C03-F01"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "本地项目记录；旧项目 ID 与交付状态保留"
+        }
+      ],
+      "checklist": [
+        "核对“页头操作区”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“项目工具卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“项目卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "videoProjects/*.tsx、useVideoProject.ts"
+        ],
+        [
+          "服务",
+          "app.py 项目接口、专用 Chrome、Kimi/本地媒体引擎"
+        ],
+        [
+          "数据",
+          "tasks、files、source_json.yingxu、review_deliveries、renders"
+        ]
+      ]
+    },
+    {
+      "id": "original",
+      "order": 10,
+      "title": "原创项目",
+      "route": "/demo/projects/original[/:id]",
+      "purpose": "从文案、旁白、音乐、分镜到样片、成片和审核交付",
+      "dependencies": "模型、Whisper、Remotion、FFmpeg；各阶段有前置门槛",
+      "screenshot": "assets/screenshots/original.png",
+      "evidence": "2026-11-15 已在 8765 验证 AI 生成／改写文案；项目 20261115-001 使用 17.85 秒真人中文旁白验证词级时间码：复用模型时后台任务 12.450 秒和 6.997 秒完成，页面实际显示转写中 8% 与已用秒数，截图 evidence/transcript-progress.png。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "阶段导航卡",
+          "task": "返回已开放阶段，查看操作说明"
+        },
+        {
+          "order": 2,
+          "card": "文案创作卡",
+          "task": "可手写完整文案，也可只填叙事方向生成；AI 生成时方向必填，进入下一步时正式文案必填"
+        },
+        {
+          "order": 3,
+          "card": "AI 文案候选区",
+          "task": "无文案时生成，有文案时改写；候选不自动覆盖，采用时保留非空历史版本"
+        },
+        {
+          "order": 4,
+          "card": "旁白与时长卡",
+          "task": "上传真实音频并显示文件和时长"
+        },
+        {
+          "order": 5,
+          "card": "生产画面卡",
+          "task": "查看真实模板效果并选择风格"
+        },
+        {
+          "order": 6,
+          "card": "镜头详情弹窗",
+          "task": "修改当前镜头时间线和文本"
+        },
+        {
+          "order": 7,
+          "card": "音乐卡",
+          "task": "添加或切换真实配乐"
+        },
+        {
+          "order": 8,
+          "card": "音乐库卡",
+          "task": "批量导入支持的音频到当前项目"
+        },
+        {
+          "order": 9,
+          "card": "样片卡",
+          "task": "生成真实单镜或选中镜样片"
+        },
+        {
+          "order": 10,
+          "card": "合成验收卡",
+          "task": "未配置，点击无效果"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P10-C01",
+          "title": "阶段导航卡",
+          "rows": [
+            {
+              "element": "01～05 阶段按钮、帮助“？”",
+              "description": "返回已开放阶段，查看操作说明",
+              "technology": "`StageNavigation` + `workflow_stage`；锁定状态来自项目快照",
+              "id": "P10-C01-F01"
+            }
+          ]
+        },
+        {
+          "id": "P10-C02",
+          "title": "文案创作卡",
+          "rows": [
+            {
+              "element": "叙事方向、正式文案",
+              "description": "可手写完整文案，也可只填叙事方向生成；AI 生成时方向必填，进入下一步时正式文案必填",
+              "technology": "`CreateOriginal.validate`；POST `/api/tasks`；PUT `/api/tasks/:id/yingxu` 保存 snapshot 和 revision",
+              "id": "P10-C02-F01"
+            },
+            {
+              "element": "目标平台、画幅、自定义宽高",
+              "description": "平台至少一项；画幅必选；自定义宽高均大于 0",
+              "technology": "前端校验后写入 `source_json.target_platforms/aspect`；Remotion 使用对应尺寸",
+              "id": "P10-C02-F02"
+            },
+            {
+              "element": "确认方案，进入视频生成",
+              "description": "校验正式文案、平台和画幅后创建／保存并进入旁白；方向不是手写路径必填项",
+              "technology": "`/api/tasks` + `/yingxu`；`useVideoProject` 本机草稿和 revision CAS",
+              "id": "P10-C02-F03"
+            }
+          ]
+        },
+        {
+          "id": "P10-C03",
+          "title": "AI 文案候选区",
+          "rows": [
+            {
+              "element": "按方向生成／改写、候选编辑、采用或保留当前文案",
+              "description": "无文案时生成，有文案时改写；候选不自动覆盖，采用时保留非空历史版本",
+              "technology": "POST `/yingxu-script-candidate`；明确传递 operation、direction、current_text、target_platforms、aspect；历史存入 `manuscript.versions`",
+              "id": "P10-C03-F01"
+            }
+          ]
+        },
+        {
+          "id": "P10-C04",
+          "title": "旁白与时长卡",
+          "rows": [
+            {
+              "element": "上传真人旁白",
+              "description": "上传真实音频并显示文件和时长",
+              "technology": "POST `/yingxu-files?kind=audio`；`stream_upload` 限制非空／500MB；FFprobe 媒体信息",
+              "id": "P10-C04-F01"
+            },
+            {
+              "element": "生成词级时间码",
+              "description": "后台对旁白生成逐词文本和起止秒数，显示真实阶段、百分比和已用时间；同模型进程复用",
+              "technology": "POST `/transcript` → `wb_jobs.project_transcript`；GET `/transcript-jobs/:id`；faster-whisper `--serve` 常驻 worker，按真实分段上报；词级结果写入 snapshot",
+              "id": "P10-C04-F02"
+            },
+            {
+              "element": "词语、开始、结束",
+              "description": "只读查看转写与同步时间",
+              "technology": "`snapshot.transcript.words`；不允许前端手改",
+              "id": "P10-C04-F03"
+            },
+            {
+              "element": "AI 修改旁白、分段试听",
+              "description": "两个按钮均明确未接入",
+              "technology": "无后端调用；禁用控件，不计为可用能力",
+              "id": "P10-C04-F04"
+            },
+            {
+              "element": "确认旁白与时长",
+              "description": "转写有效后进入音乐",
+              "technology": "`voiceFileId + transcript.words + !transcriptStale` 前端门槛；保存 `/yingxu`",
+              "id": "P10-C04-F05"
+            }
+          ]
+        },
+        {
+          "id": "P10-C05",
+          "title": "生产画面卡",
+          "rows": [
+            {
+              "element": "选择画风、模板预览",
+              "description": "查看真实模板效果并选择风格",
+              "technology": "GET `/api/video-templates`；`media/templates.py` 注册表和本地预览",
+              "id": "P10-C05-F01"
+            },
+            {
+              "element": "生成分镜",
+              "description": "根据文案、画风和真实时间码生成分镜",
+              "technology": "POST `/yingxu-director-candidate` → Remotion 编导 Agent + 配置模型；`directorPlan` 保存快照",
+              "id": "P10-C05-F02"
+            },
+            {
+              "element": "选择分镜、分别生成",
+              "description": "为选中镜头生成独立 AI 单镜",
+              "technology": "POST `/ai-video` → Remotion 场景代码 Agent → 安全校验 → Node/Remotion 渲染无声 MP4",
+              "id": "P10-C05-F03"
+            }
+          ]
+        },
+        {
+          "id": "P10-C06",
+          "title": "镜头详情弹窗",
+          "rows": [
+            {
+              "element": "起止时间、旁白文字",
+              "description": "修改当前镜头时间线和文本",
+              "technology": "`patchShot` 修改 snapshot；保存 `/yingxu`；不会自动重转写整段音频",
+              "id": "P10-C06-F01"
+            },
+            {
+              "element": "上传／更换视频",
+              "description": "添加真实镜头画面版本",
+              "technology": "POST `/yingxu-files?kind=video`；本地文件记录与媒体校验；旧版本保留",
+              "id": "P10-C06-F02"
+            },
+            {
+              "element": "新画面描述、视觉参考",
+              "description": "设置 AI 场景的构图、材质和运动约束",
+              "technology": "随 `/ai-video` prompt 进入 Remotion 场景代码 Agent",
+              "id": "P10-C06-F03"
+            },
+            {
+              "element": "AI 生成版本选择",
+              "description": "在真实 AI 候选间切换",
+              "technology": "`aiCandidateFileIds + fileId + source=ai_video`；本地 `files` 记录",
+              "id": "P10-C06-F04"
+            },
+            {
+              "element": "保存本镜、确认本镜",
+              "description": "保存不等于确认；有画面或有效 Remotion 代码后才能确认",
+              "technology": "`shot.confirmed` + `shot.fileId/source`；`useVideoProject.save` revision",
+              "id": "P10-C06-F05"
+            }
+          ]
+        },
+        {
+          "id": "P10-C07",
+          "title": "音乐卡",
+          "rows": [
+            {
+              "element": "上传音乐、选择音乐库文件",
+              "description": "添加或切换真实配乐",
+              "technology": "`/yingxu-files?kind=audio`；`bgmFileId`；本地音频列表",
+              "id": "P10-C07-F01"
+            },
+            {
+              "element": "音乐方向、AI 生成配乐",
+              "description": "按时长和方向生成真实 WAV",
+              "technology": "POST `/music-generate` → Kimi 音符谱 → `media/ai_music.py` 本地合成 WAV",
+              "id": "P10-C07-F02"
+            },
+            {
+              "element": "时长适配方式、AI 适配时长",
+              "description": "生成淡出、循环或保留无音乐段落的独立版本",
+              "technology": "POST `/music-adapt`；FFmpeg 音频处理；`musicAdaptedFileId/adapted_from`",
+              "id": "P10-C07-F03"
+            },
+            {
+              "element": "试听适配后配乐与旁白",
+              "description": "同步试听，音乐音量 35%，可暂停",
+              "technology": "浏览器双 `<audio>` 播放；不调用云端，不修改音频",
+              "id": "P10-C07-F04"
+            },
+            {
+              "element": "分离当前音频人声／伴奏",
+              "description": "生成独立人声和伴奏，原曲不变",
+              "technology": "POST `/audio-separate` → Kimi 规划 + 本地 Demucs；新文件记录",
+              "id": "P10-C07-F05"
+            },
+            {
+              "element": "确认适配效果／不另加音乐、确认音乐",
+              "description": "记录人工确认，清除旧最终验收",
+              "technology": "`musicConfirmed/finalApprovedFileId`；`confirmationReady/conflictResolved` 门槛",
+              "id": "P10-C07-F06"
+            }
+          ]
+        },
+        {
+          "id": "P10-C08",
+          "title": "音乐库卡",
+          "rows": [
+            {
+              "element": "选择／更换本地文件夹",
+              "description": "批量导入支持的音频到当前项目",
+              "technology": "浏览器 `webkitdirectory`；过滤音频扩展并逐个上传；文件复制到项目",
+              "id": "P10-C08-F01"
+            }
+          ]
+        },
+        {
+          "id": "P10-C09",
+          "title": "样片卡",
+          "rows": [
+            {
+              "element": "选择分镜、生成样片",
+              "description": "生成真实单镜或选中镜样片",
+              "technology": "POST `/yingxu-render {preview:true}`；Node/Remotion + FFmpeg；`sampleFileIds`",
+              "id": "P10-C09-F01"
+            },
+            {
+              "element": "样片通过",
+              "description": "人工确认每个必需样片",
+              "technology": "`sampleApprovedFileIds`；`sampleApproved()` 检查全部必需 ID",
+              "id": "P10-C09-F02"
+            }
+          ]
+        },
+        {
+          "id": "P10-C10",
+          "title": "合成验收卡",
+          "rows": [
+            {
+              "element": "Remotion 时间线按钮",
+              "description": "未配置，点击无效果",
+              "technology": "禁用按钮，无接口；独立 Studio 未交付",
+              "id": "P10-C10-F01"
+            },
+            {
+              "element": "生成完整成片",
+              "description": "渲染完整 MP4，不用单镜冒充整片",
+              "technology": "POST `/yingxu-render {preview:false}`；Remotion 时间线 + 音轨混合 + FFprobe 校验",
+              "id": "P10-C10-F02"
+            },
+            {
+              "element": "成片版本、预览、验收通过",
+              "description": "选择真实成片，人工验收当前版本",
+              "technology": "`finalFileId/finalApprovedFileId`；`files.kind=video` 与本地 `<video>`",
+              "id": "P10-C10-F03"
+            },
+            {
+              "element": "下载成片",
+              "description": "下载当前已验收完整成片",
+              "technology": "文件 `download_url`；只有验收后显示",
+              "id": "P10-C10-F04"
+            },
+            {
+              "element": "推送到发布中心",
+              "description": "绑定项目、文件、revision 和哈希，建立审核批次并跳转",
+              "technology": "POST `/yingxu-handoff` → `ReviewService.receive_delivery`；`review_deliveries/review_batches/items`；不等于公开发布",
+              "id": "P10-C10-F05"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "模型、Whisper、Remotion、FFmpeg；各阶段有前置门槛"
+        }
+      ],
+      "checklist": [
+        "核对“阶段导航卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“文案创作卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“AI 文案候选区”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“旁白与时长卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“生产画面卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“镜头详情弹窗”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“音乐卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“音乐库卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“样片卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“合成验收卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "videoProjects/*.tsx、useVideoProject.ts"
+        ],
+        [
+          "服务",
+          "app.py 项目接口、专用 Chrome、Kimi/本地媒体引擎"
+        ],
+        [
+          "数据",
+          "tasks、files、source_json.yingxu、review_deliveries、renders"
+        ]
+      ]
+    },
+    {
+      "id": "benchmark",
+      "order": 11,
+      "title": "对标项目",
+      "route": "/demo/projects/benchmark[/:id]",
+      "purpose": "拆解真实参考视频，逐镜替换、处理音乐并合成审核交付",
+      "dependencies": "真实视频、模型、Whisper、Remotion、FFmpeg 和使用授权",
+      "screenshot": "assets/screenshots/benchmark.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "提供参考卡",
+          "task": "上传真实参考，显示名称与大小"
+        },
+        {
+          "order": 2,
+          "card": "拆解报告卡",
+          "task": "保留原片时间码、文本和画面对照"
+        },
+        {
+          "order": 3,
+          "card": "逐镜替换卡",
+          "task": "多镜选择或打开单镜处理"
+        },
+        {
+          "order": 4,
+          "card": "镜头详情弹窗",
+          "task": "使用原参考时间区间、时长和自带声音"
+        },
+        {
+          "order": 5,
+          "card": "音乐卡",
+          "task": "添加或切换真实配乐"
+        },
+        {
+          "order": 6,
+          "card": "音乐库卡",
+          "task": "批量导入支持的音频到当前项目"
+        },
+        {
+          "order": 7,
+          "card": "音乐冲突卡",
+          "task": "解决原视频声音与新音乐冲突"
+        },
+        {
+          "order": 8,
+          "card": "样片卡",
+          "task": "生成真实单镜或选中镜样片"
+        },
+        {
+          "order": 9,
+          "card": "合成验收卡",
+          "task": "未配置，点击无效果"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P11-C01",
+          "title": "提供参考卡",
+          "rows": [
+            {
+              "element": "选择参考视频",
+              "description": "上传真实参考，显示名称与大小",
+              "technology": "POST `/yingxu-files?kind=video`；`stream_upload` + FFprobe；不用演示视频",
+              "id": "P11-C01-F01"
+            },
+            {
+              "element": "使用边界、关注重点",
+              "description": "使用边界必填；关注重点指导拆解并形成标题候选",
+              "technology": "POST `/api/tasks {source_type:benchmark}`；`source_json.usage_boundary/focus`",
+              "id": "P11-C01-F02"
+            },
+            {
+              "element": "查看拆解报告",
+              "description": "创建项目并执行真实场景拆分和整片转写",
+              "technology": "POST `/benchmark-analyze` → `app.py analyze_benchmark`；FFmpeg `scene=0.25` 场景检测 + Whisper base 整片转写 + 真实关键帧",
+              "id": "P11-C01-F03"
+            }
+          ]
+        },
+        {
+          "id": "P11-C02",
+          "title": "拆解报告卡",
+          "rows": [
+            {
+              "element": "原视频、时间码、逐镜说明",
+              "description": "保留原片时间码、文本和画面对照",
+              "technology": "`benchmark_report` + `shots.original_start/end_seconds` + `keyframe_file_id`",
+              "id": "P11-C02-F01"
+            },
+            {
+              "element": "用 Kimi 分析关键帧",
+              "description": "根据实际帧补充视觉分析",
+              "technology": "POST `/benchmark-visual-analysis` → 视觉分析 Agent 读取真实图片；不虚构不可见信息",
+              "id": "P11-C02-F02"
+            },
+            {
+              "element": "报告备注、导出报告",
+              "description": "保存人工备注并导出真实报告",
+              "technology": "snapshot `benchmark_notes`；本地下载当前报告 JSON／文档",
+              "id": "P11-C02-F03"
+            }
+          ]
+        },
+        {
+          "id": "P11-C03",
+          "title": "逐镜替换卡",
+          "rows": [
+            {
+              "element": "选择分镜、逐镜编辑",
+              "description": "多镜选择或打开单镜处理",
+              "technology": "React `checked/selected`；`shotReady` 统一校验",
+              "id": "P11-C03-F01"
+            }
+          ]
+        },
+        {
+          "id": "P11-C04",
+          "title": "镜头详情弹窗",
+          "rows": [
+            {
+              "element": "原视频对照、保留原镜头",
+              "description": "使用原参考时间区间、时长和自带声音",
+              "technology": "`source=reference`、`trim_start=original_start`、`audio_source=original`",
+              "id": "P11-C04-F01"
+            },
+            {
+              "element": "新旁白、上传本镜旁白",
+              "description": "编辑文本或上传替换音频；替换旁白必须有真实文件",
+              "technology": "`/yingxu-files?kind=audio`；`narrationFileId + audio_source=replace`",
+              "id": "P11-C04-F02"
+            },
+            {
+              "element": "上传／更换视频、用户版本",
+              "description": "添加或切换上传画面，重置相关确认",
+              "technology": "`uploadedFileIds`；`source=user_upload`；文件 ID 关联",
+              "id": "P11-C04-F03"
+            },
+            {
+              "element": "新画面描述、AI 版本",
+              "description": "生成并选择 Remotion 单镜",
+              "technology": "与原创 `/ai-video` 共用；`aiCandidateFileIds` 与上传版本分开",
+              "id": "P11-C04-F04"
+            },
+            {
+              "element": "声音检查",
+              "description": "选择原声、替换旁白或静音",
+              "technology": "`audio_source`；`fileAudioPresent` 只判断音轨存在，构成由人工确认",
+              "id": "P11-C04-F05"
+            },
+            {
+              "element": "有效时长、截取起点",
+              "description": "保持原时长或用新视频时长；设置截取起点",
+              "technology": "`duration_choice/trim_start`；`shotAvailableDuration = 文件时长－起点`",
+              "id": "P11-C04-F06"
+            },
+            {
+              "element": "视频不足补足方式",
+              "description": "选末帧静止或循环；不足超过 0.05 秒容差时必选",
+              "technology": "`fill_method=freeze/loop`；`shotReady`；Remotion 实际截取／循环／末帧处理",
+              "id": "P11-C04-F07"
+            },
+            {
+              "element": "保存本镜、确认本镜",
+              "description": "校验画面、声音、时长和必需音频后确认",
+              "technology": "`shotReady` + `shot.confirmed`；保存 `/yingxu`",
+              "id": "P11-C04-F08"
+            }
+          ]
+        },
+        {
+          "id": "P11-C05",
+          "title": "音乐卡",
+          "rows": [
+            {
+              "element": "上传音乐、选择音乐库文件",
+              "description": "添加或切换真实配乐",
+              "technology": "`/yingxu-files?kind=audio`；`bgmFileId`；本地音频列表",
+              "id": "P11-C05-F01"
+            },
+            {
+              "element": "音乐方向、AI 生成配乐",
+              "description": "按时长和方向生成真实 WAV",
+              "technology": "POST `/music-generate` → Kimi 音符谱 → `media/ai_music.py` 本地合成 WAV",
+              "id": "P11-C05-F02"
+            },
+            {
+              "element": "时长适配方式、AI 适配时长",
+              "description": "生成淡出、循环或保留无音乐段落的独立版本",
+              "technology": "POST `/music-adapt`；FFmpeg 音频处理；`musicAdaptedFileId/adapted_from`",
+              "id": "P11-C05-F03"
+            },
+            {
+              "element": "试听适配后配乐与旁白",
+              "description": "同步试听，音乐音量 35%，可暂停",
+              "technology": "浏览器双 `<audio>` 播放；不调用云端，不修改音频",
+              "id": "P11-C05-F04"
+            },
+            {
+              "element": "分离当前音频人声／伴奏",
+              "description": "生成独立人声和伴奏，原曲不变",
+              "technology": "POST `/audio-separate` → Kimi 规划 + 本地 Demucs；新文件记录",
+              "id": "P11-C05-F05"
+            },
+            {
+              "element": "确认适配效果／不另加音乐、确认音乐",
+              "description": "记录人工确认，清除旧最终验收",
+              "technology": "`musicConfirmed/finalApprovedFileId`；`confirmationReady/conflictResolved` 门槛",
+              "id": "P11-C05-F06"
+            }
+          ]
+        },
+        {
+          "id": "P11-C06",
+          "title": "音乐库卡",
+          "rows": [
+            {
+              "element": "选择／更换本地文件夹",
+              "description": "批量导入支持的音频到当前项目",
+              "technology": "浏览器 `webkitdirectory`；过滤音频扩展并逐个上传；文件复制到项目",
+              "id": "P11-C06-F01"
+            }
+          ]
+        },
+        {
+          "id": "P11-C07",
+          "title": "音乐冲突卡",
+          "rows": [
+            {
+              "element": "原声不另加／先处理再换／叠加",
+              "description": "解决原视频声音与新音乐冲突",
+              "technology": "`musicConflict/musicConflictResolved`；`replacementReady` 检查各镜声音选择",
+              "id": "P11-C07-F01"
+            }
+          ]
+        },
+        {
+          "id": "P11-C08",
+          "title": "样片卡",
+          "rows": [
+            {
+              "element": "选择分镜、生成样片",
+              "description": "生成真实单镜或选中镜样片",
+              "technology": "POST `/yingxu-render {preview:true}`；Node/Remotion + FFmpeg；`sampleFileIds`",
+              "id": "P11-C08-F01"
+            },
+            {
+              "element": "样片通过",
+              "description": "人工确认每个必需样片",
+              "technology": "`sampleApprovedFileIds`；`sampleApproved()` 检查全部必需 ID",
+              "id": "P11-C08-F02"
+            }
+          ]
+        },
+        {
+          "id": "P11-C09",
+          "title": "合成验收卡",
+          "rows": [
+            {
+              "element": "Remotion 时间线按钮",
+              "description": "未配置，点击无效果",
+              "technology": "禁用按钮，无接口；独立 Studio 未交付",
+              "id": "P11-C09-F01"
+            },
+            {
+              "element": "生成完整成片",
+              "description": "渲染完整 MP4，不用单镜冒充整片",
+              "technology": "POST `/yingxu-render {preview:false}`；Remotion 时间线 + 音轨混合 + FFprobe 校验",
+              "id": "P11-C09-F02"
+            },
+            {
+              "element": "成片版本、预览、验收通过",
+              "description": "选择真实成片，人工验收当前版本",
+              "technology": "`finalFileId/finalApprovedFileId`；`files.kind=video` 与本地 `<video>`",
+              "id": "P11-C09-F03"
+            },
+            {
+              "element": "下载成片",
+              "description": "下载当前已验收完整成片",
+              "technology": "文件 `download_url`；只有验收后显示",
+              "id": "P11-C09-F04"
+            },
+            {
+              "element": "推送到发布中心",
+              "description": "绑定项目、文件、revision 和哈希，建立审核批次并跳转",
+              "technology": "POST `/yingxu-handoff` → `ReviewService.receive_delivery`；`review_deliveries/review_batches/items`；不等于公开发布",
+              "id": "P11-C09-F05"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "真实视频、模型、Whisper、Remotion、FFmpeg 和使用授权"
+        }
+      ],
+      "checklist": [
+        "核对“提供参考卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“拆解报告卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“逐镜替换卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“镜头详情弹窗”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“音乐卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“音乐库卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“音乐冲突卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“样片卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“合成验收卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "videoProjects/*.tsx、useVideoProject.ts"
+        ],
+        [
+          "服务",
+          "app.py 项目接口、专用 Chrome、Kimi/本地媒体引擎"
+        ],
+        [
+          "数据",
+          "tasks、files、source_json.yingxu、review_deliveries、renders"
+        ]
+      ]
+    },
+    {
+      "id": "legacy-editor",
+      "order": 12,
+      "title": "旧视频编辑器",
+      "route": "/demo/tasks/:id/editor",
+      "purpose": "继续使用旧六阶段流程和原版本记录",
+      "dependencies": "旧任务、素材、媒体工具和版本状态；不强制迁移",
+      "screenshot": "assets/screenshots/legacy-editor.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "兼容工作区",
+          "task": "保留原项目链接，不强制迁移"
+        },
+        {
+          "order": 2,
+          "card": "项目操作卡",
+          "task": "查找并继续真实项目"
+        },
+        {
+          "order": 3,
+          "card": "新建任务弹窗",
+          "task": "创建兼容项目；标题最多 200 字且必填"
+        },
+        {
+          "order": 4,
+          "card": "文稿卡",
+          "task": "编辑母稿或平台口播稿，当前版本独立保存"
+        },
+        {
+          "order": 5,
+          "card": "录音字幕卡",
+          "task": "上传 WAV／MP3／M4A／AAC，最大 500MB"
+        },
+        {
+          "order": 6,
+          "card": "素材规划卡",
+          "task": "按字幕、母稿和音频时长生成规划"
+        },
+        {
+          "order": 7,
+          "card": "素材清单卡",
+          "task": "上传图片、视频、音频、PDF／TXT 授权材料"
+        },
+        {
+          "order": 8,
+          "card": "制作方案卡",
+          "task": "选择智能混合、素材混合、全部上传及模板"
+        },
+        {
+          "order": 9,
+          "card": "自动生产卡",
+          "task": "启动／取消／重排真实生产任务"
+        },
+        {
+          "order": 10,
+          "card": "封面卡",
+          "task": "生成／抽取／上传真实封面"
+        },
+        {
+          "order": 11,
+          "card": "结果版本卡",
+          "task": "每个风格独立下载、检查和重做"
+        },
+        {
+          "order": 12,
+          "card": "五项质检卡",
+          "task": "逐项人工检查并保存"
+        },
+        {
+          "order": 13,
+          "card": "人工终审卡",
+          "task": "完整观看后批准当前文件"
+        },
+        {
+          "order": 14,
+          "card": "复盘卡",
+          "task": "输入播放、互动等，空值不自动变 0"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P12-C01",
+          "title": "兼容工作区",
+          "rows": [
+            {
+              "element": "项目首页、原创项目、原编辑器入口",
+              "description": "保留原项目链接，不强制迁移",
+              "technology": "React Router；无 `project_type` 时按原创读取；原 `tasks/files/video_variants`",
+              "id": "P12-C01-F01"
+            }
+          ]
+        },
+        {
+          "id": "P12-C02",
+          "title": "项目操作卡",
+          "rows": [
+            {
+              "element": "返回最新、刷新、搜索、分页",
+              "description": "查找并继续真实项目",
+              "technology": "GET `/api/tasks`、`/api/tasks/:id`；SQLite 原任务与前端筛选",
+              "id": "P12-C02-F01"
+            }
+          ]
+        },
+        {
+          "id": "P12-C03",
+          "title": "新建任务弹窗",
+          "rows": [
+            {
+              "element": "来源与发布约定：选题／文章、标题、原文、平台、方向、受众、审核与发布方式",
+              "description": "创建兼容项目；标题最多 200 字且必填",
+              "technology": "POST `/api/tasks`；`tasks.source_json` 保存来源和约定",
+              "id": "P12-C03-F01"
+            }
+          ]
+        },
+        {
+          "id": "P12-C04",
+          "title": "文稿卡",
+          "rows": [
+            {
+              "element": "版本标签、文稿输入",
+              "description": "编辑母稿或平台口播稿，当前版本独立保存",
+              "technology": "PUT `/api/tasks/:id/scripts`；`tasks.source_json` 文稿和 revision",
+              "id": "P12-C04-F01"
+            },
+            {
+              "element": "生成此栏／重写、保存、确认口播",
+              "description": "生成当前版本或保存人工稿并推进",
+              "technology": "POST `/generate-scripts` → 脚本 Agent；`/scripts` 与 `/actions` 状态机",
+              "id": "P12-C04-F02"
+            }
+          ]
+        },
+        {
+          "id": "P12-C05",
+          "title": "录音字幕卡",
+          "rows": [
+            {
+              "element": "真人录音上传",
+              "description": "上传 WAV／MP3／M4A／AAC，最大 500MB",
+              "technology": "POST `/files?kind=audio`；流式上传 + FFprobe；`files` 本地记录",
+              "id": "P12-C05-F01"
+            },
+            {
+              "element": "音频列表、试听、下载",
+              "description": "播放或下载真实音频",
+              "technology": "`<audio>` + `/api/files/:id/media`；本地文件路径",
+              "id": "P12-C05-F02"
+            },
+            {
+              "element": "源音频、模型、WhisperX 生成 SRT",
+              "description": "本地转写选中音频",
+              "technology": "POST `/transcribe`；`workers/whisperx_worker.py` + faster-whisper；生成 `files.kind=subtitle`",
+              "id": "P12-C05-F03"
+            },
+            {
+              "element": "上传 SRT、字幕校对",
+              "description": "上传或编辑有效字幕，保存时重检",
+              "technology": "`/files?kind=subtitle`；PUT `/subtitles`；SRT 时间轴解析",
+              "id": "P12-C05-F04"
+            },
+            {
+              "element": "脚本版本、音色、TTS 文本、生成 AI 录音",
+              "description": "生成系统语音或本人授权克隆 WAV",
+              "technology": "`/generate-audio`／`generate-clone-audio`；macOS `say` 或 OpenVoice；真实文件校验",
+              "id": "P12-C05-F05"
+            },
+            {
+              "element": "样本档案名、本人样本、授权确认",
+              "description": "保存本人音色档案，授权必选",
+              "technology": "`voice_samples`／本地语音配置；样本上传 500MB 限制与授权字段",
+              "id": "P12-C05-F06"
+            },
+            {
+              "element": "确认录音与字幕、返回修改脚本",
+              "description": "推进或回退，后续确认按状态失效",
+              "technology": "POST `/actions {confirm_audio/revise_script}`；任务状态机与文件存在性检查",
+              "id": "P12-C05-F07"
+            }
+          ]
+        },
+        {
+          "id": "P12-C06",
+          "title": "素材规划卡",
+          "rows": [
+            {
+              "element": "SRT、允许素材类型、生成建议",
+              "description": "按字幕、母稿和音频时长生成规划",
+              "technology": "POST `/generate-asset-plan` → 素材规划 Agent；只生成文本计划",
+              "id": "P12-C06-F01"
+            }
+          ]
+        },
+        {
+          "id": "P12-C07",
+          "title": "素材清单卡",
+          "rows": [
+            {
+              "element": "上传素材与凭证",
+              "description": "上传图片、视频、音频、PDF／TXT 授权材料",
+              "technology": "`/files?kind=asset`；500MB 限制与任务目录存储",
+              "id": "P12-C07-F01"
+            },
+            {
+              "element": "添加／移除、名称、来源、关联文件",
+              "description": "维护逐项分镜和素材关系",
+              "technology": "PUT `/assets`；`asset_plan` 写入任务来源，文件 ID 关联",
+              "id": "P12-C07-F02"
+            },
+            {
+              "element": "起止秒、素材类型、画面关系",
+              "description": "设置素材使用方式",
+              "technology": "同上；FFmpeg／Remotion 制作时读取",
+              "id": "P12-C07-F03"
+            },
+            {
+              "element": "搜索词、提示词、授权风险、备注、授权复选",
+              "description": "记录检索、生成和授权边界",
+              "technology": "同上；勾选不代表系统验证版权",
+              "id": "P12-C07-F04"
+            },
+            {
+              "element": "保存、跳过未完成、确认全部授权",
+              "description": "保存计划或推进制作",
+              "technology": "PUT `/assets` + `/actions`；未完成项需明确跳过或确认",
+              "id": "P12-C07-F05"
+            }
+          ]
+        },
+        {
+          "id": "P12-C08",
+          "title": "制作方案卡",
+          "rows": [
+            {
+              "element": "渲染模式、目标平台、模板",
+              "description": "选择智能混合、素材混合、全部上传及模板",
+              "technology": "`production_preset`；`media/templates.py`；Remotion／FFmpeg 渲染策略",
+              "id": "P12-C08-F01"
+            },
+            {
+              "element": "烧录字幕",
+              "description": "仅全部上传模式设置字幕烧录",
+              "technology": "FFmpeg subtitles 滤镜；`burn` 参数",
+              "id": "P12-C08-F02"
+            }
+          ]
+        },
+        {
+          "id": "P12-C09",
+          "title": "自动生产卡",
+          "rows": [
+            {
+              "element": "生成成片、取消、重试",
+              "description": "启动／取消／重排真实生产任务",
+              "technology": "`/produce`、`/jobs/:id/cancel或retry`；`wb_jobs` + Remotion worker",
+              "id": "P12-C09-F01"
+            },
+            {
+              "element": "查看预览、手动上传成片",
+              "description": "预览文件或上传 MP4／MOV／WebM",
+              "technology": "本地文件 URL；`/files?kind=video`；重复上传使旧质检失效",
+              "id": "P12-C09-F02"
+            }
+          ]
+        },
+        {
+          "id": "P12-C10",
+          "title": "封面卡",
+          "rows": [
+            {
+              "element": "AI 封面、成片抽帧、上传封面",
+              "description": "生成／抽取／上传真实封面",
+              "technology": "`/cover`、封面抽帧逻辑和 `/files`；Kimi／FFmpeg／本地图片校验",
+              "id": "P12-C10-F01"
+            }
+          ]
+        },
+        {
+          "id": "P12-C11",
+          "title": "结果版本卡",
+          "rows": [
+            {
+              "element": "下载、质检／审批、重新生成",
+              "description": "每个风格独立下载、检查和重做",
+              "technology": "`video_variants` 关联 template version、file_id 和质量状态",
+              "id": "P12-C11-F01"
+            }
+          ]
+        },
+        {
+          "id": "P12-C12",
+          "title": "五项质检卡",
+          "rows": [
+            {
+              "element": "当前版本、五项复选、备注",
+              "description": "逐项人工检查并保存",
+              "technology": "PUT `/quality`；`video_variants.quality_json`；五项齐全才能提交",
+              "id": "P12-C12-F01"
+            },
+            {
+              "element": "保存、返修素材、仅重做成片、提交终审",
+              "description": "保存结果或回退对应阶段",
+              "technology": "`/quality` + `/actions`；状态机清除后续审批",
+              "id": "P12-C12-F02"
+            }
+          ]
+        },
+        {
+          "id": "P12-C13",
+          "title": "人工终审卡",
+          "rows": [
+            {
+              "element": "当前版本、批准此版本",
+              "description": "完整观看后批准当前文件",
+              "technology": "`/actions {approve_final,variant_id}`；审批绑定具体版本和文件",
+              "id": "P12-C13-F01"
+            }
+          ]
+        },
+        {
+          "id": "P12-C14",
+          "title": "复盘卡",
+          "rows": [
+            {
+              "element": "四窗口真实指标",
+              "description": "输入播放、互动等，空值不自动变 0",
+              "technology": "PUT `/metrics`；`tasks.source_json.metrics` 按时间窗口保存",
+              "id": "P12-C14-F01"
+            },
+            {
+              "element": "复盘结论、保存、完成归档",
+              "description": "保存经验或完成复盘",
+              "technology": "`/metrics` + 状态机；四窗口播放／阅读和结论齐全才能归档",
+              "id": "P12-C14-F02"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "旧任务、素材、媒体工具和版本状态；不强制迁移"
+        }
+      ],
+      "checklist": [
+        "核对“兼容工作区”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“项目操作卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“新建任务弹窗”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“文稿卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“录音字幕卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“素材规划卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“素材清单卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“制作方案卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“自动生产卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“封面卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“结果版本卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“五项质检卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“人工终审卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“复盘卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "Tasks.tsx、VideoStages.tsx"
+        ],
+        [
+          "服务",
+          "app.py 原任务状态机、媒体 worker、Remotion/FFmpeg"
+        ],
+        [
+          "数据",
+          "tasks、files、video_variants、source_json、wb_jobs"
+        ]
+      ]
+    },
+    {
+      "id": "review",
+      "order": 13,
+      "title": "短视频审核中心",
+      "route": "/demo/review",
+      "purpose": "读取本地视频，技术预审、AI 风险证据和人工终审",
+      "dependencies": "FFmpeg／FFprobe；OCR／模型按需；原文件不覆盖",
+      "screenshot": "assets/screenshots/review.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "映序成片卡",
+          "task": "查看项目、文件和制作版本，返回原项目；过期时警告"
+        },
+        {
+          "order": 2,
+          "card": "选择或切换内容来源卡",
+          "task": "扫描当前目录支持的视频，不递归、不改原文件"
+        },
+        {
+          "order": 3,
+          "card": "机器预审卡",
+          "task": "设置尺寸和时长规则；尺寸正整数，时长正数且大于最短时长"
+        },
+        {
+          "order": 4,
+          "card": "批次进度卡",
+          "task": "查看当前批次真实状态"
+        },
+        {
+          "order": 5,
+          "card": "单视频审核卡",
+          "task": "播放真实文件，查看技术报告和 AI 证据"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P13-C01",
+          "title": "映序成片卡",
+          "rows": [
+            {
+              "element": "来源信息、返回映序制作",
+              "description": "查看项目、文件和制作版本，返回原项目；过期时警告",
+              "technology": "`review_deliveries` 关联 `tasks/files/revision/SHA-256`；GET `/api/review/yingxu/:content_id`",
+              "id": "P13-C01-F01"
+            }
+          ]
+        },
+        {
+          "id": "P13-C02",
+          "title": "选择或切换内容来源卡",
+          "rows": [
+            {
+              "element": "文件夹路径、选择文件夹、读取文件夹",
+              "description": "扫描当前目录支持的视频，不递归、不改原文件",
+              "technology": "POST `/api/review/batches`；`ReviewService.create` + `VIDEO_EXTENSIONS`",
+              "id": "P13-C02-F01"
+            },
+            {
+              "element": "新建上传批次、文件多选、上传 N 个视频",
+              "description": "上传 MP4／MOV／WebM／MKV 并形成审核项",
+              "technology": "POST `/api/review/uploads`；流式上传 + 文件检查 + `review_batches/items`",
+              "id": "P13-C02-F02"
+            }
+          ]
+        },
+        {
+          "id": "P13-C03",
+          "title": "机器预审卡",
+          "rows": [
+            {
+              "element": "目标宽／高、最长时长",
+              "description": "设置尺寸和时长规则；尺寸正整数，时长正数且大于最短时长",
+              "technology": "`review/schemas.validate_rules`；默认 1080×1920、180 秒",
+              "id": "P13-C03-F01"
+            },
+            {
+              "element": "黑帧／静音阈值",
+              "description": "设置连续异常秒数，必须大于 0",
+              "technology": "同上；FFmpeg `blackdetect/silencedetect`",
+              "id": "P13-C03-F02"
+            },
+            {
+              "element": "OCR、AI 风险复选",
+              "description": "分别启用字幕越界和模型风险证据",
+              "technology": "RapidOCR 帧分析 + 配置的风险 Agent；均不替代人工合规判断",
+              "id": "P13-C03-F03"
+            },
+            {
+              "element": "开始机器预审",
+              "description": "生成技术报告、问题时间点和修复建议",
+              "technology": "POST `/api/review/batches/:id/start` → `wb_jobs` → `ReviewExecutors` + FFprobe／FFmpeg",
+              "id": "P13-C03-F04"
+            }
+          ]
+        },
+        {
+          "id": "P13-C04",
+          "title": "批次进度卡",
+          "rows": [
+            {
+              "element": "总数、待终审、通过、失败统计",
+              "description": "查看当前批次真实状态",
+              "technology": "`ReviewService.bootstrap` 聚合 `review_items.status/decision`",
+              "id": "P13-C04-F01"
+            },
+            {
+              "element": "通过全部无阻断项",
+              "description": "只通过有报告、无 error、未过期且未预审的项目",
+              "technology": "POST `/api/review/items/:id/decide`；`ReviewService.decide` 条件校验",
+              "id": "P13-C04-F02"
+            }
+          ]
+        },
+        {
+          "id": "P13-C05",
+          "title": "单视频审核卡",
+          "rows": [
+            {
+              "element": "视频预览、技术检查、问题与风险",
+              "description": "播放真实文件，查看技术报告和 AI 证据",
+              "technology": "`/api/files/:id/media`；`report/ai_risk` JSON；本地文件路径",
+              "id": "P13-C05-F01"
+            },
+            {
+              "element": "查看检查详情",
+              "description": "展开只读原始报告",
+              "technology": "React 展开状态；不调用修改接口",
+              "id": "P13-C05-F02"
+            },
+            {
+              "element": "安全转码并复审",
+              "description": "对 eligible 文件生成安全输出并重新预审",
+              "technology": "POST `/api/review/items/:id/repair`；FFmpeg 新输出 + 新哈希，不覆盖原文件",
+              "id": "P13-C05-F03"
+            },
+            {
+              "element": "驳回、人工通过",
+              "description": "记录人工终审决定；错误或过期项不能通过",
+              "technology": "`/decide`；`review_items.decision/output_path`，与发布来源衔接",
+              "id": "P13-C05-F04"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "FFmpeg／FFprobe；OCR／模型按需；原文件不覆盖"
+        }
+      ],
+      "checklist": [
+        "核对“映序成片卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“选择或切换内容来源卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“机器预审卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“批次进度卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“单视频审核卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "Review.tsx"
+        ],
+        [
+          "服务",
+          "ReviewService、ReviewExecutors、review/schemas.py"
+        ],
+        [
+          "数据",
+          "review_batches、review_items、review_deliveries、本地原文件与新输出"
+        ]
+      ]
+    },
+    {
+      "id": "publish",
+      "order": 14,
+      "title": "发布中心",
+      "route": "/demo/publish",
+      "purpose": "接收审核成果，编辑平台字段、预填、排期和结果核对",
+      "dependencies": "审核来源、模型、专用 Chrome；预填不等于公开发布",
+      "screenshot": "assets/screenshots/publish.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "类型与记录卡",
+          "task": "切换内容类型和来源"
+        },
+        {
+          "order": 2,
+          "card": "发布记录卡",
+          "task": "筛选并选择需要预填的记录"
+        },
+        {
+          "order": 3,
+          "card": "审核成果来源卡",
+          "task": "查看真实文件或定位审核批次"
+        },
+        {
+          "order": 4,
+          "card": "文章来源卡",
+          "task": "选择已批准文章，不读取视频替代"
+        },
+        {
+          "order": 5,
+          "card": "发布 Agent 字段生成卡",
+          "task": "输入文本生成附加规则，最多 2000 字"
+        },
+        {
+          "order": 6,
+          "card": "平台卡共用区",
+          "task": "选择进入批次的平台，锁定状态不能重复提交"
+        },
+        {
+          "order": 7,
+          "card": "抖音视频卡",
+          "task": "标题必填 30 字；描述必填并与话题合计 1000 字"
+        },
+        {
+          "order": 8,
+          "card": "小红书视频卡",
+          "task": "标题必填 20 字；正文与话题合计 1000 字"
+        },
+        {
+          "order": 9,
+          "card": "小红书文章卡",
+          "task": "标题 20 字、正文 6000 字；描述与话题 1000 字；模板需验证"
+        },
+        {
+          "order": 10,
+          "card": "视频号卡",
+          "task": "短标题 16 字、描述安全上限 2000 字；当前手动发布"
+        },
+        {
+          "order": 11,
+          "card": "公众号卡",
+          "task": "标题 64、作者 8、摘要 120 字；正文以编辑器读回为准"
+        },
+        {
+          "order": 12,
+          "card": "批次操作栏",
+          "task": "保存平台选择和字段，不执行预填"
+        },
+        {
+          "order": 13,
+          "card": "公开确认弹窗",
+          "task": "二次确认后执行；未知结果禁止直接重试"
+        },
+        {
+          "order": 14,
+          "card": "定时队列卡",
+          "task": "设置第一次执行时间"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P14-C01",
+          "title": "类型与记录卡",
+          "rows": [
+            {
+              "element": "文章发布／视频发布标签",
+              "description": "切换内容类型和来源",
+              "technology": "React 查询参数；`PublishingService.bootstrap(kind,id)`",
+              "id": "P14-C01-F01"
+            }
+          ]
+        },
+        {
+          "id": "P14-C02",
+          "title": "发布记录卡",
+          "rows": [
+            {
+              "element": "状态筛选、搜索、来源复选",
+              "description": "筛选并选择需要预填的记录",
+              "technology": "GET `/api/publishing/queue`；`publish_batches/targets` 本地筛选",
+              "id": "P14-C02-F01"
+            },
+            {
+              "element": "全选当前筛选、提交选中后台预填",
+              "description": "批量提交 draft／failed 目标预填",
+              "technology": "POST `/api/publishing/batches/:id/prepare`；`wb_jobs` + `PublishingExecutors.prepare`",
+              "id": "P14-C02-F02"
+            }
+          ]
+        },
+        {
+          "id": "P14-C03",
+          "title": "审核成果来源卡",
+          "rows": [
+            {
+              "element": "查看成片、打开对应审核",
+              "description": "查看真实文件或定位审核批次",
+              "technology": "`/api/files/:id/media`；`review_deliveries.review_batch_id`",
+              "id": "P14-C03-F01"
+            },
+            {
+              "element": "准备发布字段",
+              "description": "打开对应审核项的发布编辑区",
+              "technology": "`PublishingService.source_for_publish` 校验批准输出、当前路径与 SHA-256",
+              "id": "P14-C03-F02"
+            }
+          ]
+        },
+        {
+          "id": "P14-C04",
+          "title": "文章来源卡",
+          "rows": [
+            {
+              "element": "文章来源下拉框",
+              "description": "选择已批准文章，不读取视频替代",
+              "technology": "`PublishingService.source(\"article\")`；`wb_content_items/wb_revisions/wb_approvals`",
+              "id": "P14-C04-F01"
+            }
+          ]
+        },
+        {
+          "id": "P14-C05",
+          "title": "发布 Agent 字段生成卡",
+          "rows": [
+            {
+              "element": "补充要求",
+              "description": "输入文本生成附加规则，最多 2000 字",
+              "technology": "POST `/api/publishing/generate-fields` 时传入 prompt；`useContentDraft` 保存本机草稿",
+              "id": "P14-C05-F01"
+            },
+            {
+              "element": "生成选中平台字段",
+              "description": "回填文本并保存本机草稿，需再保存正式批次",
+              "technology": "`PublishingExecutors.generate_fields` → 发布 Agent + `publish_knowledge` 字段契约；不自动公开",
+              "id": "P14-C05-F02"
+            }
+          ]
+        },
+        {
+          "id": "P14-C06",
+          "title": "平台卡共用区",
+          "rows": [
+            {
+              "element": "平台启用复选",
+              "description": "选择进入批次的平台，锁定状态不能重复提交",
+              "technology": "`publish_targets` 状态机；`lockedStatuses` 前端与后端共同校验",
+              "id": "P14-C06-F01"
+            },
+            {
+              "element": "打开专用浏览器登录",
+              "description": "在固定窗口打开对应后台并等待本人登录",
+              "technology": "`/api/publishing/connections/:platform/login` → `publishing/browser_worker.py` → Playwright CDP 专用 Chrome",
+              "id": "P14-C06-F02"
+            },
+            {
+              "element": "复制发布内容、手动复制",
+              "description": "复制当前字段；剪贴板失败时手动选择",
+              "technology": "Navigator Clipboard API；失败只显示备用文本域，不伪报成功",
+              "id": "P14-C06-F03"
+            },
+            {
+              "element": "手动打开后台",
+              "description": "用默认浏览器打开平台官网",
+              "technology": "平台外链；与专用 Chrome 登录入口不同",
+              "id": "P14-C06-F04"
+            },
+            {
+              "element": "下载视频／文章配图长图",
+              "description": "下载审核文件或回文章页下载",
+              "technology": "文件下载 URL／文章路由；真实文件与资产 ID",
+              "id": "P14-C06-F05"
+            },
+            {
+              "element": "重试失败预览",
+              "description": "按已保存内容重新预填失败目标",
+              "technology": "`/api/publishing/targets/:id/retry`；fencing job_id 防止旧任务结果覆盖",
+              "id": "P14-C06-F06"
+            },
+            {
+              "element": "已在后台核实为已发布",
+              "description": "输入人工证据，登记未知远端结果",
+              "technology": "`/targets/:id/reconcile`；`unknown_remote → published` 仅在人工证据后",
+              "id": "P14-C06-F07"
+            }
+          ]
+        },
+        {
+          "id": "P14-C07",
+          "title": "抖音视频卡",
+          "rows": [
+            {
+              "element": "标题、描述、话题",
+              "description": "标题必填 30 字；描述必填并与话题合计 1000 字",
+              "technology": "`publishing/contracts.py (douyin,video)`；`validate_generated_fields` 长度和组合校验",
+              "id": "P14-C07-F01"
+            }
+          ]
+        },
+        {
+          "id": "P14-C08",
+          "title": "小红书视频卡",
+          "rows": [
+            {
+              "element": "标题、正文、话题",
+              "description": "标题必填 20 字；正文与话题合计 1000 字",
+              "technology": "`(xiaohongshu,video)` 契约 + 发布浏览器字段读回",
+              "id": "P14-C08-F01"
+            }
+          ]
+        },
+        {
+          "id": "P14-C09",
+          "title": "小红书文章卡",
+          "rows": [
+            {
+              "element": "长文标题、正文、发布描述、话题、模板",
+              "description": "标题 20 字、正文 6000 字；描述与话题 1000 字；模板需验证",
+              "technology": "`(xiaohongshu,article)` 契约；`prepare_xhs_article` 检查图片数量、文本和平台状态",
+              "id": "P14-C09-F01"
+            }
+          ]
+        },
+        {
+          "id": "P14-C10",
+          "title": "视频号卡",
+          "rows": [
+            {
+              "element": "短标题、描述、话题",
+              "description": "短标题 16 字、描述安全上限 2000 字；当前手动发布",
+              "technology": "`(wechat_channels,video)` 契约；`manual_transfer`，不宣称自动上传已验收",
+              "id": "P14-C10-F01"
+            }
+          ]
+        },
+        {
+          "id": "P14-C11",
+          "title": "公众号卡",
+          "rows": [
+            {
+              "element": "标题、作者、正文、摘要",
+              "description": "标题 64、作者 8、摘要 120 字；正文以编辑器读回为准",
+              "technology": "`(wechat_official_account,article)` 契约；当前手动发布，封面等由平台处理",
+              "id": "P14-C11-F01"
+            }
+          ]
+        },
+        {
+          "id": "P14-C12",
+          "title": "批次操作栏",
+          "rows": [
+            {
+              "element": "保存文章／视频批次",
+              "description": "保存平台选择和字段，不执行预填",
+              "technology": "POST `/api/publishing/batches`；`source_hash` 绑定内容版本",
+              "id": "P14-C12-F01"
+            },
+            {
+              "element": "一键同步到后台",
+              "description": "保存后提交可编辑目标预填",
+              "technology": "`/batches` + `/prepare`；`publishing/browser_worker.py` 上传／读回；不是公开发布",
+              "id": "P14-C12-F02"
+            }
+          ]
+        },
+        {
+          "id": "P14-C13",
+          "title": "公开确认弹窗",
+          "rows": [
+            {
+              "element": "返回检查、确认公开",
+              "description": "二次确认后执行；未知结果禁止直接重试",
+              "technology": "`/batches/:id/confirm` → `PublishingExecutors.execute`；仅明确启用环境 + ready + source hash 一致",
+              "id": "P14-C13-F01"
+            }
+          ]
+        },
+        {
+          "id": "P14-C14",
+          "title": "定时队列卡",
+          "rows": [
+            {
+              "element": "首次发布时间",
+              "description": "设置第一次执行时间",
+              "technology": "`/api/schedule`；`ScheduleService._datetime` 解析 ISO 时间并转 UTC",
+              "id": "P14-C14-F01"
+            },
+            {
+              "element": "全局间隔、每日上限",
+              "description": "设置正整数分钟数和每日数量",
+              "technology": "`ScheduleService._positive`；`publish_schedules`",
+              "id": "P14-C14-F02"
+            },
+            {
+              "element": "创建定时队列",
+              "description": "为已预览且 source hash 确认的目标排期",
+              "technology": "`ScheduleService.create_schedule`；`publish_queue` + 时间槽计算",
+              "id": "P14-C14-F03"
+            },
+            {
+              "element": "暂停／恢复、应用设置",
+              "description": "修改队列状态或排期",
+              "technology": "`/api/schedule/:id`；`update_schedule`；不重写内容版本",
+              "id": "P14-C14-F04"
+            },
+            {
+              "element": "取消未开始",
+              "description": "只取消 queued 项，运行中不变",
+              "technology": "`/api/schedule/:id/cancel`；`publish_queue.status`",
+              "id": "P14-C14-F05"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "审核来源、模型、专用 Chrome；预填不等于公开发布"
+        }
+      ],
+      "checklist": [
+        "核对“类型与记录卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“发布记录卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“审核成果来源卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“文章来源卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“发布 Agent 字段生成卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“平台卡共用区”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“抖音视频卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“小红书视频卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“小红书文章卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“视频号卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“公众号卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“批次操作栏”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“公开确认弹窗”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“定时队列卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "Publish.tsx、PublishingPanel.tsx、ScheduleSettings.tsx"
+        ],
+        [
+          "服务",
+          "PublishingService、PublishingExecutors、ScheduleService、专用 Chrome"
+        ],
+        [
+          "数据",
+          "publish_batches、publish_targets、publish_schedules、publish_queue"
+        ]
+      ]
+    },
+    {
+      "id": "knowledge",
+      "order": 15,
+      "title": "增长记忆大脑",
+      "route": "/demo/knowledge",
+      "purpose": "维护有效经验、避坑记录和知识关系，供选题参考",
+      "dependencies": "真实证据与效果数据；待验证不能冒充成功规律",
+      "screenshot": "assets/screenshots/knowledge.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "知识回填卡",
+          "task": "按稳定 ID 回填实体、规则和关系，避免重复"
+        },
+        {
+          "order": 2,
+          "card": "搜索与筛选卡",
+          "task": "查找或恢复实体列表"
+        },
+        {
+          "order": 3,
+          "card": "知识网络卡",
+          "task": "查看真实实体关系和来源"
+        },
+        {
+          "order": 4,
+          "card": "编辑与审批规则卡",
+          "task": "查看供文章、选题、审核复用的规则"
+        },
+        {
+          "order": 5,
+          "card": "记忆统计卡",
+          "task": "查看真实数量和启用状态"
+        },
+        {
+          "order": 6,
+          "card": "记忆编辑卡",
+          "task": "打开编辑并填写名称，标题必填最多 200 字"
+        },
+        {
+          "order": 7,
+          "card": "记忆列表卡",
+          "task": "按标题、经验和效果筛选"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P15-C01",
+          "title": "知识回填卡",
+          "rows": [
+            {
+              "element": "同步现有数据到知识库",
+              "description": "按稳定 ID 回填实体、规则和关系，避免重复",
+              "technology": "POST `/api/knowledge/backfill`；`KnowledgeService.backfill` → `kb_entities/kb_rules/kb_relations`",
+              "id": "P15-C01-F01"
+            }
+          ]
+        },
+        {
+          "id": "P15-C02",
+          "title": "搜索与筛选卡",
+          "rows": [
+            {
+              "element": "实体关键词、类型、搜索、清空",
+              "description": "查找或恢复实体列表",
+              "technology": "GET `/api/knowledge/bootstrap`；SQLite 查询与前端筛选",
+              "id": "P15-C02-F01"
+            }
+          ]
+        },
+        {
+          "id": "P15-C03",
+          "title": "知识网络卡",
+          "rows": [
+            {
+              "element": "实体条目、属性、关系、来源证据",
+              "description": "查看真实实体关系和来源",
+              "technology": "`kb_entities/kb_relations`；`KnowledgeService` JSON 属性与 evidence",
+              "id": "P15-C03-F01"
+            }
+          ]
+        },
+        {
+          "id": "P15-C04",
+          "title": "编辑与审批规则卡",
+          "rows": [
+            {
+              "element": "规则列表",
+              "description": "查看供文章、选题、审核复用的规则",
+              "technology": "`kb_rules`；由账号策略初始化，不是模型临时生成",
+              "id": "P15-C04-F01"
+            }
+          ]
+        },
+        {
+          "id": "P15-C05",
+          "title": "记忆统计卡",
+          "rows": [
+            {
+              "element": "总量、有效、避坑、参与推荐",
+              "description": "查看真实数量和启用状态",
+              "technology": "`growth_memories.payload_json`；前端统计",
+              "id": "P15-C05-F01"
+            }
+          ]
+        },
+        {
+          "id": "P15-C06",
+          "title": "记忆编辑卡",
+          "rows": [
+            {
+              "element": "新增、标题",
+              "description": "打开编辑并填写名称，标题必填最多 200 字",
+              "technology": "POST `/api/knowledge/memories`；`KnowledgeService.save_memory` 非空校验",
+              "id": "P15-C06-F01"
+            },
+            {
+              "element": "适用平台、内容类型、判断",
+              "description": "选择平台、文章／视频／规则、有效／避坑／待验证",
+              "technology": "同接口；枚举校验 `platform/kind/outcome`",
+              "id": "P15-C06-F02"
+            },
+            {
+              "element": "来源、效果依据",
+              "description": "有效／避坑必填，各最多 4000 字；待验证可空",
+              "technology": "`MEMORY_EVIDENCE_REQUIRED` 与 `MEMORY_TOO_LONG`",
+              "id": "P15-C06-F03"
+            },
+            {
+              "element": "可复用经验、保存、取消",
+              "description": "保存经验与适用场景；正文必填最多 4000 字",
+              "technology": "`growth_memories` UPSERT；`save_memory` 校验",
+              "id": "P15-C06-F04"
+            }
+          ]
+        },
+        {
+          "id": "P15-C07",
+          "title": "记忆列表卡",
+          "rows": [
+            {
+              "element": "搜索、分类筛选",
+              "description": "按标题、经验和效果筛选",
+              "technology": "前端读取 `/api/knowledge/memories` 后过滤",
+              "id": "P15-C07-F01"
+            },
+            {
+              "element": "编辑、暂停／启用推荐",
+              "description": "更新同一记忆或改变是否参与推荐",
+              "technology": "POST `/api/knowledge/memories`；选题 Agent 按平台读取最近 20 条启用记忆",
+              "id": "P15-C07-F02"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "真实证据与效果数据；待验证不能冒充成功规律"
+        }
+      ],
+      "checklist": [
+        "核对“知识回填卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“搜索与筛选卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“知识网络卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“编辑与审批规则卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“记忆统计卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“记忆编辑卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“记忆列表卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "Knowledge.tsx、GrowthMemory.tsx、CollectionKnowledge.tsx、PublishKnowledge.tsx"
+        ],
+        [
+          "服务",
+          "KnowledgeService、collection_ontology、publishing/contracts.py"
+        ],
+        [
+          "数据",
+          "growth_memories、kb_entities、kb_rules、kb_relations、机器契约"
+        ]
+      ]
+    },
+    {
+      "id": "collection",
+      "order": 16,
+      "title": "采集知识库",
+      "route": "/demo/knowledge/collection",
+      "purpose": "查看各平台采集规则、字段和验证边界",
+      "dependencies": "规则契约是说明，不证明当前登录或实时同步",
+      "screenshot": "assets/screenshots/collection.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "筛选卡",
+          "task": "选择采集契约组合"
+        },
+        {
+          "order": 2,
+          "card": "知识实体卡",
+          "task": "查看采集入口、数据结构和证据状态"
+        },
+        {
+          "order": 3,
+          "card": "知识详情卡",
+          "task": "查看契约或打开真实平台"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P16-C01",
+          "title": "筛选卡",
+          "rows": [
+            {
+              "element": "平台、类别",
+              "description": "选择采集契约组合",
+              "technology": "`accounts/collection_ontology.py` 静态机器契约；GET `/api/accounts/collection-knowledge`",
+              "id": "P16-C01-F01"
+            }
+          ]
+        },
+        {
+          "id": "P16-C02",
+          "title": "知识实体卡",
+          "rows": [
+            {
+              "element": "实体选择、验证状态",
+              "description": "查看采集入口、数据结构和证据状态",
+              "technology": "同上；`verification` 是契约状态，不读取当前 Cookie 判断登录",
+              "id": "P16-C02-F01"
+            }
+          ]
+        },
+        {
+          "id": "P16-C03",
+          "title": "知识详情卡",
+          "rows": [
+            {
+              "element": "机器可读 JSON、采集入口",
+              "description": "查看契约或打开真实平台",
+              "technology": "`/api/accounts/collection-knowledge/:platform/:category`；平台 URL",
+              "id": "P16-C03-F01"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "规则契约是说明，不证明当前登录或实时同步"
+        }
+      ],
+      "checklist": [
+        "核对“筛选卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“知识实体卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“知识详情卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "Knowledge.tsx、GrowthMemory.tsx、CollectionKnowledge.tsx、PublishKnowledge.tsx"
+        ],
+        [
+          "服务",
+          "KnowledgeService、collection_ontology、publishing/contracts.py"
+        ],
+        [
+          "数据",
+          "growth_memories、kb_entities、kb_rules、kb_relations、机器契约"
+        ]
+      ]
+    },
+    {
+      "id": "publish-knowledge",
+      "order": 17,
+      "title": "发布知识库",
+      "route": "/demo/knowledge/publishing",
+      "purpose": "查看平台独立字段、长度和组合限制",
+      "dependencies": "契约驱动字段生成；保存字段不表示已写入平台",
+      "screenshot": "assets/screenshots/publish-knowledge.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "筛选卡",
+          "task": "选择发布字段契约，不支持组合显示空状态"
+        },
+        {
+          "order": 2,
+          "card": "生成规范卡",
+          "task": "查看各平台真实生成规则"
+        },
+        {
+          "order": 3,
+          "card": "机器契约区",
+          "task": "打开只读平台契约"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P17-C01",
+          "title": "筛选卡",
+          "rows": [
+            {
+              "element": "平台、内容类型",
+              "description": "选择发布字段契约，不支持组合显示空状态",
+              "technology": "`publishing/contracts.py`；GET `/api/publishing/knowledge/:platform/:kind`",
+              "id": "P17-C01-F01"
+            }
+          ]
+        },
+        {
+          "id": "P17-C02",
+          "title": "生成规范卡",
+          "rows": [
+            {
+              "element": "字段、必填、长度、组合限制",
+              "description": "查看各平台真实生成规则",
+              "technology": "`publish_knowledge` + `contract_fields`；生成时由 `validate_generated_fields` 执行",
+              "id": "P17-C02-F01"
+            }
+          ]
+        },
+        {
+          "id": "P17-C03",
+          "title": "机器契约区",
+          "rows": [
+            {
+              "element": "查看规则 JSON",
+              "description": "打开只读平台契约",
+              "technology": "`/api/publishing/knowledge/...`；不把保存字段当成已写入平台",
+              "id": "P17-C03-F01"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "契约驱动字段生成；保存字段不表示已写入平台"
+        }
+      ],
+      "checklist": [
+        "核对“筛选卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“生成规范卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“机器契约区”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "Knowledge.tsx、GrowthMemory.tsx、CollectionKnowledge.tsx、PublishKnowledge.tsx"
+        ],
+        [
+          "服务",
+          "KnowledgeService、collection_ontology、publishing/contracts.py"
+        ],
+        [
+          "数据",
+          "growth_memories、kb_entities、kb_rules、kb_relations、机器契约"
+        ]
+      ]
+    },
+    {
+      "id": "settings-agents",
+      "order": 18,
+      "title": "Agent 配置",
+      "route": "/demo/settings/agents",
+      "purpose": "独立配置 Agent 引擎、模型、提示词和执行参数",
+      "dependencies": "未接入能力不能启用；保存只影响新任务",
+      "screenshot": "assets/screenshots/settings-agents.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "环境检测与能力状态卡",
+          "task": "查看执行器、依赖和阻塞原因"
+        },
+        {
+          "order": 2,
+          "card": "Agent 配置中心",
+          "task": "选择 26 个注册 Agent之一；未接入不能启用"
+        },
+        {
+          "order": 3,
+          "card": "Agent 编辑器",
+          "task": "从当前 Agent 支持的引擎中选择；跟随系统时读取系统默认"
+        },
+        {
+          "order": 4,
+          "card": "高级执行参数折叠区",
+          "task": "分别为 30～3600 秒、1～5 次、1～2 并发"
+        },
+        {
+          "order": 5,
+          "card": "写作 Skills 区",
+          "task": "为脚本／文章 Agent 注入只读技能文件"
+        },
+        {
+          "order": 6,
+          "card": "保存操作区",
+          "task": "独立保存或恢复当前 Agent，只影响新任务"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P18-C01",
+          "title": "环境检测与能力状态卡",
+          "rows": [
+            {
+              "element": "刷新真实状态、重新检查本机、检查详情",
+              "description": "查看执行器、依赖和阻塞原因",
+              "technology": "GET `/api/v2/runtime-readiness`；`readiness.py` 只读检查 Worker、CLI、FFmpeg、Chrome、Playwright 等",
+              "id": "P18-C01-F01"
+            }
+          ]
+        },
+        {
+          "id": "P18-C02",
+          "title": "Agent 配置中心",
+          "rows": [
+            {
+              "element": "Agent 列表、启用状态",
+              "description": "选择 26 个注册 Agent之一；未接入不能启用",
+              "technology": "GET `/api/agents/config`；`agents/registry.AGENTS` 注册表与连接状态",
+              "id": "P18-C02-F01"
+            }
+          ]
+        },
+        {
+          "id": "P18-C03",
+          "title": "Agent 编辑器",
+          "rows": [
+            {
+              "element": "执行引擎",
+              "description": "从当前 Agent 支持的引擎中选择；跟随系统时读取系统默认",
+              "technology": "PUT `/api/agents/config/:id`；`save_agent_config` 校验 `definition.engines`",
+              "id": "P18-C03-F01"
+            },
+            {
+              "element": "模型／变体",
+              "description": "选择变体或输入模型名，必填 1～100 字符",
+              "technology": "同上；`INVALID_AGENT_MODEL/VARIANT`；SQLite `settings.agent_configs`",
+              "id": "P18-C03-F02"
+            },
+            {
+              "element": "补充提示词",
+              "description": "追加当前 Agent 规则，最多 12000 字，不覆盖安全约束",
+              "technology": "同上；`require_agent_enabled` 在执行时读取并传给 Provider",
+              "id": "P18-C03-F03"
+            }
+          ]
+        },
+        {
+          "id": "P18-C04",
+          "title": "高级执行参数折叠区",
+          "rows": [
+            {
+              "element": "超时、尝试次数、并发",
+              "description": "分别为 30～3600 秒、1～5 次、1～2 并发",
+              "technology": "同上；`INVALID_AGENT_LIMIT` 前后端范围校验",
+              "id": "P18-C04-F01"
+            }
+          ]
+        },
+        {
+          "id": "P18-C05",
+          "title": "写作 Skills 区",
+          "rows": [
+            {
+              "element": "每行一个 Markdown 路径",
+              "description": "为脚本／文章 Agent 注入只读技能文件",
+              "technology": "`custom.skills`；仅允许 `skills/`、`.agents/skills/` 下 `.md`；`ArticleSkillInjection`",
+              "id": "P18-C05-F01"
+            }
+          ]
+        },
+        {
+          "id": "P18-C06",
+          "title": "保存操作区",
+          "rows": [
+            {
+              "element": "保存该 Agent、恢复默认",
+              "description": "独立保存或恢复当前 Agent，只影响新任务",
+              "technology": "`save_agent_config(reset?)`；`settings.agent_configs`；不改历史媒体",
+              "id": "P18-C06-F01"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "未接入能力不能启用；保存只影响新任务"
+        }
+      ],
+      "checklist": [
+        "核对“环境检测与能力状态卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“Agent 配置中心”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“Agent 编辑器”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“高级执行参数折叠区”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“写作 Skills 区”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“保存操作区”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "Settings.tsx 及设置共享组件"
+        ],
+        [
+          "服务",
+          "agents/registry、providers、media/tools、storage/portable、render_cache"
+        ],
+        [
+          "数据",
+          "settings.agent_configs、config/*.json、wb_assets、工作区工具与缓存"
+        ]
+      ]
+    },
+    {
+      "id": "settings-models",
+      "order": 19,
+      "title": "模型连接",
+      "route": "/demo/settings/models",
+      "purpose": "配置默认文本模型并执行真实连接测试",
+      "dependencies": "Kimi／Codex CLI 或模型 API、账号和网络",
+      "screenshot": "assets/screenshots/settings-models.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "系统默认文本模型卡",
+          "task": "选择 Kimi CLI、Codex CLI 或 OpenAI 兼容 API"
+        },
+        {
+          "order": 2,
+          "card": "保存与测试区",
+          "task": "保存配置但不调用模型"
+        },
+        {
+          "order": 3,
+          "card": "文章插画与本地渲染卡",
+          "task": "查看插画 Provider 与 Remotion 渲染状态"
+        },
+        {
+          "order": 4,
+          "card": "模型连接测试卡",
+          "task": "使用临时输入检查指定 Agent"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P19-C01",
+          "title": "系统默认文本模型卡",
+          "rows": [
+            {
+              "element": "默认服务",
+              "description": "选择 Kimi CLI、Codex CLI 或 OpenAI 兼容 API",
+              "technology": "GET/PUT `/api/agents/system-model`；`providers/system.py`；跟随系统的 Agent 执行时读取",
+              "id": "P19-C01-F01"
+            },
+            {
+              "element": "API 基础地址、模型名称",
+              "description": "配置兼容 API 端点和实际模型",
+              "technology": "同上；`ProviderRegistry` 根据 engine 创建 API Provider；密钥服务与模型分开校验",
+              "id": "P19-C01-F02"
+            },
+            {
+              "element": "API Key",
+              "description": "输入密钥；已保存时留空保留，保存后不回显",
+              "technology": "`public_settings` 隐藏敏感值；密钥写入本机配置，不进入文档或前端状态回显",
+              "id": "P19-C01-F03"
+            }
+          ]
+        },
+        {
+          "id": "P19-C02",
+          "title": "保存与测试区",
+          "rows": [
+            {
+              "element": "保存默认模型",
+              "description": "保存配置但不调用模型",
+              "technology": "PUT `/api/agents/system-model`；下一次跟随系统的执行使用",
+              "id": "P19-C02-F01"
+            },
+            {
+              "element": "保存并测试连接",
+              "description": "保存后执行真实最小调用，失败显示原因",
+              "technology": "POST `/api/agents/system-model/test` → 当前 Provider `complete_json`；不伪报连接",
+              "id": "P19-C02-F02"
+            }
+          ]
+        },
+        {
+          "id": "P19-C03",
+          "title": "文章插画与本地渲染卡",
+          "rows": [
+            {
+              "element": "刷新模型状态",
+              "description": "查看插画 Provider 与 Remotion 渲染状态",
+              "technology": "GET `/api/articles/image-provider`；`articles/images.py` + 本地 Remotion 环境",
+              "id": "P19-C03-F01"
+            }
+          ]
+        },
+        {
+          "id": "P19-C04",
+          "title": "模型连接测试卡",
+          "rows": [
+            {
+              "element": "脚本／素材规划等真实测试",
+              "description": "使用临时输入检查指定 Agent",
+              "technology": "各 Agent 测试接口；`ProviderRegistry` 真实 CLI/API；不创建业务内容",
+              "id": "P19-C04-F01"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "Kimi／Codex CLI 或模型 API、账号和网络"
+        }
+      ],
+      "checklist": [
+        "核对“系统默认文本模型卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“保存与测试区”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“文章插画与本地渲染卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“模型连接测试卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "Settings.tsx 及设置共享组件"
+        ],
+        [
+          "服务",
+          "agents/registry、providers、media/tools、storage/portable、render_cache"
+        ],
+        [
+          "数据",
+          "settings.agent_configs、config/*.json、wb_assets、工作区工具与缓存"
+        ]
+      ]
+    },
+    {
+      "id": "settings-media",
+      "order": 20,
+      "title": "本地媒体",
+      "route": "/demo/settings/media",
+      "purpose": "管理素材、工具路径、缓存、迁移和本地媒体能力",
+      "dependencies": "本地文件、模型环境、磁盘空间；高风险操作需新目录",
+      "screenshot": "assets/screenshots/settings-media.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "本地素材卡",
+          "task": "导入引用或本地副本，默认不复制"
+        },
+        {
+          "order": 2,
+          "card": "本地模型环境位置卡",
+          "task": "配置真实可执行环境"
+        },
+        {
+          "order": 3,
+          "card": "渲染缓存卡",
+          "task": "设置 1～1000 的可重建缓存容量"
+        },
+        {
+          "order": 4,
+          "card": "项目备份与换电脑卡",
+          "task": "校验并打包数据库、项目、版本和外部素材"
+        },
+        {
+          "order": 5,
+          "card": "本地媒体能力测试卡",
+          "task": "临时渲染并校验媒体输出"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P20-C01",
+          "title": "本地素材卡",
+          "rows": [
+            {
+              "element": "素材路径、选择文件、复制进素材库",
+              "description": "导入引用或本地副本，默认不复制",
+              "technology": "GET/POST `/api/v2/local-assets`；`Workbench.import_local_asset`；`wb_assets.storage_key`",
+              "id": "P20-C01-F01"
+            },
+            {
+              "element": "刷新、素材类型、显示更多",
+              "description": "重新检查文件可用性并筛选列表",
+              "technology": "`/api/v2/local-assets`；`os.path` 存在性、MIME 与引用状态；前端分页展开",
+              "id": "P20-C01-F02"
+            },
+            {
+              "element": "重新定位、验证并重新定位、取消",
+              "description": "修复失效引用，必须验证内容一致",
+              "technology": "POST `/api/v2/local-assets/:id/relink`；`Workbench.relink_asset`；不静默换素材",
+              "id": "P20-C01-F03"
+            }
+          ]
+        },
+        {
+          "id": "P20-C02",
+          "title": "本地模型环境位置卡",
+          "rows": [
+            {
+              "element": "Whisper／OCR／Demucs／OpenVoice Python 路径",
+              "description": "配置真实可执行环境",
+              "technology": "GET/POST `/api/media-tools`；`media/tools.py` 写入工作区 `config/media-tools.json`",
+              "id": "P20-C02-F01"
+            },
+            {
+              "element": "OpenVoice 模型文件夹",
+              "description": "选择模型根目录",
+              "technology": "原生目录选择器 + `/api/media-tools`；模型文件留在本机",
+              "id": "P20-C02-F02"
+            },
+            {
+              "element": "保存环境位置",
+              "description": "保存路径，但不等于能力通过",
+              "technology": "同上；之后仍需各能力自测",
+              "id": "P20-C02-F03"
+            }
+          ]
+        },
+        {
+          "id": "P20-C03",
+          "title": "渲染缓存卡",
+          "rows": [
+            {
+              "element": "容量输入、保存容量",
+              "description": "设置 1～1000 的可重建缓存容量",
+              "technology": "`/api/yingxu-cache`；`media/render_cache.py` 与文件锁；不涉及业务原文件",
+              "id": "P20-C03-F01"
+            },
+            {
+              "element": "清理可重建缓存",
+              "description": "只删除受控派生输入和 bundle cache",
+              "technology": "`render_cache.inventory/clear` + `lease` 文件锁；保护项目素材与最终输出",
+              "id": "P20-C03-F02"
+            },
+            {
+              "element": "刷新占用",
+              "description": "查看缓存文件和可清理字节",
+              "technology": "`render_cache.stats/bundle_stats`；只读统计",
+              "id": "P20-C03-F03"
+            }
+          ]
+        },
+        {
+          "id": "P20-C04",
+          "title": "项目备份与换电脑卡",
+          "rows": [
+            {
+              "element": "新导出目录、导出完整工作区",
+              "description": "校验并打包数据库、项目、版本和外部素材",
+              "technology": "POST `/api/workspace/export`；`storage/portable.export_workspace`；新目录、清单和 SHA-256",
+              "id": "P20-C04-F01"
+            },
+            {
+              "element": "迁移包目录、恢复到新目录",
+              "description": "校验迁移包并写入不存在的新目录",
+              "technology": "POST `/api/workspace/restore`；`restore_workspace` 检查指纹、空间和目标不存在",
+              "id": "P20-C04-F02"
+            },
+            {
+              "element": "已有工作区目录、校验并切换",
+              "description": "切换完整工作区并重启；有任务禁止",
+              "technology": "POST `/api/workspace/select`；`workspace_selection.py` + `desktop/entry.py`；原数据保留",
+              "id": "P20-C04-F03"
+            }
+          ]
+        },
+        {
+          "id": "P20-C05",
+          "title": "本地媒体能力测试卡",
+          "rows": [
+            {
+              "element": "Remotion 测试",
+              "description": "临时渲染并校验媒体输出",
+              "technology": "对应媒体测试接口；Node/Remotion/FFmpeg，不加入项目",
+              "id": "P20-C05-F01"
+            },
+            {
+              "element": "系统语音测试",
+              "description": "生成并检查临时 WAV",
+              "technology": "macOS 系统语音 `say` + FFprobe",
+              "id": "P20-C05-F02"
+            },
+            {
+              "element": "WhisperX 测试",
+              "description": "本地临时转写检查",
+              "technology": "faster-whisper worker 与配置模型缓存",
+              "id": "P20-C05-F03"
+            },
+            {
+              "element": "OpenVoice 测试",
+              "description": "本地音色转换并检查 WAV",
+              "technology": "OpenVoice/MeloTTS 与配置模型路径；原授权音色要求不变",
+              "id": "P20-C05-F04"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "本地文件、模型环境、磁盘空间；高风险操作需新目录"
+        }
+      ],
+      "checklist": [
+        "核对“本地素材卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“本地模型环境位置卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“渲染缓存卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“项目备份与换电脑卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“本地媒体能力测试卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "Settings.tsx 及设置共享组件"
+        ],
+        [
+          "服务",
+          "agents/registry、providers、media/tools、storage/portable、render_cache"
+        ],
+        [
+          "数据",
+          "settings.agent_configs、config/*.json、wb_assets、工作区工具与缓存"
+        ]
+      ]
+    },
+    {
+      "id": "settings-templates",
+      "order": 21,
+      "title": "视频模板",
+      "route": "/demo/settings/templates",
+      "purpose": "查看真实模板并管理稳定、草稿和停用状态",
+      "dependencies": "模板注册表与真实预览；状态影响之后制作",
+      "screenshot": "assets/screenshots/settings-templates.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "视频模板库卡",
+          "task": "查看真实模板图片／视频"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P21-C01",
+          "title": "视频模板库卡",
+          "rows": [
+            {
+              "element": "模板预览、放大预览",
+              "description": "查看真实模板图片／视频",
+              "technology": "GET `/api/video-templates`；`media/templates.py` 与本地预览文件",
+              "id": "P21-C01-F01"
+            },
+            {
+              "element": "升级为稳定",
+              "description": "将模板设为 stable",
+              "technology": "POST `/api/video-templates/:key/status`；`config/video_templates.json` 注册表状态",
+              "id": "P21-C01-F02"
+            },
+            {
+              "element": "停用",
+              "description": "将模板设为 deprecated，保留模板",
+              "technology": "同上；不删除文件或历史版本",
+              "id": "P21-C01-F03"
+            },
+            {
+              "element": "恢复为草稿",
+              "description": "将模板设为 draft",
+              "technology": "同上；不等于稳定可用",
+              "id": "P21-C01-F04"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "模板注册表与真实预览；状态影响之后制作"
+        }
+      ],
+      "checklist": [
+        "核对“视频模板库卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "Settings.tsx 及设置共享组件"
+        ],
+        [
+          "服务",
+          "agents/registry、providers、media/tools、storage/portable、render_cache"
+        ],
+        [
+          "数据",
+          "settings.agent_configs、config/*.json、wb_assets、工作区工具与缓存"
+        ]
+      ]
+    },
+    {
+      "id": "settings-data",
+      "order": 22,
+      "title": "数据与隐私",
+      "route": "/demo/settings/data",
+      "purpose": "查看本地数据、模型输入和人工审核边界",
+      "dependencies": "说明页，不提供清空或删除业务数据操作",
+      "screenshot": "assets/screenshots/settings-data.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "数据与隐私卡",
+          "task": "查看 SQLite、回环监听、模型输入和人工审核边界"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P22-C01",
+          "title": "数据与隐私卡",
+          "rows": [
+            {
+              "element": "本地存储与输入边界说明、刷新状态",
+              "description": "查看 SQLite、回环监听、模型输入和人工审核边界",
+              "technology": "`docs` 与当前 `desktop/entry.py`、Provider 输入范围；无删除业务数据接口",
+              "id": "P22-C01-F01"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "说明页，不提供清空或删除业务数据操作"
+        }
+      ],
+      "checklist": [
+        "核对“数据与隐私卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "Settings.tsx 及设置共享组件"
+        ],
+        [
+          "服务",
+          "agents/registry、providers、media/tools、storage/portable、render_cache"
+        ],
+        [
+          "数据",
+          "settings.agent_configs、config/*.json、wb_assets、工作区工具与缓存"
+        ]
+      ]
+    },
+    {
+      "id": "activation",
+      "order": 23,
+      "title": "离线授权",
+      "route": "/demo/activation",
+      "purpose": "复制安装申请码、导入授权文件并验证激活",
+      "dependencies": "OpenSSL 3 Ed25519、安装身份、公钥配置；申请码截图需隐藏",
+      "screenshot": "assets/screenshots/activation.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "联系与申请码卡",
+          "task": "打开刘洋微信二维码原图"
+        },
+        {
+          "order": 2,
+          "card": "导入授权码卡",
+          "task": "粘贴最长 16000 字符的授权内容"
+        },
+        {
+          "order": 3,
+          "card": "只读查看区",
+          "task": "进入工作台查看，不绕开执行授权"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P23-C01",
+          "title": "联系与申请码卡",
+          "rows": [
+            {
+              "element": "微信二维码",
+              "description": "打开刘洋微信二维码原图",
+              "technology": "本地 `/demo-wechat.png` 静态资源；不读取微信账号",
+              "id": "P23-C01-F01"
+            },
+            {
+              "element": "申请码、复制申请码",
+              "description": "查看并复制当前安装身份申请码",
+              "technology": "GET `/api/v2/license`；`LicenseService.status` + `protocol.request_code(installationId)`；Clipboard API",
+              "id": "P23-C01-F02"
+            }
+          ]
+        },
+        {
+          "id": "P23-C02",
+          "title": "导入授权码卡",
+          "rows": [
+            {
+              "element": "授权码文本域",
+              "description": "粘贴最长 16000 字符的授权内容",
+              "technology": "React 本地 token；POST `/api/v2/license/activate` 时提交",
+              "id": "P23-C02-F01"
+            },
+            {
+              "element": "选择授权文件",
+              "description": "选择 `.yxlicense/.txt` 并填入",
+              "technology": "`desktop/launcher.m` WebKit `runOpenPanelWithParameters`；取消也完成回调",
+              "id": "P23-C02-F02"
+            },
+            {
+              "element": "验证并激活",
+              "description": "验签、绑定安装身份，成功后保存；失败不覆盖有效授权",
+              "technology": "`LicenseService.activate` → `protocol.verify` → OpenSSL 3 Ed25519；`license/state.json` 原子写入",
+              "id": "P23-C02-F03"
+            }
+          ]
+        },
+        {
+          "id": "P23-C03",
+          "title": "只读查看区",
+          "rows": [
+            {
+              "element": "先查看已有工作与成果",
+              "description": "进入工作台查看，不绕开执行授权",
+              "technology": "`sessionStorage yx-read-only` + `LicenseGate`；`LicenseService.require_active` 仍限制任务",
+              "id": "P23-C03-F01"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "OpenSSL 3 Ed25519、安装身份、公钥配置；申请码截图需隐藏"
+        }
+      ],
+      "checklist": [
+        "核对“联系与申请码卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“导入授权码卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“只读查看区”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "Activation.tsx、Welcome.tsx"
+        ],
+        [
+          "服务",
+          "LicenseService、licensing/protocol、Workbench"
+        ],
+        [
+          "数据",
+          "license/state.json、installationId、onboarding、项目记录"
+        ]
+      ]
+    },
+    {
+      "id": "welcome",
+      "order": 24,
+      "title": "新手引导",
+      "route": "/demo/welcome",
+      "purpose": "检查存储和环境，创建第一条视频或文章样例",
+      "dependencies": "必需授权模式下先激活；示例只创建真实本地任务",
+      "screenshot": "assets/screenshots/welcome.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "步骤卡",
+          "task": "切换并显示各步骤完成状态"
+        },
+        {
+          "order": 2,
+          "card": "本地存储卡",
+          "task": "保存存储步骤，不自动迁移文件"
+        },
+        {
+          "order": 3,
+          "card": "环境检查卡",
+          "task": "检查本机环境"
+        },
+        {
+          "order": 4,
+          "card": "能力说明卡",
+          "task": "标记能力说明已读"
+        },
+        {
+          "order": 5,
+          "card": "第一条视频卡",
+          "task": "创建或继续真实本地项目"
+        },
+        {
+          "order": 6,
+          "card": "文章体验折叠区",
+          "task": "创建本地文章样例"
+        },
+        {
+          "order": 7,
+          "card": "完成区",
+          "task": "标记引导完成"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P24-C01",
+          "title": "步骤卡",
+          "rows": [
+            {
+              "element": "本地存储、环境、能力、第一条视频",
+              "description": "切换并显示各步骤完成状态",
+              "technology": "`LicenseService.onboarding`；`license/state.json.onboarding.steps`",
+              "id": "P24-C01-F01"
+            }
+          ]
+        },
+        {
+          "id": "P24-C02",
+          "title": "本地存储卡",
+          "rows": [
+            {
+              "element": "使用当前本地目录",
+              "description": "保存存储步骤，不自动迁移文件",
+              "technology": "POST `/api/v2/license/onboarding {step:storage}`",
+              "id": "P24-C02-F01"
+            }
+          ]
+        },
+        {
+          "id": "P24-C03",
+          "title": "环境检查卡",
+          "rows": [
+            {
+              "element": "重新检测",
+              "description": "检查本机环境",
+              "technology": "GET `/api/accounts/setup`；`accounts/setup.py` 依赖检测",
+              "id": "P24-C03-F01"
+            },
+            {
+              "element": "已了解检测结果，继续",
+              "description": "标记环境步骤，不代表全部依赖通过",
+              "technology": "POST `/api/v2/license/onboarding {step:environment}`",
+              "id": "P24-C03-F02"
+            }
+          ]
+        },
+        {
+          "id": "P24-C04",
+          "title": "能力说明卡",
+          "rows": [
+            {
+              "element": "按需配置，继续",
+              "description": "标记能力说明已读",
+              "technology": "POST `/api/v2/license/onboarding {step:capabilities}`",
+              "id": "P24-C04-F01"
+            }
+          ]
+        },
+        {
+          "id": "P24-C05",
+          "title": "第一条视频卡",
+          "rows": [
+            {
+              "element": "使用示例稿／继续第一条视频",
+              "description": "创建或继续真实本地项目",
+              "technology": "POST `/api/v2/license/first-project`；`tasks`；必需模式下 `require_active`",
+              "id": "P24-C05-F01"
+            }
+          ]
+        },
+        {
+          "id": "P24-C06",
+          "title": "文章体验折叠区",
+          "rows": [
+            {
+              "element": "创建文章规范样例",
+              "description": "创建本地文章样例",
+              "technology": "POST `/api/articles`；`wb_campaigns/wb_content_items`；不公开发布",
+              "id": "P24-C06-F01"
+            }
+          ]
+        },
+        {
+          "id": "P24-C07",
+          "title": "完成区",
+          "rows": [
+            {
+              "element": "结束入门提示，进入工作台",
+              "description": "标记引导完成",
+              "technology": "POST `/api/v2/license/onboarding {step:complete}`；`AppShell` 保留设置内重入",
+              "id": "P24-C07-F01"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "必需授权模式下先激活；示例只创建真实本地任务"
+        }
+      ],
+      "checklist": [
+        "核对“步骤卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“本地存储卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“环境检查卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“能力说明卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“第一条视频卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“文章体验折叠区”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“完成区”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "Activation.tsx、Welcome.tsx"
+        ],
+        [
+          "服务",
+          "LicenseService、licensing/protocol、Workbench"
+        ],
+        [
+          "数据",
+          "license/state.json、installationId、onboarding、项目记录"
+        ]
+      ]
+    },
+    {
+      "id": "setup",
+      "order": 25,
+      "title": "接入向导",
+      "route": "/demo/setup",
+      "purpose": "检查环境、启动专用 Chrome、连接微信和平台账号",
+      "dependencies": "Chrome、Playwright、模型、微信及平台本人登录",
+      "screenshot": "assets/screenshots/setup.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "安装后的接入清单卡",
+          "task": "跳到对应配置或页面锚点"
+        },
+        {
+          "order": 2,
+          "card": "映序专用 Chrome 卡",
+          "task": "启动或复用固定 Chrome，使用工作区固定资料"
+        },
+        {
+          "order": 3,
+          "card": "环境状态卡",
+          "task": "查看本机环境与当前工作台地址"
+        },
+        {
+          "order": 4,
+          "card": "核心依赖卡",
+          "task": "逐项显示已检测、待安装或可选"
+        },
+        {
+          "order": 5,
+          "card": "当前可用范围折叠卡",
+          "task": "查看文案、导出、视频、审核、发布等真实状态"
+        },
+        {
+          "order": 6,
+          "card": "开发者安装折叠卡",
+          "task": "切换源码安装命令说明"
+        },
+        {
+          "order": 7,
+          "card": "微信机器人连接卡",
+          "task": "完成微信 Bot 连接，数据独立保存"
+        },
+        {
+          "order": 8,
+          "card": "抖音登录卡",
+          "task": "打开抖音创作者后台并等待登录"
+        },
+        {
+          "order": 9,
+          "card": "小红书登录卡",
+          "task": "打开小红书创作者后台并等待登录"
+        },
+        {
+          "order": 10,
+          "card": "视频号登录卡",
+          "task": "打开视频号助手并等待扫码"
+        },
+        {
+          "order": 11,
+          "card": "公众号登录卡",
+          "task": "打开公众号后台并等待扫码"
+        },
+        {
+          "order": 12,
+          "card": "登录任务卡",
+          "task": "查看登录任务是否确认成功，打开窗口不等于成功"
+        },
+        {
+          "order": 13,
+          "card": "完成接入卡",
+          "task": "进入设置或抖音选题"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P25-C01",
+          "title": "安装后的接入清单卡",
+          "rows": [
+            {
+              "element": "激活、微信、模型、平台、首次制作链接",
+              "description": "跳到对应配置或页面锚点",
+              "technology": "React Router Link／HTML anchor；不自动执行操作",
+              "id": "P25-C01-F01"
+            }
+          ]
+        },
+        {
+          "id": "P25-C02",
+          "title": "映序专用 Chrome 卡",
+          "rows": [
+            {
+              "element": "启动专用浏览器",
+              "description": "启动或复用固定 Chrome，使用工作区固定资料",
+              "technology": "POST `/api/accounts/browser/connection {action:start}` → `dedicated_browser.ensure_started`；官方 Chrome + 本机 CDP 9223",
+              "id": "P25-C02-F01"
+            },
+            {
+              "element": "重启专用浏览器",
+              "description": "正常关闭后使用同一 Profile 再启动",
+              "technology": "`browser_connection.control` 检查活动任务 → CDP `Browser.close` → `ensure_started`",
+              "id": "P25-C02-F02"
+            },
+            {
+              "element": "关闭专用浏览器",
+              "description": "正常退出专用实例，不关闭日常浏览器",
+              "technology": "`stop` → Playwright `new_browser_cdp_session().send(Browser.close)`；主 Python 无驱动时复用 `.venv-topics`",
+              "id": "P25-C02-F03"
+            },
+            {
+              "element": "重新检测、状态文本",
+              "description": "查看安装、运行、Profile 模式和端口占用",
+              "technology": "GET `/api/accounts/browser/connection`；`lsof/ps`（macOS）或 Windows 对应检查 + `/json/version`",
+              "id": "P25-C02-F04"
+            }
+          ]
+        },
+        {
+          "id": "P25-C03",
+          "title": "环境状态卡",
+          "rows": [
+            {
+              "element": "系统、Python、当前地址、重新检查",
+              "description": "查看本机环境与当前工作台地址",
+              "technology": "GET `/api/accounts/setup`；`accounts/setup.py`；`platform/shutil/importlib` 只读探测",
+              "id": "P25-C03-F01"
+            }
+          ]
+        },
+        {
+          "id": "P25-C04",
+          "title": "核心依赖卡",
+          "rows": [
+            {
+              "element": "Python、Node、FFmpeg、Chrome、Playwright 等",
+              "description": "逐项显示已检测、待安装或可选",
+              "technology": "同上；工具存在不等于账号登录或生成通过",
+              "id": "P25-C04-F01"
+            }
+          ]
+        },
+        {
+          "id": "P25-C05",
+          "title": "当前可用范围折叠卡",
+          "rows": [
+            {
+              "element": "能力与阻塞项",
+              "description": "查看文案、导出、视频、审核、发布等真实状态",
+              "technology": "`readiness.runtime_readiness`；Worker 执行器映射和依赖检查",
+              "id": "P25-C05-F01"
+            }
+          ]
+        },
+        {
+          "id": "P25-C06",
+          "title": "开发者安装折叠卡",
+          "rows": [
+            {
+              "element": "macOS／Windows 切换",
+              "description": "切换源码安装命令说明",
+              "technology": "React 本地 OS 状态；`scripts/start.sh/start.ps1` 说明，不执行安装",
+              "id": "P25-C06-F01"
+            }
+          ]
+        },
+        {
+          "id": "P25-C07",
+          "title": "微信机器人连接卡",
+          "rows": [
+            {
+              "element": "二维码、配对码、检查、断开",
+              "description": "完成微信 Bot 连接，数据独立保存",
+              "technology": "`topics/wechat_client.py` 与 `/api/topics/wechat/client/*`；不是专用 Chrome 平台登录",
+              "id": "P25-C07-F01"
+            }
+          ]
+        },
+        {
+          "id": "P25-C08",
+          "title": "抖音登录卡",
+          "rows": [
+            {
+              "element": "打开登录窗口",
+              "description": "打开抖音创作者后台并等待登录",
+              "technology": "`/api/accounts/browser/open` → `accounts.login` → `existing_browser.wait_for_login` → 专用 Chrome",
+              "id": "P25-C08-F01"
+            }
+          ]
+        },
+        {
+          "id": "P25-C09",
+          "title": "小红书登录卡",
+          "rows": [
+            {
+              "element": "打开登录窗口",
+              "description": "打开小红书创作者后台并等待登录",
+              "technology": "同上，`xiaohongshu_login`；登录状态由页面和 URL 证据判断",
+              "id": "P25-C09-F01"
+            }
+          ]
+        },
+        {
+          "id": "P25-C10",
+          "title": "视频号登录卡",
+          "rows": [
+            {
+              "element": "打开登录窗口",
+              "description": "打开视频号助手并等待扫码",
+              "technology": "同上，`channels_login`；不再用系统默认浏览器新窗口代替",
+              "id": "P25-C10-F01"
+            }
+          ]
+        },
+        {
+          "id": "P25-C11",
+          "title": "公众号登录卡",
+          "rows": [
+            {
+              "element": "打开登录窗口",
+              "description": "打开公众号后台并等待扫码",
+              "technology": "同上，`official_login`；可结合后台 token／页面证据判断",
+              "id": "P25-C11-F01"
+            }
+          ]
+        },
+        {
+          "id": "P25-C12",
+          "title": "登录任务卡",
+          "rows": [
+            {
+              "element": "状态、错误、处理建议",
+              "description": "查看登录任务是否确认成功，打开窗口不等于成功",
+              "technology": "`wb_jobs` + `accounts.login` 结果；`login_verified` 和结构化错误",
+              "id": "P25-C12-F01"
+            }
+          ]
+        },
+        {
+          "id": "P25-C13",
+          "title": "完成接入卡",
+          "rows": [
+            {
+              "element": "配置 Agent、开始选题",
+              "description": "进入设置或抖音选题",
+              "technology": "React Router Link；不自动保存配置",
+              "id": "P25-C13-F01"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "Chrome、Playwright、模型、微信及平台本人登录"
+        }
+      ],
+      "checklist": [
+        "核对“安装后的接入清单卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“映序专用 Chrome 卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“环境状态卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“核心依赖卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“当前可用范围折叠卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“开发者安装折叠卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“微信机器人连接卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“抖音登录卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“小红书登录卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“视频号登录卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“公众号登录卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“登录任务卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“完成接入卡”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "Setup.tsx、WechatConnection.tsx、PublishingPanel.tsx"
+        ],
+        [
+          "服务",
+          "accounts/setup、accounts/dedicated_browser、accounts/local_browser、wechat_client"
+        ],
+        [
+          "数据",
+          "工作区固定 Chrome Profile、wb_jobs、平台登录结果"
+        ]
+      ]
+    },
+    {
+      "id": "legacy",
+      "order": 26,
+      "title": "旧版工作台",
+      "route": "/legacy",
+      "purpose": "保留旧版导航和原任务、账号、发布、设置入口",
+      "dependencies": "原生 JS 与旧接口；数据口径需与新版分开核查",
+      "screenshot": "assets/screenshots/legacy.png",
+      "evidence": "截图为隔离工作区真实页面；动态卡片和有数据状态按当前源码核对，未在本轮重新执行全部生成、同步或发布。",
+      "overview": [
+        {
+          "order": 1,
+          "card": "旧版侧栏",
+          "task": "打开旧版各工作区"
+        },
+        {
+          "order": 2,
+          "card": "旧版顶部操作区",
+          "task": "打开原任务创建流程"
+        },
+        {
+          "order": 3,
+          "card": "旧版内容工作区",
+          "task": "保留旧接口和旧数据视图"
+        }
+      ],
+      "cards": [
+        {
+          "id": "P26-C01",
+          "title": "旧版侧栏",
+          "rows": [
+            {
+              "element": "今天、选题、账号日报、发布复盘、文章、视频、知识、设置",
+              "description": "打开旧版各工作区",
+              "technology": "`web/index.html` 原生导航 + `web/app.js` 视图切换；不使用 React AppShell",
+              "id": "P26-C01-F01"
+            }
+          ]
+        },
+        {
+          "id": "P26-C02",
+          "title": "旧版顶部操作区",
+          "rows": [
+            {
+              "element": "＋新建任务",
+              "description": "打开原任务创建流程",
+              "technology": "`web/app.js` + 原 `/api/tasks`；旧 `tasks` 数据",
+              "id": "P26-C02-F01"
+            }
+          ]
+        },
+        {
+          "id": "P26-C03",
+          "title": "旧版内容工作区",
+          "rows": [
+            {
+              "element": "原任务、账号、发布与设置控件",
+              "description": "保留旧接口和旧数据视图",
+              "technology": "`web/workspaces.js`、`web/publishing.js` 等原生 JS；与新版数据口径需分别核查",
+              "id": "P26-C03-F01"
+            }
+          ]
+        }
+      ],
+      "states": [
+        {
+          "state": "首次加载",
+          "expected": "显示真实加载状态，不用空白或演示数据冒充完成",
+          "technology": "AppContext / 当前页面 API 并发读取"
+        },
+        {
+          "state": "空数据或无权限",
+          "expected": "保留可用入口并说明下一步；未接入能力保持禁用或明确提示",
+          "technology": "空状态来自真实接口；LicenseGate 与执行器状态约束"
+        },
+        {
+          "state": "操作执行中",
+          "expected": "对应按钮显示进行中并防重复提交；离开页面后后台任务按原机制保留",
+          "technology": "busy/active 前端状态 + wb_jobs / 本地执行器"
+        },
+        {
+          "state": "操作失败或外部不可用",
+          "expected": "显示具体错误和处理建议，保留已有内容与文件，不伪报成功",
+          "technology": "结构化 DomainError / 任务 error_json / 页面 ErrorBox"
+        },
+        {
+          "state": "有真实记录",
+          "expected": "按卡片显示真实 ID、来源、版本或文件；操作进入原记录",
+          "technology": "原生 JS 与旧接口；数据口径需与新版分开核查"
+        }
+      ],
+      "checklist": [
+        "核对“旧版侧栏”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“旧版顶部操作区”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对“旧版内容工作区”中的控件效果、输入限制、禁用条件和技术调用是否一致。",
+        "核对空状态、加载中、执行中、失败及有数据状态是否都能区分。",
+        "核对本页没有把预填、保存、登录、生成或上传误写成公开发布或真实验收通过。"
+      ],
+      "technology": [
+        [
+          "前端",
+          "web/index.html、web/app.js、web/workspaces.js"
+        ],
+        [
+          "服务",
+          "原 app.py 与旧版接口"
+        ],
+        [
+          "数据",
+          "旧 tasks、账号、发布和设置记录"
+        ]
+      ]
+    }
+  ]
+}

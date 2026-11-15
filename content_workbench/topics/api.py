@@ -1,9 +1,13 @@
+import platform
 import re
+import shutil
+import subprocess
 
 from content_workbench.domain.errors import DomainError
+from content_workbench.domain.services import Workbench
 from content_workbench.storage.db import connect, dumps
-from content_workbench.topics.wechat_inbox import WechatInboxService
 from content_workbench.topics.wechat_client import WechatClient
+from content_workbench.topics.wechat_inbox import WechatInboxService
 
 
 class TopicAPI:
@@ -15,15 +19,54 @@ class TopicAPI:
         self.wechat_inbox = WechatInboxService(service.db_path, service)
         self.wechat_client = WechatClient(service.root, self.wechat_inbox)
 
+    def download_path(self, item_id):
+        item = self.service.get_item(item_id)
+        asset_id = item["metadata"].get("download_asset_id")
+        if not asset_id:
+            raise DomainError(
+                "DOWNLOAD_NOT_FOUND",
+                "该作品尚未下载成功",
+                404,
+                "file",
+                "先点击下载视频",
+            )
+        with self.service.conn(readonly=True) as conn:
+            asset = conn.execute(
+                "SELECT * FROM wb_assets WHERE id=?", (asset_id,)
+            ).fetchone()
+        return Workbench(self.service.db_path, self.service.root).resolve_asset_path(
+            asset
+        )
+
     def handle(self, handler, method, path, query, body):
         if path == "/api/topics/wechat/client" and method == "GET":
             return self.app.response(handler, self.wechat_client.status())
-        if path in ("/api/topics/wechat/client/login", "/api/topics/wechat/client/poll", "/api/topics/wechat/client/disconnect") and method == "POST":
+        if (
+            path
+            in (
+                "/api/topics/wechat/client/login",
+                "/api/topics/wechat/client/poll",
+                "/api/topics/wechat/client/disconnect",
+            )
+            and method == "POST"
+        ):
             try:
-                result = self.wechat_client.disconnect() if path.endswith("/disconnect") else self.wechat_client.begin_login() if path.endswith('/login') else self.wechat_client.poll_login((body or {}).get('code',''))
+                result = (
+                    self.wechat_client.disconnect()
+                    if path.endswith("/disconnect")
+                    else self.wechat_client.begin_login()
+                    if path.endswith("/login")
+                    else self.wechat_client.poll_login((body or {}).get("code", ""))
+                )
                 return self.app.response(handler, result)
             except Exception:
-                raise DomainError("WECHAT_CONNECT_FAILED", "微信连接请求失败，请检查网络或重新获取二维码", 502, "wechat", "重试扫码连接")
+                raise DomainError(
+                    "WECHAT_CONNECT_FAILED",
+                    "微信连接请求失败，请检查网络或重新获取二维码",
+                    502,
+                    "wechat",
+                    "重试扫码连接",
+                )
         if method == "GET" and path == "/api/topics/bootstrap":
             data = self.service.bootstrap()
             data["wechat_messages"] = self.wechat_inbox.list()
@@ -34,11 +77,23 @@ class TopicAPI:
             return self.app.response(handler, {"items": self.wechat_inbox.list()})
         if method == "GET" and path == "/api/topics/wechat/connection":
             return self.app.response(handler, self.wechat_inbox.connection())
-        match = re.fullmatch(r"/api/topics/wechat/snapshots/([A-Za-z0-9_-]+)/cover", path)
+        match = re.fullmatch(
+            r"/api/topics/wechat/snapshots/([A-Za-z0-9_-]+)/cover", path
+        )
         if method == "GET" and match:
-            cover = self.service.root / "data/publishing-evidence" / (match.group(1) + "-link-cover.png")
+            cover = (
+                self.service.root
+                / "data/publishing-evidence"
+                / (match.group(1) + "-link-cover.png")
+            )
             if not cover.is_file():
-                raise DomainError("COVER_NOT_FOUND", "视频截帧封面尚未生成", 404, "cover", "先完成一次动态链接解析")
+                raise DomainError(
+                    "COVER_NOT_FOUND",
+                    "视频截帧封面尚未生成",
+                    404,
+                    "cover",
+                    "先完成一次动态链接解析",
+                )
             content = cover.read_bytes()
             handler.send_response(200)
             handler.send_header("Content-Type", "image/png")
@@ -51,44 +106,129 @@ class TopicAPI:
             message, created = self.wechat_inbox.ingest(body or {})
             if created and message.get("original_url"):
                 self.wechat_inbox.update_snapshot(message["id"], "queued")
-                self.jobs.enqueue("research.snapshot", {}, message["id"], resource_key="snapshot")
+                self.jobs.enqueue(
+                    "research.snapshot", {}, message["id"], resource_key="snapshot"
+                )
                 message = self.wechat_inbox.get(message["id"])
             return self.app.response(handler, message, 201 if created else 200)
         match = re.fullmatch(r"/api/topics/wechat/messages/([^/]+)/snapshot", path)
         if method == "POST" and match:
             message = self.wechat_inbox.get(match.group(1))
             if not message.get("original_url"):
-                raise DomainError("SNAPSHOT_URL_MISSING", "请先补充原始链接再生成快照", 422, "original_url", "编辑消息并填写公开链接")
+                raise DomainError(
+                    "SNAPSHOT_URL_MISSING",
+                    "请先补充原始链接再生成快照",
+                    422,
+                    "original_url",
+                    "编辑消息并填写公开链接",
+                )
             self.wechat_inbox.update_snapshot(message["id"], "queued")
-            self.jobs.enqueue("research.snapshot", {}, message["id"], resource_key="snapshot")
+            self.jobs.enqueue(
+                "research.snapshot", {}, message["id"], resource_key="snapshot"
+            )
             return self.app.response(handler, self.wechat_inbox.get(message["id"]), 202)
         match = re.fullmatch(r"/api/topics/wechat/messages/([^/]+)", path)
         if method == "PUT" and match:
-            return self.app.response(handler, self.wechat_inbox.update(match.group(1), body or {}))
+            return self.app.response(
+                handler, self.wechat_inbox.update(match.group(1), body or {})
+            )
         if method == "POST" and path == "/api/topics/settings":
             return self.app.response(handler, self.service.save_settings(body or {}))
         if method == "POST" and path == "/api/topics/browser/open":
-            return self.app.response(handler, self.jobs.enqueue("topics.login", {}, "source_douyin_main", resource_key="browser"), 202)
+            return self.app.response(
+                handler,
+                self.jobs.enqueue(
+                    "topics.login", {}, "source_douyin_main", resource_key="browser"
+                ),
+                202,
+            )
         if method == "POST" and path == "/api/topics/sync":
-            return self.app.response(handler, self.jobs.enqueue_active_once("topics.sync", {}, "source_douyin_main", resource_key="browser"), 202)
+            return self.app.response(
+                handler,
+                self.jobs.enqueue_active_once(
+                    "topics.sync", {}, "source_douyin_main", resource_key="browser"
+                ),
+                202,
+            )
+        if method == "POST" and path == "/api/topics/metadata-backfill":
+            return self.app.response(
+                handler,
+                self.jobs.enqueue_active_once(
+                    "topics.metadata_backfill", {}, "metadata", resource_key="browser"
+                ),
+                202,
+            )
         if method == "POST" and path == "/api/topics/xiaohongshu/browser/open":
-            return self.app.response(handler, self.jobs.enqueue("topics.xhs_login", {}, "source_xiaohongshu_main", resource_key="browser"), 202)
+            return self.app.response(
+                handler,
+                self.jobs.enqueue(
+                    "topics.xhs_login",
+                    {},
+                    "source_xiaohongshu_main",
+                    resource_key="browser",
+                ),
+                202,
+            )
         if method == "POST" and path == "/api/topics/xiaohongshu/sync":
-            return self.app.response(handler, self.jobs.enqueue_active_once("topics.xhs_sync", {}, "source_xiaohongshu_main", resource_key="browser"), 202)
+            return self.app.response(
+                handler,
+                self.jobs.enqueue_active_once(
+                    "topics.xhs_sync",
+                    {},
+                    "source_xiaohongshu_main",
+                    resource_key="browser",
+                ),
+                202,
+            )
         if method == "POST" and path == "/api/topics/industry":
-            return self.app.response(handler, self.jobs.enqueue("topics.industry", {"agent": "industry"}, "industry", resource_key="topics"), 202)
+            return self.app.response(
+                handler,
+                self.jobs.enqueue(
+                    "topics.industry",
+                    {"agent": "industry"},
+                    "industry",
+                    resource_key="topics",
+                ),
+                202,
+            )
         if method == "POST" and path == "/api/topics/recommend":
             agent = (body or {}).get("agent", "douyin")
-            return self.app.response(handler, self.jobs.enqueue_active_once("topics.recommend", {"agent": agent}, agent, resource_key="cloud_text"), 202)
+            return self.app.response(
+                handler,
+                self.jobs.enqueue_active_once(
+                    "topics.recommend",
+                    {"agent": agent},
+                    agent,
+                    resource_key="cloud_text",
+                ),
+                202,
+            )
         match = re.fullmatch(r"/api/topics/items/([^/]+)/cover/retry", path)
         if method == "POST" and match:
             item = self.service.get_item(match.group(1))
-            return self.app.response(handler, self.jobs.enqueue_active_once("topics.cover", {}, item["id"], resource_key="browser"), 202)
+            return self.app.response(
+                handler,
+                self.jobs.enqueue_active_once(
+                    "topics.cover", {}, item["id"], resource_key="browser"
+                ),
+                202,
+            )
         match = re.fullmatch(r"/api/topics/items/([^/]+)/cover", path)
         if method == "GET" and match:
-            cover = self.service.root / "covers" / "topic-research" / (match.group(1) + ".jpg")
+            cover = (
+                self.service.root
+                / "covers"
+                / "topic-research"
+                / (match.group(1) + ".jpg")
+            )
             if not cover.is_file():
-                raise DomainError("COVER_NOT_FOUND", "封面尚未缓存", 404, "cover", "先同步该作品的封面元数据")
+                raise DomainError(
+                    "COVER_NOT_FOUND",
+                    "封面尚未缓存",
+                    404,
+                    "cover",
+                    "先同步该作品的封面元数据",
+                )
             body = cover.read_bytes()
             handler.send_response(200)
             handler.send_header("Content-Type", "image/jpeg")
@@ -100,9 +240,67 @@ class TopicAPI:
         match = re.fullmatch(r"/api/topics/items/([^/]+)", path)
         if method == "GET" and match:
             return self.app.response(handler, self.service.get_item(match.group(1)))
+        match = re.fullmatch(r"/api/topics/items/([^/]+)/download/probe", path)
+        if method == "POST" and match:
+            return self.app.response(
+                handler,
+                self.jobs.enqueue(
+                    "research.probe", {}, match.group(1), resource_key="download"
+                ),
+                202,
+            )
         match = re.fullmatch(r"/api/topics/items/([^/]+)/analyze", path)
         if method == "POST" and match:
-            return self.app.response(handler, self.jobs.enqueue("research.analyze", {}, match.group(1), resource_key="download"), 202)
+            return self.app.response(
+                handler,
+                self.jobs.enqueue(
+                    "research.analyze",
+                    {"mode": (body or {}).get("mode")},
+                    match.group(1),
+                    resource_key="download",
+                ),
+                202,
+            )
+        match = re.fullmatch(r"/api/topics/items/([^/]+)/download/copy", path)
+        if method == "POST" and match:
+            path = self.download_path(match.group(1))
+            system = platform.system()
+            if system == "Darwin":
+                subprocess.run(["pbcopy"], input=str(path), text=True, check=True)
+            elif system == "Windows":
+                subprocess.run(["clip"], input=str(path), text=True, check=True)
+            elif shutil.which("wl-copy"):
+                subprocess.run(["wl-copy", str(path)], check=True)
+            elif shutil.which("xclip"):
+                subprocess.run(
+                    ["xclip", "-selection", "clipboard"],
+                    input=str(path),
+                    text=True,
+                    check=True,
+                )
+            else:
+                raise DomainError(
+                    "CLIPBOARD_UNAVAILABLE",
+                    "系统剪贴板不可用，请手动复制完整路径",
+                    503,
+                    "file",
+                    "安装 wl-clipboard 或 xclip 后重试",
+                )
+            return self.app.response(handler, {"copied": True, "path": str(path)})
+        match = re.fullmatch(r"/api/topics/items/([^/]+)/download/reveal", path)
+        if method == "POST" and match:
+            path = self.download_path(match.group(1))
+            command = (
+                ["open", str(path.parent)]
+                if platform.system() == "Darwin"
+                else ["explorer", str(path.parent)]
+                if platform.system() == "Windows"
+                else ["xdg-open", str(path.parent)]
+            )
+            subprocess.Popen(command)
+            return self.app.response(
+                handler, {"path": str(path), "folder": str(path.parent)}
+            )
         match = re.fullmatch(r"/api/topics/items/([^/]+)/archive", path)
         if method == "POST" and match:
             item_id = match.group(1)
@@ -112,14 +310,33 @@ class TopicAPI:
         if method == "POST" and match:
             item = self.service.get_item(match.group(1))
             if item.get("archived"):
-                raise DomainError("TOPIC_ARCHIVED", "已归档选题不能创建生产任务", 409, "id", "先在已归档列表恢复该选题")
-            payload = {"title": item["title"][:200], "pillar": "enterprise_ai", "audience": "business_owners",
-                       "angle": "从真实热点或收藏结构切入，不复制原文；先核对来源与事实", "pain_point": ""}
+                raise DomainError(
+                    "TOPIC_ARCHIVED",
+                    "已归档选题不能创建生产任务",
+                    409,
+                    "id",
+                    "先在已归档列表恢复该选题",
+                )
+            payload = {
+                "title": item["title"][:200],
+                "pillar": "enterprise_ai",
+                "audience": "business_owners",
+                "angle": "从真实热点或收藏结构切入，不复制原文；先核对来源与事实",
+                "pain_point": "",
+            }
             task = self.legacy_task_creator(payload)
-            source = {"type": "topic_research", "research_item_id": item["id"], "url": item["url"],
-                      "source_key": item["source_key"], "snapshot_at": item["last_seen_at"]}
+            source = {
+                "type": "topic_research",
+                "research_item_id": item["id"],
+                "url": item["url"],
+                "source_key": item["source_key"],
+                "snapshot_at": item["last_seen_at"],
+            }
             with connect(self.service.db_path) as conn:
-                conn.execute("UPDATE tasks SET source_json=? WHERE content_id=?", (dumps(source), task["content_id"]))
+                conn.execute(
+                    "UPDATE tasks SET source_json=? WHERE content_id=?",
+                    (dumps(source), task["content_id"]),
+                )
             task["source"] = source
             return self.app.response(handler, task, 201)
         match = re.fullmatch(r"/api/topics/candidates/([^/]+)/create-task", path)
@@ -127,15 +344,33 @@ class TopicAPI:
             candidate_id = match.group(1)
             candidate = self.service.get_candidate(candidate_id)
             if candidate.get("status") == "converted":
-                raise DomainError("TOPIC_CANDIDATE_CONVERTED", "这条推荐已经转为选题", 409, "id", "从推荐卡片打开已创建的任务，不要重复创建")
-            payload = {"title": candidate["title"][:200], "pillar": candidate.get("pillar") or "enterprise_ai",
-                       "audience": candidate.get("audience") or "business_owners", "angle": candidate.get("angle") or "",
-                       "pain_point": candidate.get("reason") or ""}
+                raise DomainError(
+                    "TOPIC_CANDIDATE_CONVERTED",
+                    "这条推荐已经转为选题",
+                    409,
+                    "id",
+                    "从推荐卡片打开已创建的任务，不要重复创建",
+                )
+            payload = {
+                "title": candidate["title"][:200],
+                "pillar": candidate.get("pillar") or "enterprise_ai",
+                "audience": candidate.get("audience") or "business_owners",
+                "angle": candidate.get("angle") or "",
+                "pain_point": candidate.get("reason") or "",
+            }
             task = self.legacy_task_creator(payload)
-            source = {"type": "topic_candidate", "candidate_id": candidate_id, "agent": candidate.get("agent"),
-                      "evidence_ids": candidate.get("evidence_ids") or [], "recommended_at": candidate.get("created_at")}
+            source = {
+                "type": "topic_candidate",
+                "candidate_id": candidate_id,
+                "agent": candidate.get("agent"),
+                "evidence_ids": candidate.get("evidence_ids") or [],
+                "recommended_at": candidate.get("created_at"),
+            }
             with connect(self.service.db_path) as conn:
-                conn.execute("UPDATE tasks SET source_json=? WHERE content_id=?", (dumps(source), task["content_id"]))
+                conn.execute(
+                    "UPDATE tasks SET source_json=? WHERE content_id=?",
+                    (dumps(source), task["content_id"]),
+                )
             self.service.mark_candidate_converted(candidate_id, task["content_id"])
             task["source"] = source
             return self.app.response(handler, task, 201)

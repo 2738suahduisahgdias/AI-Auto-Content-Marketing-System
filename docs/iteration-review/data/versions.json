@@ -1,0 +1,119 @@
+[
+  {
+    "version": "v0.1.0",
+    "id": "2026-11-11-baseline",
+    "date": "2026-11-11",
+    "title": "全功能逐页评审基线与专用 Chrome",
+    "summary": "按确认的单页格式整理全功能，建立可离线查看、可持续追加的迭代资料夹。",
+    "record": "#iteration-2026-11-11-baseline",
+    "current": false
+  },
+  {
+    "version": "v0.2.0",
+    "id": "2026-11-13-kimi-douyin-collection",
+    "date": "2026-11-13",
+    "title": "Kimi CLI 抖音登录与全量同步",
+    "summary": "抖音两个入口统一由 Kimi CLI 操作固定 Chrome，登录等待、同步恢复和错误记录均已按真实流程改造。",
+    "record": "#iteration-2026-11-13-kimi-douyin-collection",
+    "current": false
+  },
+  {
+    "version": "v0.3.0",
+    "id": "2026-11-13-douyin-author-engagement-ids",
+    "date": "2026-11-13",
+    "title": "抖音作品作者与互动数据、全功能编号",
+    "summary": "作品卡补齐作者、粉丝、点赞和评论，全部功能获得稳定编号，便于按编号迭代。",
+    "record": "#iteration-2026-11-13-douyin-author-engagement-ids",
+    "current": false
+  },
+  {
+    "version": "v0.4.0",
+    "id": "2026-11-13-douyin-batch-author-backfill",
+    "date": "2026-11-13",
+    "title": "抖音全部作品卡逐条补全与真实协议修复",
+    "summary": "将高赞单条详情能力扩展为热榜、精选、竞对和高赞通用补全，按真实 Kimi 返回修复数据丢失，并为新增入口分配稳定功能编号。",
+    "record": "#iteration-2026-11-13-douyin-batch-author-backfill",
+    "current": false
+  },
+  {
+    "version": "v0.5.0",
+    "id": "2026-11-13-douyin-hot-collection-card-split",
+    "date": "2026-11-13",
+    "title": "热点作品卡与收藏作品卡拆分",
+    "summary": "按用户确认，热点保持原榜单获取和更新逻辑，只取消作者详情调用与展示；精选、竞对、高赞继续使用作者与互动补全。",
+    "record": "#iteration-2026-11-13-douyin-hot-collection-card-split",
+    "current": false
+  },
+  {
+    "version": "v0.6.0",
+    "id": "2026-11-14-evidence-chain-video-analysis",
+    "date": "2026-11-14",
+    "title": "证据链七步拆解法与指定视频真实验收",
+    "summary": "将旧版 60 帧 OCR 升级为 Kimi 下载、完整口播、全时长画面与语义拆解，支持 5 分钟准入、部分成果、历史版本和真实报告页面。",
+    "record": "#iteration-2026-11-14-evidence-chain-video-analysis",
+    "current": false
+  },
+  {
+    "version": "v0.7.0",
+    "id": "2026-11-14-download-only-local-files",
+    "date": "2026-11-14",
+    "title": "移除拆解功能，改为下载与本地地址",
+    "summary": "按用户确认，彻底移除 Whisper、抽帧、OCR 和语义拆解，只保留 Kimi CLI 下载、真实本地路径、打开文件夹和系统剪贴板复制。",
+    "record": "#iteration-2026-11-14-download-only-local-files",
+    "current": false
+  },
+  {
+    "version": "v0.8.0",
+    "id": "2026-11-15-original-copy-ai",
+    "date": "2026-11-15",
+    "title": "原创文案手写与 AI 生成双路径",
+    "summary": "只修改 P10-C02 与 P10-C03：完整手写文案可跳过叙事方向，AI 可按叙事方向生成或改写候选，采用后才进入正式文案。",
+    "record": "iterations/2026-11-15-original-copy-ai.md",
+    "current": false
+  },
+  {
+    "version": "v0.9.0",
+    "id": "2026-11-15-collection-author-engagement-completion",
+    "date": "2026-11-15",
+    "title": "收藏作品卡合并与作者互动全量补全",
+    "summary": "纠正把收藏卡与作者互动拆成两个功能卡、把预留展示当真实完成的问题；统一 P04-C04，完成 25 条真实缺失数据补全并验证续跑。",
+    "record": "#iteration-2026-11-15-collection-author-engagement-completion",
+    "current": false
+  },
+  {
+    "version": "v0.10.0",
+    "id": "2026-11-15-version-archive",
+    "date": "2026-11-15",
+    "title": "统一开发版本记录与产品功能归档",
+    "summary": "在指定目录建立统一开发版本记录，汇总当前产品功能、真实截图、历史迭代和版本索引。",
+    "record": "#iteration-2026-11-15-version-archive",
+    "current": false
+  },
+  {
+    "version": "v0.11.0",
+    "id": "2026-11-15-xiaohongshu-topic-strategies",
+    "date": "2026-11-15",
+    "title": "小红书四类选题策略与真实素材下载",
+    "summary": "修复真实登录反馈；平台热点与精选、竞对、高赞分策略采集，补齐作者互动，按视频与图文探测并下载素材。",
+    "record": "#iteration-2026-11-15-xiaohongshu-topic-strategies",
+    "current": false
+  },
+  {
+    "version": "v0.12.0",
+    "id": "2026-11-15-transcript-progress",
+    "date": "2026-11-15",
+    "title": "词级时间码后台进度与模型复用",
+    "summary": "P10-C04-F02 改为后台真实转写任务，复用本地 Whisper 模型，并展示实际阶段、百分比和耗时。",
+    "record": "iterations/2026-11-15-transcript-progress.md",
+    "current": false
+  },
+  {
+    "version": "v0.13.0",
+    "id": "2026-11-16-xiaohongshu-download-acceptance",
+    "date": "2026-11-16",
+    "title": "小红书真实视频与图文下载验收",
+    "summary": "修复 Python 3.9 兼容和探测终态丢失，使用固定 Chrome 读取实际媒体并完成一个真实视频与一组真实图文的下载、路径和系统操作验收。",
+    "record": "iterations/2026-11-16-xiaohongshu-download-acceptance.md",
+    "current": true
+  }
+]

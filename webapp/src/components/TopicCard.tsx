@@ -17,43 +17,58 @@ interface TopicCardProps {
   onRetryCover?: (item: TopicItem) => void;
 }
 
-export function TopicCard({ item, busy = false, allowAnalyze = true, onCreate, onAnalyze, onDetail, onArchive, archived = false, onRetryCover }: TopicCardProps) {
+export function HotTopicCard({ item, busy = false, onCreate, onArchive, archived = false }: TopicCardProps) {
+  const metadata: Json = item.metadata || {};
+  const hasOriginalUrl = /^https?:\/\//.test(item.url);
+  const isXhs = item.platform === "xiaohongshu";
+  return <Card className="topic-hot-item">
+    <span className="topic-hot-rank">{metadata.rank ? `#${metadata.rank}` : "—"}</span>
+    <div className="topic-hot-copy"><h3>{item.title}</h3><small>{isXhs ? "小红书平台热点" : "抖音热点榜"} · 采集于 {displayTime(item.last_seen_at)}</small><div className="topic-hot-meta"><strong>{metadata.heat || "热度未读取"}</strong><small>热点榜单快照</small></div></div>
+    <div className="topic-card-actions">
+      {hasOriginalUrl && <a className="button button-small" href={item.url} target="_blank" rel="noreferrer"><ExternalLink size={13} />原链接</a>}
+      {!isXhs && !archived && <Button size="small" disabled={busy} onClick={() => onCreate(item)}><Plus size={13} />转为选题</Button>}
+      {!isXhs && onArchive && <Button size="small" variant="ghost" disabled={busy} onClick={() => onArchive(item)}>{archived ? <><ArchiveRestore size={13} />恢复</> : <><Archive size={13} />归档</>}</Button>}
+    </div>
+  </Card>;
+}
+
+export function CollectionTopicCard({ item, busy = false, allowAnalyze = true, onCreate, onAnalyze, onDetail, onArchive, archived = false, onRetryCover }: TopicCardProps) {
   const [failedCover, setFailedCover] = useState("");
   const metadata: Json = item.metadata || {};
   const author = metadata.author_name || metadata.author || "作者未读取";
   const likes = metadata.like_count ?? metadata.visible_metrics?.like_count;
+  const comments = metadata.comment_count ?? metadata.visible_metrics?.comment_count;
   const hasOriginalUrl = /^https?:\/\//.test(item.url) && !item.url.startsWith("https://wechat.local/");
   const source = item.source_key || metadata.source_key;
   const showCover = !["hot", "industry", "wechat_inbox"].includes(String(source || "")) && hasOriginalUrl;
-  if (source === "hot") return <Card className="topic-hot-item">
-    <span className="topic-hot-rank">{metadata.rank ? `#${metadata.rank}` : "—"}</span>
-    <div className="topic-hot-copy"><h3>{item.title}</h3><small>抖音热点榜 · 采集于 {displayTime(item.last_seen_at)}</small></div>
-    <div className="topic-card-actions">
-      {hasOriginalUrl && <a className="button button-small" href={item.url} target="_blank" rel="noreferrer"><ExternalLink size={13} />原链接</a>}
-      {!archived && <Button size="small" disabled={busy} onClick={() => onCreate(item)}><Plus size={13} />转为选题</Button>}
-      {onArchive && <Button size="small" variant="ghost" disabled={busy} onClick={() => onArchive(item)}>{archived ? <><ArchiveRestore size={13} />恢复</> : <><Archive size={13} />归档</>}</Button>}
-    </div>
-  </Card>;
   return <Card className="topic-research-card">
     {showCover && <div className="topic-research-cover-native">
       {metadata.cover_cached && failedCover !== String(metadata.cover_url || item.id) ? <img src={`/api/topics/items/${encodeURIComponent(item.id)}/cover`} alt={`${item.title} 封面`} loading="lazy" onError={() => setFailedCover(String(metadata.cover_url || item.id))} /> : <span className="topic-cover-pending">{metadata.cover_error || "封面暂未获取"}{onRetryCover && <Button size="small" disabled={busy} onClick={() => {setFailedCover("");onRetryCover(item);}}>重新获取封面</Button>}</span>}
       <div className="topic-cover-meta">
         <Badge tone="orange">{metadata.rank ? `#${metadata.rank}` : metadata.source_name || metadata.tag || item.platform}</Badge>
-        <span>赞 {formatNumber(likes)}</span>
       </div>
-      <span className="topic-analysis-mark">{item.analysis_status === "succeeded" ? "已拆解" : "仅快照"}</span>
+      <span className="topic-analysis-mark">{metadata.download_status === "downloaded" ? "已下载" : metadata.download_status === "failed" ? "下载失败" : "仅快照"}</span>
     </div>}
     <div className="topic-research-body">
       <h3>{item.title}</h3>
-      <div className="topic-author"><span>{String(author).slice(0, 1)}</span><div><strong>{author}</strong><small>{metadata.author_followers != null ? `粉丝 ${formatNumber(metadata.author_followers)}` : "粉丝未读取"}</small></div></div>
+      <div className="topic-author"><span>{String(author).slice(0, 1)}</span><div><strong>{author}</strong><small>作者与作品公开快照</small></div></div>
+      <div className="topic-engagement" aria-label="作者与互动数据">
+        <span>粉丝 {metadata.author_followers != null ? formatNumber(metadata.author_followers) : "未读取"}</span>
+        <span>点赞 {formatNumber(likes)}</span>
+        <span>评论 {formatNumber(comments)}</span>
+      </div>
       <p className="topic-captured">采集于 {displayTime(item.last_seen_at)} · 同步不下载视频</p>
       <div className="topic-card-actions">
         {hasOriginalUrl ? <a className="button button-small" href={item.url} target="_blank" rel="noreferrer"><ExternalLink size={13} />原链接</a> : <span className="muted-text" title="纯文本微信消息没有原链接">无原链接</span>}
         {!archived && <Button size="small" disabled={busy} onClick={() => onCreate(item)}><Plus size={13} />创建任务</Button>}
-        {!archived && allowAnalyze && onAnalyze && <Button size="small" disabled={busy} onClick={() => onAnalyze(item)}><ScanText size={13} />{item.analysis_status === "succeeded" ? "重新检查拆解" : "下载并拆解"}</Button>}
-        <Button size="small" variant="ghost" disabled={busy} onClick={() => onDetail(item)}><FileSearch size={13} />{item.analysis_status === "succeeded" ? "查看拆解" : "详情"}</Button>
+        {!archived && allowAnalyze && onAnalyze && metadata.download_status !== "downloaded" && <Button size="small" disabled={busy} onClick={() => onAnalyze(item)}><ScanText size={13} />{metadata.download_status === "failed" ? "重试下载" : item.platform === "xiaohongshu" ? "下载素材" : "下载视频"}</Button>}
+        <Button size="small" variant="ghost" disabled={busy} onClick={() => onDetail(item)}><FileSearch size={13} />{metadata.download_status === "downloaded" ? "查看下载信息" : "详情"}</Button>
         {onArchive && <Button size="small" variant="ghost" disabled={busy} onClick={() => onArchive(item)}>{archived ? <><ArchiveRestore size={13} />恢复</> : <><Archive size={13} />归档</>}</Button>}
       </div>
     </div>
   </Card>;
+}
+
+export function TopicCard(props: TopicCardProps) {
+  return ["hot", "xhs_hot"].includes(props.item.source_key) ? <HotTopicCard {...props} /> : <CollectionTopicCard {...props} />;
 }
