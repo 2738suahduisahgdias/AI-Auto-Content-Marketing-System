@@ -158,6 +158,8 @@ PATH="/usr/local/opt/openssl@3/bin:$PATH" bash scripts/start.sh
 - **已验证**：项目 `20261115-001`、17.85 秒真人中文旁白；复用后任务 `job_eae57fe633a84b7e932a` 耗时 12.450 秒，`job_97b4cd3e8f0b48699626` 耗时 6.997 秒，页面显示“转写中 · 8% · 已用 4 秒”，证据 `docs/acceptance/transcript-progress.png`。
 - **已验证**：相关 Python 27 项、React 相关 15 项和生产构建通过；本次 Python 文件 Ruff format/check 通过。真实 worker 55503 调用 `stop()` 后返回码 0，主服务退出时也会关闭复用进程。完整后端 434 项通过、1 项跳过；最终单 worker 前端 45 个文件、127 项全部通过。
 - **已验证**：最终精简 DMG 的原生窗口生成 66 个词/片段，主服务 66954 和 worker 67213 均退出；运行后签名与镜像校验通过。DMG 位于 `mac-slim-transcript-progress`，SHA-256 `ff9f5acfbea9ddf1d4cf6dd2f8876069249cf0a55f0f40a335538ba2f49a5c0e`。
+- **已验证**：全量 APP 任务 `job_403b7b1e1e89421689d8` 生成 66 个词/片段并达到 91.6% 实际进度；主服务 17017 与 worker 18514 均退出，运行后签名有效。
+- **已验证**：GitHub 提交 `39d22d8799d6e9e2d1afe57317f6ca65794c47e4` 已推送并核对远端一致；另一个进行中的转写提示改动未纳入本次提交。
 - **边界**：当前是本机短视频实测；长音频、大量并发、Apple Silicon 和其他机器性能未验证。词级转写不是 Kimi CLI 文本生成，仍由本地 faster-whisper 执行。
 
 ## 10. UI、Agent 与自包含客户端迭代（2026-11-06）

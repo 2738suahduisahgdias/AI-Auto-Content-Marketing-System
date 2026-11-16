@@ -21,6 +21,8 @@
 - 完整后端在 Python 3.12 + OpenSSL 3 下 434 项通过、1 项跳过；完整前端并行轮次 124 项通过、1 项高负载超时，最终单 worker 复验为 45 个文件、127 项全部通过。转写 worker 覆盖率统计为 91%。
 - 最终精简 DMG 的原生窗口完成任务 `job_5011282586ed4cffb913`，生成 66 个词/片段；模型就绪后约 10 秒。主服务 66954 与 worker 67213 均退出，运行后签名有效；镜像 `VALID`，SHA-256 `ff9f5acfbea9ddf1d4cf6dd2f8876069249cf0a55f0f40a335538ba2f49a5c0e`。
 - 构建排除 `._*` AppleDouble 元数据，桌面入口同步清理 Whisper worker；相关 27 项测试通过。原生证据 `docs/acceptance/transcript-slim-native.jpg` 和 `transcript-real-results.json`。
+- 全量 APP 真实任务 `job_403b7b1e1e89421689d8` 生成 66 个词/片段，实际进度达到 91.6%；主服务 17017 与 worker 18514 均退出，运行后签名有效。
+- GitHub 提交 `39d22d8799d6e9e2d1afe57317f6ca65794c47e4` 已推送到 `continue-from-fd9e2785`，远端哈希核对一致；另一个进行中的转写提示改动保留在工作区，未混入本次提交。
 - 长音频、多任务并发和其他硬件性能未验证；词级时间码使用本地 faster-whisper，不冒充 Kimi CLI 转写。
 
 ## 2026-11-15 · 升级版 APP 内 AI 生成与改写通过
