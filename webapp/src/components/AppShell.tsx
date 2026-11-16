@@ -8,6 +8,7 @@ import { useApp } from "@/AppContext";
 
 import { Busy, ErrorBox } from "@/components/ui";
 import { cn } from "@/components/ui";
+import SlimDependencies from "@/components/SlimDependencies";
 
 const groups: { label: string; items: { to: string; label: string; icon: LucideIcon; end?: boolean }[] }[] = [
   { label: "工作", items: [{ to: "/", label: "今天", icon: Home, end: true }] },
@@ -16,7 +17,7 @@ const groups: { label: string; items: { to: string; label: string; icon: LucideI
   ] },
   { label: "生产", items: [
     { to: "/articles", label: "文章任务", icon: FileText },
-    { to: "/tasks", label: "视频任务", icon: Video },
+    { to: "/projects", label: "视频项目", icon: Video },
   ] },
   { label: "发布", items: [
     { to: "/review", label: "审核中心", icon: ShieldCheck },
@@ -27,7 +28,7 @@ const groups: { label: string; items: { to: string; label: string; icon: LucideI
     { to: "/settings", label: "设置", icon: Settings },
   ] },
 ];
-const titles: Record<string, string> = { "/": "今天", "/topics/industry": "行业热点", "/topics/douyin": "抖音选题", "/topics/wechat": "微信选题", "/topics/xiaohongshu": "小红书选题", "/accounts": "日报总览", "/accounts/douyin": "抖音日报", "/accounts/wechat_channels": "视频号日报", "/accounts/xiaohongshu": "小红书日报", "/accounts/wechat_official_account": "公众号日报", "/competitors": "竞对分析", "/social": "社媒能力", "/retrospective": "内容复盘", "/articles": "文章任务", "/tasks": "视频任务", "/review": "短视频审核", "/publish": "发布中心", "/knowledge": "增长记忆大脑", "/knowledge/collection": "采集知识库", "/knowledge/publishing": "发布知识库", "/setup": "接入向导", "/settings": "设置" };
+const titles: Record<string, string> = { "/": "今天", "/topics/industry": "行业热点", "/topics/douyin": "抖音选题", "/topics/wechat": "微信选题", "/topics/xiaohongshu": "小红书选题", "/accounts": "日报总览", "/accounts/douyin": "抖音日报", "/accounts/wechat_channels": "视频号日报", "/accounts/xiaohongshu": "小红书日报", "/accounts/wechat_official_account": "公众号日报", "/competitors": "竞对分析", "/social": "社媒能力", "/retrospective": "内容复盘", "/articles": "文章任务", "/tasks": "视频项目", "/projects": "视频项目", "/review": "短视频审核", "/publish": "发布中心", "/knowledge": "增长记忆大脑", "/knowledge/collection": "采集知识库", "/knowledge/publishing": "发布知识库", "/setup": "接入向导", "/settings": "设置" };
 
 const topicSources = [
   { to: "/topics/industry", label: "行业热点" },
@@ -46,22 +47,33 @@ function NavDropdown({ label, path, icon: Icon, items, onNavigate }: { label: st
   return <div className="nav-dropdown"><button type="button" className={cn("nav-link nav-dropdown-toggle", active && "active")} aria-expanded={open} aria-controls={menuId} onClick={() => setOpen(value => !value)}><Icon size={16} /><span>{label}</span><ChevronDown className={cn("nav-dropdown-chevron", open && "open")} size={14} /></button>{open && <div className="nav-dropdown-menu" id={menuId}>{items.map(item => <NavLink key={item.to} to={item.to} end={item.end} onClick={onNavigate} className={({ isActive }) => cn("nav-link nav-sublink", isActive && "active")}><span>{item.label}</span></NavLink>)}</div>}</div>;
 }
 
+function VideoProjectNavigation({ onNavigate }: { onNavigate?: () => void }) {
+  const location = useLocation();
+  const menuId = useId();
+  const active = location.pathname === "/projects" || location.pathname.startsWith("/tasks") || location.pathname.startsWith("/projects/");
+  const [open, setOpen] = useState(active);
+  useEffect(() => { if (active) setOpen(true); }, [active, location.pathname]);
+  return <div className="nav-dropdown"><div className="nav-dropdown-toggle-row"><NavLink to="/projects" onClick={onNavigate} className={cn("nav-link nav-dropdown-toggle", active && "active")}><Video size={16} /><span>视频项目</span></NavLink><button type="button" className="nav-dropdown-chevron-button" aria-label={open ? "收起视频项目" : "展开视频项目"} aria-expanded={open} aria-controls={menuId} onClick={() => setOpen(value => !value)}><ChevronDown className={cn("nav-dropdown-chevron", open && "open")} size={14} /></button></div>{open && <div className="nav-dropdown-menu" id={menuId}><NavLink to="/projects/original" onClick={onNavigate} className={({ isActive }) => cn("nav-link nav-sublink", isActive && "active")}><span>原创</span></NavLink><NavLink to="/projects/benchmark" onClick={onNavigate} className={({ isActive }) => cn("nav-link nav-sublink", isActive && "active")}><span>对标</span></NavLink></div>}</div>;
+}
+
 function Navigation({ onNavigate, compactOnboarding = true }: { onNavigate?: () => void; compactOnboarding?: boolean }) {
   const settingsItems = Object.entries(settingPages).map(([key, item]) => ({to: '/settings/' + key, label: item.title}));
   settingsItems.push({to:"/setup",label:"接入与连接"});
   if (compactOnboarding) settingsItems.push({to:'/activation',label:'离线授权'},{to:'/welcome',label:'新手引导'});
-  return <nav className="main-nav" aria-label="主导航">{groups.map(group => <div className="nav-group" key={group.label}><p>{group.label}</p>{group.label === "选题" ? <NavDropdown label="选题中心" path="/topics/" icon={TrendingUp} items={topicSources} onNavigate={onNavigate}/> : group.items.map(({to,label,icon:Icon,end}) => to === '/settings' ? <NavDropdown key={to} label="设置" path="/settings" icon={Settings} items={settingsItems} onNavigate={onNavigate}/> : <NavLink key={to} to={to} end={end} onClick={onNavigate} className={({isActive})=>cn('nav-link',isActive&&'active')}><Icon size={16}/><span>{label}</span></NavLink>)}</div>)}</nav>;
+  return <nav className="main-nav" aria-label="主导航">{groups.map(group => <div className="nav-group" key={group.label}><p>{group.label}</p>{group.label === "选题" ? <NavDropdown label="选题中心" path="/topics/" icon={TrendingUp} items={topicSources} onNavigate={onNavigate}/> : group.items.map(({to,label,icon:Icon,end}) => to === '/projects' ? <VideoProjectNavigation key={to} onNavigate={onNavigate}/> : to === '/settings' ? <NavDropdown key={to} label="设置" path="/settings" icon={Settings} items={settingsItems} onNavigate={onNavigate}/> : <NavLink key={to} to={to} end={end} onClick={onNavigate} className={({isActive})=>cn('nav-link',isActive&&'active')}><Icon size={16}/><span>{label}</span></NavLink>)}</div>)}</nav>;
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { resources, loading, loadError, notice } = useApp();
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [location.pathname, location.search]);
   const basePath = "/" + location.pathname.split("/")[1];
   const title = ({"/activation":"离线授权","/welcome":"新手引导"} as Record<string,string>)[location.pathname] || titles[location.pathname] || titles[basePath] || "内容工作台";
   return <div className="app-shell">
     <aside className="sidebar"><NavLink to="/" className="brand"><span className="brand-symbol">L</span><span><strong>刘量</strong><small>内容增长工作台</small></span></NavLink><div className="workspace-label"><Bot size={16} /><span>多 Agent 本地工作区<small>真实数据 · 人工终审</small></span></div><Navigation compactOnboarding /><div className="sidebar-foot"><span className="live-dot" />本地数据由你掌控<a href="/legacy">打开旧版 ↗</a></div></aside>
     <div className="main-shell"><header className="topbar"><Dialog.Root open={menuOpen} onOpenChange={setMenuOpen}><Dialog.Trigger className="icon-button mobile-menu" aria-label="打开导航"><Menu size={20} /></Dialog.Trigger><Dialog.Portal><Dialog.Overlay className="modal-overlay" /><Dialog.Content className="mobile-drawer"><div className="drawer-head"><strong>内容增长工作台</strong><Dialog.Close className="icon-button" aria-label="关闭"><X size={18} /></Dialog.Close></div><Navigation compactOnboarding onNavigate={() => setMenuOpen(false)} /><a href="/legacy" className="legacy-link">打开旧版 ↗</a></Dialog.Content></Dialog.Portal></Dialog.Root><div><p className="topbar-date">{new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "long" }).format(new Date())}</p><h2>{title}</h2></div><div className="topbar-meta"><PenTool size={15} /><span>Agent 生产，你来判断</span></div></header>
+      <SlimDependencies />
       <main className="page-container">{["/activation","/welcome"].includes(location.pathname) ? children : loading ? <Busy /> : loadError && !resources ? <ErrorBox>{loadError}</ErrorBox> : children}</main>
     </div>
     <nav className="mobile-bottom" aria-label="高频导航">{[{ to: "/", label: "今天", icon: Home, end: true }, { to: "/topics/douyin", label: "选题", icon: TrendingUp }, { to: "/tasks", label: "制作", icon: Video }, { to: "/publish", label: "发布", icon: Share2 }].map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} className={({ isActive }) => cn(isActive && "active")}><Icon size={18} /><span>{label}</span></NavLink>)}</nav>

@@ -2,7 +2,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from content_workbench.agents.registry import AGENTS, agent_config, all_agent_configs, require_agent_enabled, save_agent_config
+from content_workbench.agents.registry import (
+    AGENTS,
+    agent_config,
+    all_agent_configs,
+    require_agent_enabled,
+    save_agent_config,
+)
 from content_workbench.domain.errors import DomainError
 from content_workbench.storage.db import connect, expand_schema, immediate
 from content_workbench.topics.scheduler import TopicScheduler, configure_schedule
@@ -27,9 +33,46 @@ class AgentRegistryCase(unittest.TestCase):
         self.assertFalse(configs["quality_agent"]["enabled"])
         self.assertEqual("small", configs["caption_agent"]["model"])
 
+    def test_every_generative_agent_has_independent_kimi_model_configuration(self):
+        generative = {
+            "industry_topic_agent",
+            "douyin_topic_agent",
+            "xiaohongshu_topic_agent",
+            "script_agent",
+            "asset_planning_agent",
+            "publish_agent",
+            "account_analysis_agent",
+            "article_agent",
+            "video_review_agent",
+            "article_image_agent",
+            "music_composer_agent",
+            "visual_analysis_agent",
+            "audio_separation_agent",
+            "remotion_director_agent",
+            "remotion_code_agent",
+            "social_data_agent",
+        }
+        self.assertTrue(generative.issubset(AGENTS))
+        for agent_id in generative:
+            with self.subTest(agent=agent_id):
+                config = agent_config(self.db, agent_id)
+                self.assertEqual("kimi_cli", config["engine"])
+                self.assertEqual("default_unpinned", config["model"])
+                for engine in ("system", "kimi_cli", "codex_cli", "model_api"):
+                    self.assertIn(engine, AGENTS[agent_id]["engines"])
+
     def test_save_and_reset_only_one_agent(self):
         other = agent_config(self.db, "douyin_topic_agent")["prompt"]
-        updated = save_agent_config(self.db, "industry_topic_agent", {"prompt": "只保留真实业务案例", "timeout_seconds": 300, "max_attempts": 2, "concurrency": 1})
+        updated = save_agent_config(
+            self.db,
+            "industry_topic_agent",
+            {
+                "prompt": "只保留真实业务案例",
+                "timeout_seconds": 300,
+                "max_attempts": 2,
+                "concurrency": 1,
+            },
+        )
         self.assertEqual("只保留真实业务案例", updated["prompt"])
         self.assertEqual(300, updated["timeout_seconds"])
         self.assertEqual(other, agent_config(self.db, "douyin_topic_agent")["prompt"])
@@ -38,12 +81,12 @@ class AgentRegistryCase(unittest.TestCase):
         self.assertEqual(other, agent_config(self.db, "douyin_topic_agent")["prompt"])
 
     def test_cli_selection_persists_independently(self):
-        self.assertEqual("codex_cli", agent_config(self.db, "script_agent")["engine"])
-        save_agent_config(self.db, "script_agent", {"engine": "kimi_cli"})
         self.assertEqual("kimi_cli", agent_config(self.db, "script_agent")["engine"])
-        self.assertEqual("codex_cli", agent_config(self.db, "article_agent")["engine"])
         save_agent_config(self.db, "script_agent", {"engine": "codex_cli"})
         self.assertEqual("codex_cli", agent_config(self.db, "script_agent")["engine"])
+        self.assertEqual("kimi_cli", agent_config(self.db, "article_agent")["engine"])
+        save_agent_config(self.db, "script_agent", {"engine": "kimi_cli"})
+        self.assertEqual("kimi_cli", agent_config(self.db, "script_agent")["engine"])
 
     def test_invalid_config_and_unconnected_enable_rejected(self):
         with self.assertRaises(DomainError):
@@ -62,7 +105,9 @@ class AgentRegistryCase(unittest.TestCase):
         self.assertEqual("AGENT_DISABLED", caught.exception.code)
         configure_schedule(self.db, {"daily_time": "09:00", "daily_enabled": True})
         with connect(self.db) as conn, immediate(conn):
-            conn.execute("UPDATE wb_schedules SET next_due_at='2000-01-01T00:00:00Z' WHERE id='topics.daily'")
+            conn.execute(
+                "UPDATE wb_schedules SET next_due_at='2000-01-01T00:00:00Z' WHERE id='topics.daily'"
+            )
         save_agent_config(self.db, "workflow_agent", {"enabled": False})
         scheduler = TopicScheduler(self.db)
         self.assertEqual(0, scheduler.tick())

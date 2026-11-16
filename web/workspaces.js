@@ -43,7 +43,15 @@ function renderAccountDaily() {
   $("#accounts").insertAdjacentHTML("beforeend", `<div class="account-automation"><div class="section-head"><div><h2>每日自助分析与选题推荐</h2><p>每天 09:30 调度；先同步真实快照，再由账号分析Agent推荐，缺失指标保持空值</p></div><div class="button-row"><button class="button" data-sync-accounts>立即同步</button><button class="button primary" data-account-recommend ${data.accounts?.length ? "" : "disabled"}>生成账号选题推荐</button></div></div>${jobs.slice(0, 5).map(workspaceJob).join("")}<div class="grid cols-2 account-snapshots">${(data.accounts || []).map(account => `<article class="card"><div class="section-head"><div><h3>${esc(platformNames[account.platform] || account.platform)}</h3><p>${esc(account.captured_at)}</p></div><span class="badge green">真实快照</span></div><p>${esc(account.profile?.account_name || "账号名称未读取")}</p><small class="muted">${Object.entries(account.profile || {}).filter(([key]) => key !== "account_name").map(([key,value]) => `${esc(key)}：${fmt(value)}`).join(" · ") || "账号指标未读取"}</small></article>`).join("") || `<div class="empty">还没有自动同步的账号快照。上方手动录入的历史数据仍保留，不能冒充今日数据。</div>`}</div><div class="section-head"><div><h2>账号分析Agent推荐</h2><p>${data.recommendations?.length || 0} 条 · 事实、推断和实验分开</p></div></div><div class="topic-grid">${(data.recommendations || []).map(item => `<article class="card topic"><span class="badge green">账号分析Agent</span><h3>${esc(item.title)}</h3><p>${esc(item.reason)}</p><div class="evidence"><strong>建议切入</strong><p>${esc(item.angle)}</p>${(item.uncertainties || []).map(value => `<small>待核实：${esc(value)}</small>`).join("")}</div><small>${esc(item.created_at)}</small></article>`).join("") || `<div class="empty">同步后点击“生成账号选题推荐”；未同步时不生成无依据结论。</div>`}</div></div>`);
 }
 function approvedVideos() {
-  return (state.data?.tasks || []).filter(task => task.state === "approved" && task.files.some(file => file.kind === "video"));
+  const legacy = (state.data?.tasks || []).filter(task => task.state === "approved" && !task.source?.yingxu_handoff && task.files.some(file => file.kind === "video"));
+  const delivered = (state.publishing?.queue || []).filter(item => item.delivery).map(item => ({
+    content_id: item.id,
+    title: item.title,
+    description: item.body,
+    delivery: item.delivery,
+    files: [{ kind: "video" }],
+  }));
+  return [...delivered, ...legacy];
 }
 function renderPublishing() {
   const videos = approvedVideos();

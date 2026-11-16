@@ -13,7 +13,7 @@ export type TalkingHeadScene = {
   end_seconds: number;
   asset_type: "own" | "screen_record" | "stock" | "ai_image" | "ai_video";
   description: string;
-  media?: {kind: "video" | "image"; src: string} | null;
+  media?: {kind: "video" | "image"; src: string; muted?: boolean; loop?: boolean; freeze_after_seconds?: number | null} | null;
   type?: "hook" | "key_point" | "metric" | "process" | "comparison" | "timeline" | "architecture" | "map" | "media" | "quote" | "cta";
   narration?: string;
   headline?: string;

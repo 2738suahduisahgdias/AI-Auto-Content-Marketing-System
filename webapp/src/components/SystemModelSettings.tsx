@@ -9,7 +9,7 @@ interface ModelSettings {
   key_configured?: boolean;
 }
 export default function SystemModelSettings() {
-  const [settings,setSettings] = useState<ModelSettings>({engine:"codex_cli"});
+  const [settings,setSettings] = useState<ModelSettings>({engine:"kimi_cli"});
   const [key,setKey] = useState("");
   const [busy,setBusy] = useState(false);
   const [error,setError] = useState("");
@@ -29,7 +29,7 @@ export default function SystemModelSettings() {
   }
   return <Card>
     <h2>系统默认文本模型</h2>
-    <p>选题推荐、文案、编导、素材规划、内容审核和发布文案统一跟随此处选择。Agent 配置中可单独指定服务；配音、生图、视频生成和本地渲染使用各自能力。</p>
+    <p>生成型 Agent 默认跟随此处选择，也可以在 Agent 配置中心分别覆盖服务和模型。Whisper、OCR、Demucs、OpenVoice 与 Remotion 是客户端内置的本地媒体能力，不在这里选择文本模型。</p>
     <Field label="默认服务"><select disabled={busy} value={settings.engine} onChange={e=>{setSettings({...settings,engine:e.target.value});setMessage("");}}>
       <option value="codex_cli">Codex CLI · 本机登录</option>
       <option value="kimi_cli">Kimi CLI · 本机登录</option>

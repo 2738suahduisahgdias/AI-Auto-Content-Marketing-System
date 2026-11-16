@@ -1,6 +1,7 @@
 $ErrorActionPreference = "Stop"
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $Root
+if (-not $env:YINGXU_DEDICATED_CHROME) { $env:YINGXU_DEDICATED_CHROME = "1" }
 if (-not (Test-Path (Join-Path $Root "data\seed.json"))) {
   Copy-Item (Join-Path $Root "data\seed.example.json") (Join-Path $Root "data\seed.json")
 }

@@ -3,7 +3,7 @@
 // 改为按模板主题色取色。
 import {Video} from "@remotion/media";
 import React from "react";
-import {CanvasImage, interpolate, staticFile, useCurrentFrame, useVideoConfig} from "remotion";
+import {CanvasImage, Freeze, interpolate, staticFile, useCurrentFrame, useVideoConfig} from "remotion";
 import {TalkingHeadAppearance, TalkingHeadScene} from "./VideoComposition";
 
 const hexToRgb = (value: string, fallback: [number, number, number]): [number, number, number] => {
@@ -100,16 +100,22 @@ export const SceneMedia: React.FC<{scene: TalkingHeadScene; opacity?: number}> =
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   if (scene.media?.kind === "video") {
-    return (
+    const player = (
       <Video
         name={scene.name}
         src={mediaSource(scene.media.src)}
         trimBefore={Math.max(0, Math.round((scene.source_start_seconds || 0) * fps))}
         premountFor={fps}
         objectFit="cover"
+        muted={scene.media.muted}
+        loop={scene.media.loop}
         style={{position: "absolute", width: "100%", height: "100%", opacity}}
       />
     );
+    if (typeof scene.media.freeze_after_seconds === "number") {
+      return <Freeze frame={Math.max(0, Math.round(scene.media.freeze_after_seconds * fps) - 1)}>{player}</Freeze>;
+    }
+    return player;
   }
   if (scene.media?.kind === "image") {
     const total = Math.max(1, Math.round((scene.end_seconds - scene.start_seconds) * fps));

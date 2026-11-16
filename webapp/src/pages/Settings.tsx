@@ -381,7 +381,7 @@ export default function Settings() {
           <aside className="settings-agent-list" aria-label="独立 Agent 列表">{entries.map(([id, item]) => <button type="button" key={id} className={`settings-agent-item${id === selectedId ? " active" : ""}`} onClick={() => selectAgent(id)} aria-pressed={id === selectedId}>
             <span className="settings-agent-item-top"><strong>{item.name}</strong>{dirty.has(id) && <i title="有未保存修改">未保存</i>}</span>
             <small>{item.description}</small>
-            <span className="settings-agent-item-meta">{engineLabel(configs[id]?.engine||"")} · {configs[id]?.enabled ? "启用" : item.connected ? "停用" : "未接入"}</span>
+            <span className="settings-agent-item-meta">{engineLabel(configs[id]?.engine||"")} · {configs[id]?.model === "default_unpinned" ? "默认模型" : configs[id]?.model} · {configs[id]?.enabled ? "启用" : item.connected ? "停用" : "未接入"}</span>
           </button>)}</aside>
           <section className="settings-agent-editor" aria-label={`${definition.name}配置`}>
             <div className="settings-editor-title"><div><p className="eyebrow">AGENT / {selectedId}</p><h3>{definition.name}</h3><p>{definition.description}</p></div>{dirty.has(selectedId) ? <Badge tone="orange">有未保存修改</Badge> : <Badge>已读取本地配置</Badge>}</div>

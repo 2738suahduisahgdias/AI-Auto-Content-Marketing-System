@@ -1,0 +1,62 @@
+{
+  "audio": {
+    "file": "build/whisper-progress-test.wav",
+    "duration_seconds": 17.849705,
+    "kind": "真人中文语音"
+  },
+  "online_8765": [
+    {
+      "job_id": "job_eae57fe633a84b7e932a",
+      "created_at": "2026-11-15T15:17:59.145Z",
+      "updated_at": "2026-11-15T15:18:11.595Z",
+      "elapsed_seconds": 12.45,
+      "status": "succeeded"
+    },
+    {
+      "job_id": "job_97b4cd3e8f0b48699626",
+      "created_at": "2026-11-15T15:24:36.000Z",
+      "updated_at": "2026-11-15T15:24:42.997Z",
+      "elapsed_seconds": 6.997,
+      "status": "succeeded"
+    }
+  ],
+  "slim_native": {
+    "worker_pid": 61270,
+    "same_worker_for_both_runs": true,
+    "runs": [
+      {
+        "job_id": "job_e7f64d4a6ee64b1cb9cc",
+        "created_at": "2026-11-15T16:15:27.676Z",
+        "updated_at": "2026-11-15T16:19:44.312Z",
+        "elapsed_seconds": 256.636,
+        "status": "succeeded",
+        "word_count": 66,
+        "stages": ["running", "model_loading", "transcribing", "writing", "succeeded"]
+      },
+      {
+        "job_id": "job_8b177fa34d9641d88e2b",
+        "created_at": "2026-11-15T16:22:41.599Z",
+        "updated_at": "2026-11-15T16:23:12.317Z",
+        "elapsed_seconds": 30.718,
+        "status": "succeeded",
+        "word_count": 66,
+        "stages": ["running", "transcribing", "writing", "succeeded"]
+      }
+    ],
+    "screenshot": "docs/acceptance/transcript-slim-native.jpg"
+  },
+  "final_slim": {
+    "job_id": "job_5011282586ed4cffb913",
+    "created_at": "2026-11-15T16:48:06.650Z",
+    "updated_at": "2026-11-15T16:51:42.307Z",
+    "elapsed_seconds": 215.657,
+    "status": "succeeded",
+    "word_count": 66,
+    "service_pid": 66954,
+    "worker_pid": 67213,
+    "service_and_worker_exited": true,
+    "codesign_after_run": "valid on disk; satisfies its Designated Requirement",
+    "dmg_verify": "VALID",
+    "dmg_sha256": "ff9f5acfbea9ddf1d4cf6dd2f8876069249cf0a55f0f40a335538ba2f49a5c0e"
+  }
+}

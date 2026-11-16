@@ -1,9 +1,11 @@
+#!/usr/bin/env python3
 import argparse
 import json
 import os
-import re
 import subprocess
 import time
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 try:
@@ -17,7 +19,8 @@ VIDEO_LINK = r"/(?:video|note)/"
 
 
 def public_items(page, limit=20):
-    return page.evaluate("""({limit}) => {
+    return page.evaluate(
+        """({limit}) => {
       const result=[]; const seen=new Set();
       for (const heading of document.querySelectorAll('h3')) {
         const a=heading.closest('a[href*="/hot/"]');
@@ -32,11 +35,14 @@ def public_items(page, limit=20):
         if (result.length>=limit) break;
       }
       return result;
-    }""", {"limit": limit})
+    }""",
+        {"limit": limit},
+    )
 
 
 def visible_videos(page, limit=100):
-    return page.evaluate("""({limit}) => {
+    return page.evaluate(
+        """({limit}) => {
       const result=[]; const seen=new Set();
       for (const a of document.querySelectorAll('a[href*="/video/"]:has(img),a[href*="/note/"]:has(img)')) {
         const href=a.href; if (seen.has(href)) continue;
@@ -50,7 +56,9 @@ def visible_videos(page, limit=100):
         if (result.length>=limit) break;
       }
       return result;
-    }""", {"limit": limit})
+    }""",
+        {"limit": limit},
+    )
 
 
 def logged_in(context):
@@ -58,13 +66,43 @@ def logged_in(context):
     return bool(names & {"sessionid", "sessionid_ss", "sid_guard", "uid_tt"})
 
 
+def use_shared_browser() -> bool:
+    from content_workbench.accounts.dedicated_browser import enabled
+
+    return enabled() or bool(os.environ.get("CONTENT_AGENT_CDP_URL"))
+
+
+def close_context(context) -> None:
+    if not use_shared_browser():
+        context.close()
+
+
 def open_context(playwright, profile):
     if playwright is None:
-        raise RuntimeError("浏览器采集需要在 .venv-topics 隔离环境运行 Playwright")
-    browser = playwright.chromium.connect_over_cdp(os.environ.get("CONTENT_AGENT_CDP_URL", "http://127.0.0.1:9222"))
-    if not browser.contexts:
-        raise RuntimeError("现有浏览器没有可复用的页面上下文，请在已打开的浏览器中操作")
-    return browser.contexts[0]
+        raise RuntimeError("客户端缺少内置 Playwright 浏览器运行环境")
+    cdp_url = os.environ.get("CONTENT_AGENT_CDP_URL")
+    if not cdp_url:
+        from content_workbench.accounts.dedicated_browser import enabled, ensure_started
+
+        if enabled():
+            cdp_url = ensure_started()
+    if cdp_url:
+        host = urllib.parse.urlparse(cdp_url).hostname
+        if host not in ("127.0.0.1", "localhost", "::1"):
+            raise RuntimeError("浏览器连接只能使用本机回环地址")
+        browser = playwright.chromium.connect_over_cdp(cdp_url)
+        if not browser.contexts:
+            raise RuntimeError("映序专用 Chrome 没有可复用的页面，请重新启动专用浏览器")
+        return browser.contexts[0]
+    profile = Path(profile).resolve()
+    profile.mkdir(parents=True, exist_ok=True)
+    return playwright.chromium.launch_persistent_context(
+        user_data_dir=str(profile),
+        headless=os.environ.get("CONTENT_AGENT_BROWSER_HEADLESS") == "1",
+        viewport={"width": 1280, "height": 900},
+        locale="zh-CN",
+        accept_downloads=True,
+    )
 
 
 def sync_hot(page):
@@ -105,7 +143,21 @@ def sync_collection(page, title):
 
 
 def has_video_stream(path):
-    result = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=codec_type", "-of", "json", str(path)], capture_output=True, text=True, timeout=30)
+    result = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "stream=codec_type",
+            "-of",
+            "json",
+            str(path),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
     if result.returncode:
         return False
     streams = json.loads(result.stdout or "{}").get("streams", [])
@@ -114,9 +166,13 @@ def has_video_stream(path):
 
 def download_video(context, page, url, output):
     network_candidates = []
+
     def capture_response(response):
-        if "douyinvod" in response.url and response.headers.get("content-type", "").startswith("video/"):
+        if "douyinvod" in response.url and response.headers.get(
+            "content-type", ""
+        ).startswith("video/"):
             network_candidates.append(response.url)
+
     page.on("response", capture_response)
     page.goto(url, wait_until="domcontentloaded", timeout=60000)
     page.wait_for_selector("body", timeout=30000)
@@ -136,25 +192,43 @@ def download_video(context, page, url, output):
         try:
             page.locator("video").first.click(timeout=3000)
             page.wait_for_timeout(3000)
-            candidates = page.evaluate("() => [...document.querySelectorAll('video,video source')].map(x=>x.src).filter(Boolean)")
+            candidates = page.evaluate(
+                "() => [...document.querySelectorAll('video,video source')].map(x=>x.src).filter(Boolean)"
+            )
         except Exception:
             pass
     for candidate in candidates:
         if not candidate.startswith("https://") or "douyinstatic.com" in candidate:
             continue
         try:
-            response = context.request.get(candidate, headers={"Referer": page.url, "Accept": "video/*,*/*"}, timeout=90000)
+            response = context.request.get(
+                candidate,
+                headers={"Referer": page.url, "Accept": "video/*,*/*"},
+                timeout=90000,
+            )
             if not response.ok:
                 continue
             body = response.body()
             if body.startswith(b"{") and b"play_addr" in body:
                 payload = json.loads(body)
-                play = payload.get("play_addr") or payload.get("data", {}).get("play_addr") or {}
+                play = (
+                    payload.get("play_addr")
+                    or payload.get("data", {}).get("play_addr")
+                    or {}
+                )
                 urls = play.get("url_list") or play.get("urlList") or []
                 if urls:
-                    response = context.request.get(urls[0], headers={"Referer": page.url, "Accept": "video/*,*/*"}, timeout=90000)
+                    response = context.request.get(
+                        urls[0],
+                        headers={"Referer": page.url, "Accept": "video/*,*/*"},
+                        timeout=90000,
+                    )
                     body = response.body() if response.ok else b""
-            if len(body) < 1000 or len(body) > 500 * 1024 * 1024 or body.startswith(b"{"):
+            if (
+                len(body) < 1000
+                or len(body) > 500 * 1024 * 1024
+                or body.startswith(b"{")
+            ):
                 continue
             output.write_bytes(body)
             if not has_video_stream(output):
@@ -179,7 +253,9 @@ def video_details(context, page, url, cover_url, output):
     }""")
     if output and cover_url:
         try:
-            response = context.request.get(cover_url, headers={"Referer": page.url}, timeout=30000)
+            response = context.request.get(
+                cover_url, headers={"Referer": page.url}, timeout=30000
+            )
             if response.ok:
                 output.parent.mkdir(parents=True, exist_ok=True)
                 output.write_bytes(response.body())
@@ -191,7 +267,11 @@ def video_details(context, page, url, cover_url, output):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--action", choices=("hot", "favorites", "login", "download", "details"), required=True)
+    parser.add_argument(
+        "--action",
+        choices=("hot", "favorites", "login", "download", "details"),
+        required=True,
+    )
     parser.add_argument("--profile", required=True)
     parser.add_argument("--collection")
     parser.add_argument("--url")
@@ -204,7 +284,11 @@ def main():
         try:
             page = context.pages[0] if context.pages else context.new_page()
             if args.action == "hot":
-                print(json.dumps({"status": "ok", "items": sync_hot(page)}, ensure_ascii=False))
+                print(
+                    json.dumps(
+                        {"status": "ok", "items": sync_hot(page)}, ensure_ascii=False
+                    )
+                )
                 return
             if args.action == "login":
                 page.goto(PROFILE_URL, wait_until="domcontentloaded", timeout=60000)
@@ -214,24 +298,64 @@ def main():
                         print(json.dumps({"status": "ready"}, ensure_ascii=False))
                         return
                     page.wait_for_timeout(2000)
-                print(json.dumps({"status": "login_required", "action": "在专用采集窗口完成登录后重试"}, ensure_ascii=False))
+                print(
+                    json.dumps(
+                        {
+                            "status": "login_required",
+                            "action": "在专用采集窗口完成登录后重试",
+                        },
+                        ensure_ascii=False,
+                    )
+                )
                 return
             if args.action == "favorites" and not logged_in(context):
-                print(json.dumps({"status": "login_required", "action": "先点击“连接采集窗口”完成抖音登录"}, ensure_ascii=False))
+                print(
+                    json.dumps(
+                        {
+                            "status": "login_required",
+                            "action": "先点击“连接采集窗口”完成抖音登录",
+                        },
+                        ensure_ascii=False,
+                    )
+                )
                 return
             if args.action == "favorites":
-                print(json.dumps({"status": "ok", "items": sync_collection(page, args.collection)}, ensure_ascii=False))
+                print(
+                    json.dumps(
+                        {
+                            "status": "ok",
+                            "items": sync_collection(page, args.collection),
+                        },
+                        ensure_ascii=False,
+                    )
+                )
                 return
             if args.action == "details":
-                print(json.dumps({"status": "ok", "details": video_details(context, page, args.url, args.cover_url, Path(args.output).resolve() if args.output else None)}, ensure_ascii=False))
+                print(
+                    json.dumps(
+                        {
+                            "status": "ok",
+                            "details": video_details(
+                                context,
+                                page,
+                                args.url,
+                                args.cover_url,
+                                Path(args.output).resolve() if args.output else None,
+                            ),
+                        },
+                        ensure_ascii=False,
+                    )
+                )
                 return
-            result = download_video(context, page, args.url, Path(args.output).resolve())
+            result = download_video(
+                context, page, args.url, Path(args.output).resolve()
+            )
             print(json.dumps({"status": "ok", **result}, ensure_ascii=False))
         except Exception as error:
             message = str(error)[:500]
             print(json.dumps({"status": "error", "error": message}, ensure_ascii=False))
         finally:
-            context.close()
+            close_context(context)
 
 
 if __name__ == "__main__":

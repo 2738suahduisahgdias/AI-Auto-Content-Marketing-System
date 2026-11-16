@@ -2,6 +2,10 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+export YINGXU_DEDICATED_CHROME="${YINGXU_DEDICATED_CHROME:-1}"
+if [[ -z "${CONTENT_AGENT_DB:-}" && -f "/Volumes/EXTERNAL_USB/kimi/storage/YingxuDevWorkspace/data/content-agent.db" ]]; then
+  export CONTENT_AGENT_DB="/Volumes/EXTERNAL_USB/kimi/storage/YingxuDevWorkspace/data/content-agent.db"
+fi
 if [[ ! -f "$ROOT/data/seed.json" ]]; then
   cp "$ROOT/data/seed.example.json" "$ROOT/data/seed.json"
 fi

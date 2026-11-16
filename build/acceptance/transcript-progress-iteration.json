@@ -1,0 +1,46 @@
+{
+  "id": "2026-11-15-transcript-progress",
+  "date": "2026-11-15",
+  "title": "词级时间码后台进度与模型复用",
+  "summary": "P10-C04-F02 改为后台真实转写任务，复用本地 Whisper 模型，并展示实际阶段、百分比和耗时。",
+  "changes": [
+    "POST /transcript 提交 project.transcript 后台任务，GET /transcript-jobs/:id 返回真实状态。",
+    "small/base 按模型复用常驻 faster-whisper worker，避免每次重新初始化。",
+    "开始识别立即上报 8% 起点，之后按真实分段推进；页面显示阶段、百分比和已用秒数。",
+    "构建排除 AppleDouble 元数据；桌面服务关闭时也清理复用的 Whisper worker。",
+    "沿用原项目、文件和 snapshot，不覆盖旧字幕或业务数据。"
+  ],
+  "verification": [
+    "8765 项目 20261115-001 使用 17.85 秒真人中文语音；复用后两次任务耗时 12.450 秒和 6.997 秒。",
+    "后台实测出现 model_loading、transcribing 8% 和 succeeded；页面显示转写中 8%、已用 4 秒。",
+    "连续任务复用 worker PID 54422；证据 evidence/transcript-progress.png。",
+    "最终 Python 相关 12 项、React 相关 15 项、生产构建、相关 Ruff 和语法检查通过；真实 worker 55503 调用 stop() 后返回码 0。",
+    "完整后端在 Python 3.12 + OpenSSL 3 下 434 项通过、1 项跳过；完整前端并行轮次 124 项通过、1 项高负载超时，最终单 worker 复验 45 个文件、127 项全部通过；worker 覆盖率 91%。",
+    "最终精简 DMG 的原生窗口完成真实转写 job_5011282586ed4cffb913，66 个词/片段；模型就绪后转写约 10 秒。",
+    "精简版主服务 66954 与 worker 67213 均退出，运行后签名有效；DMG VALID，SHA-256 ff9f5acfbea9ddf1d4cf6dd2f8876069249cf0a55f0f40a335538ba2f49a5c0e。",
+    "桌面入口、构建元数据及转写相关 27 项测试通过。"
+  ],
+  "unverified": [
+    "长音频、大量并发、其他硬件性能和安装版覆盖升级未验证。",
+    "单个长分段期间百分比可能保持不变；不插入虚假平滑进度。",
+    "词级识别使用本地 faster-whisper，不是 Kimi CLI；文本仍需人工校对。"
+  ],
+  "files": [
+    "app.py",
+    "workers/whisperx_worker.py",
+    "content_workbench/providers/local.py",
+    "webapp/src/pages/videoProjects/OriginalProject.tsx",
+    "desktop/entry.py",
+    "desktop/build.py",
+    "desktop/runtime_bundle.py",
+    "tests/test_whisperx_worker.py",
+    "tests/test_project_transcript.py",
+    "tests/test_desktop_entry.py",
+    "tests/test_desktop_runtime_refresh.py",
+    "webapp/src/pages/videoProjects/VideoProjects.test.tsx",
+    "docs/acceptance/transcript-progress.png",
+    "docs/acceptance/transcript-slim-native.jpg",
+    "docs/acceptance/transcript-real-results.json",
+    "iterations/2026-11-15-transcript-progress.md"
+  ]
+}

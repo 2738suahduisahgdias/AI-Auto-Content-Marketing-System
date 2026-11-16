@@ -21,6 +21,7 @@ data/*
 
 # User media, generated outputs, research data and local backups.
 assets/
+!desktop/assets/Workbench.icns
 voice/
 voice_profiles/
 subtitles/
@@ -56,3 +57,11 @@ customers.sqlite3*
 # Local dependency environments may be symlinks on external disks.
 /.venv-topics
 /.venv-faster-whisper
+
+# Tool-generated metadata and local test state.
+._*
+.pytest_cache/
+
+# Machine-specific media paths and platform connection settings.
+config/media-tools.json
+config/wechat-client.json

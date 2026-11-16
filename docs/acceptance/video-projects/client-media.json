@@ -1,0 +1,20 @@
+{
+  "whisper": true,
+  "ocr": [
+    {
+      "frame": "frame-long-video-004-tail.png",
+      "text": "长视频压力验收 12/12 真实渲染12 12 真实渲染 记录真实渲染过程 稳定性检查 检查长视频是否稳定",
+      "confidence": 95.47
+    }
+  ],
+  "demucs": {
+    "vocals": {"duration": "2.948934", "size": "520236"},
+    "accompaniment": {"duration": "2.948934", "size": "520236"}
+  },
+  "openvoice": {"duration": "2.658685", "size": "117292"},
+  "model_cli": {
+    "engine": "kimi_cli",
+    "model": "default_unpinned",
+    "result": {"ok": true}
+  }
+}

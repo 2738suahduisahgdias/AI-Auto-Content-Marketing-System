@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useNavigate } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppShell } from "./AppShell";
 
@@ -48,4 +48,31 @@ describe("AppShell retired analytics navigation", () => {
   expect(screen.getByRole("button",{name:"选题中心"})).toBeInTheDocument();
   expect(screen.getAllByRole("link",{name:"发布中心"}).length).toBeGreaterThan(0);
  });
+});
+
+function QueryNavigation() {
+  const navigate = useNavigate();
+  return <button onClick={() => navigate("/publish?kind=article")}>文章发布</button>;
+}
+
+describe("AppShell scroll restoration", () => {
+  it("resets scroll after pathname navigation", async () => {
+    const user = userEvent.setup();
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    renderShell();
+
+    await user.click(screen.getByRole("link", { name: "文章任务" }));
+
+    expect(scrollTo).toHaveBeenLastCalledWith(0, 0);
+  });
+
+  it("resets scroll after publish type query navigation", async () => {
+    const user = userEvent.setup();
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    render(<MemoryRouter initialEntries={["/publish?kind=video"]}><AppShell><QueryNavigation /></AppShell></MemoryRouter>);
+
+    await user.click(screen.getByRole("button", { name: "文章发布" }));
+
+    expect(scrollTo).toHaveBeenLastCalledWith(0, 0);
+  });
 });

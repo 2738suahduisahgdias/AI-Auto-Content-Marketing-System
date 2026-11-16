@@ -18,7 +18,7 @@
 - 8765 项目 `20261115-001` 使用 17.85 秒真人中文语音：复用后两次后台任务分别耗时 12.450 秒和 6.997 秒；页面实测显示“转写中 · 8% · 已用 4 秒”，截图 `docs/acceptance/transcript-progress.png`。
 - 修复 `V2.jobs` 调用错误和短音频中间状态被页面轮询跳过的问题；回归先复现漏报，再通过自动测试。
 - Python 相关 12 项、React 相关 15 项和生产构建通过；本次 Python 文件 Ruff format/check 通过。真实 worker 55503 调用 `stop()` 后返回码 0，主服务退出会关闭复用进程。旧 `app.py` 的历史风格问题未扩大修改。
-- 完整后端在 Python 3.12 + OpenSSL 3 下 434 项通过、1 项跳过；完整前端并行轮次 124 项通过、1 项高负载超时，单 worker 复验为 44 个文件、125 项全部通过。转写 worker 覆盖率统计为 91%。
+- 完整后端在 Python 3.12 + OpenSSL 3 下 434 项通过、1 项跳过；完整前端并行轮次 124 项通过、1 项高负载超时，最终单 worker 复验为 45 个文件、127 项全部通过。转写 worker 覆盖率统计为 91%。
 - 最终精简 DMG 的原生窗口完成任务 `job_5011282586ed4cffb913`，生成 66 个词/片段；模型就绪后约 10 秒。主服务 66954 与 worker 67213 均退出，运行后签名有效；镜像 `VALID`，SHA-256 `ff9f5acfbea9ddf1d4cf6dd2f8876069249cf0a55f0f40a335538ba2f49a5c0e`。
 - 构建排除 `._*` AppleDouble 元数据，桌面入口同步清理 Whisper worker；相关 27 项测试通过。原生证据 `docs/acceptance/transcript-slim-native.jpg` 和 `transcript-real-results.json`。
 - 长音频、多任务并发和其他硬件性能未验证；词级时间码使用本地 faster-whisper，不冒充 Kimi CLI 转写。

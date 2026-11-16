@@ -1,30 +1,329 @@
+#!/usr/bin/env python3
+from pathlib import Path
+from typing import Union
+
 from content_workbench.domain.errors import DomainError
 from content_workbench.storage.db import connect, dumps, loads
 
 AGENTS = {
-    "hotspot_agent": {"name": "热点情报Agent", "description": "热榜与收藏快照采集", "engines": ["playwright"], "engine": "playwright", "model": "topics-v1", "timeout": 1800, "attempts": 3, "concurrency": 1, "prompt": False, "connected": True},
-    "industry_topic_agent": {"name": "行业选题Agent", "description": "行业资讯分析与今日推荐", "engines": ["codex_cli", "kimi_cli"], "engine": "codex_cli", "model": "default_unpinned", "timeout": 600, "attempts": 3, "concurrency": 2, "prompt": True, "connected": True},
-    "douyin_topic_agent": {"name": "抖音选题Agent", "description": "抖音热榜、收藏与今日推荐", "engines": ["codex_cli", "kimi_cli"], "engine": "codex_cli", "model": "default_unpinned", "timeout": 600, "attempts": 3, "concurrency": 2, "prompt": True, "connected": True},
-    "xiaohongshu_topic_agent": {"name": "小红书选题Agent", "description": "小红书笔记研究与今日推荐", "engines": ["codex_cli", "kimi_cli"], "engine": "codex_cli", "model": "default_unpinned", "timeout": 600, "attempts": 3, "concurrency": 2, "prompt": True, "connected": True},
-    "script_agent": {"name": "脚本Agent", "description": "母稿与平台版本生成", "engines": ["codex_cli", "kimi_cli"], "engine": "codex_cli", "model": "default_unpinned", "timeout": 600, "attempts": 3, "concurrency": 2, "prompt": True, "connected": True},
-    "asset_planning_agent": {"name": "素材规划Agent", "description": "口播与 SRT 分镜规划", "engines": ["codex_cli", "kimi_cli"], "engine": "codex_cli", "model": "default_unpinned", "timeout": 600, "attempts": 3, "concurrency": 2, "prompt": True, "connected": True},
-    "voice_agent": {"name": "配音Agent", "description": "macOS 系统语音生成", "engines": ["macos_say"], "engine": "macos_say", "model": "system_voice", "timeout": 300, "attempts": 2, "concurrency": 1, "prompt": False, "connected": True},
-    "clone_agent": {"name": "本人音色Agent", "description": "OpenVoice 本人授权音色克隆", "engines": ["openvoice"], "engine": "openvoice", "model": "v2_zh_cpu", "timeout": 3600, "attempts": 2, "concurrency": 1, "prompt": False, "connected": True},
-    "caption_agent": {"name": "字幕转写Agent", "description": "faster-whisper 本地字幕", "engines": ["faster_whisper"], "engine": "faster_whisper", "model": "small", "variants": ["small", "base"], "timeout": 3600, "attempts": 2, "concurrency": 1, "prompt": False, "connected": True},
-    "remotion_agent": {"name": "Remotion视频Agent", "description": "Remotion 与 FFmpeg 视频构建", "engines": ["remotion", "ffmpeg"], "engine": "remotion", "model": "TalkingHead", "timeout": 1800, "attempts": 2, "concurrency": 1, "prompt": False, "connected": True},
-    "quality_agent": {"name": "合规质检Agent", "description": "自动规格与内容质检", "engines": ["manual"], "engine": "manual", "model": "not_connected", "timeout": 600, "attempts": 1, "concurrency": 1, "prompt": False, "connected": False},
-    "publish_agent": {"name": "发布助手Agent", "description": "平台字段生成、发布检查、预览填充与人工确认", "engines": ["codex_cli", "kimi_cli", "playwright"], "engine": "codex_cli", "model": "default_unpinned", "timeout": 1800, "attempts": 2, "concurrency": 1, "prompt": True, "connected": True},
-    "retro_agent": {"name": "发布复盘Agent", "description": "复盘结论与下一轮建议", "engines": ["manual"], "engine": "manual", "model": "not_connected", "timeout": 600, "attempts": 1, "concurrency": 1, "prompt": False, "connected": False},
-    "analytics_agent": {"name": "数据分析Agent", "description": "账号指标采集与比较", "engines": ["manual"], "engine": "manual", "model": "not_connected", "timeout": 600, "attempts": 1, "concurrency": 1, "prompt": False, "connected": False},
-    "account_analysis_agent": {"name": "账号分析Agent", "description": "账号日报、表现分析与今日推荐", "engines": ["codex_cli", "kimi_cli"], "engine": "codex_cli", "model": "default_unpinned", "timeout": 600, "attempts": 3, "concurrency": 2, "prompt": True, "connected": True},
-    "article_agent": {"name": "文章创作Agent", "description": "文章大纲、正文、引用与导出", "engines": ["codex_cli", "kimi_cli"], "engine": "codex_cli", "model": "default_unpinned", "timeout": 600, "attempts": 3, "concurrency": 2, "prompt": True, "connected": True},
-    "workflow_agent": {"name": "流程监督Agent", "description": "每日调度、提醒与恢复", "engines": ["scheduler"], "engine": "scheduler", "model": "daily", "timeout": 60, "attempts": 3, "concurrency": 1, "prompt": False, "connected": True},
-    "video_review_agent": {"name": "短视频审核Agent", "description": "批量技术预审与风险证据整理", "engines": ["codex_cli", "kimi_cli"], "engine": "codex_cli", "model": "default_unpinned", "timeout": 600, "attempts": 2, "concurrency": 1, "prompt": True, "connected": True},
-    "schedule_agent": {"name": "发布调度Agent", "description": "批量定时、间隔与发布队列管理", "engines": ["scheduler"], "engine": "scheduler", "model": "interval_queue", "timeout": 60, "attempts": 3, "concurrency": 1, "prompt": False, "connected": True},
+    "hotspot_agent": {
+        "name": "热点情报Agent",
+        "description": "热榜与收藏快照采集",
+        "engines": ["playwright"],
+        "engine": "playwright",
+        "model": "topics-v1",
+        "timeout": 1800,
+        "attempts": 3,
+        "concurrency": 1,
+        "prompt": False,
+        "connected": True,
+    },
+    "industry_topic_agent": {
+        "name": "行业选题Agent",
+        "description": "行业资讯分析与今日推荐",
+        "engines": ["codex_cli", "kimi_cli"],
+        "engine": "codex_cli",
+        "model": "default_unpinned",
+        "timeout": 600,
+        "attempts": 3,
+        "concurrency": 2,
+        "prompt": True,
+        "connected": True,
+    },
+    "douyin_topic_agent": {
+        "name": "抖音选题Agent",
+        "description": "抖音热榜、收藏与今日推荐",
+        "engines": ["codex_cli", "kimi_cli"],
+        "engine": "codex_cli",
+        "model": "default_unpinned",
+        "timeout": 600,
+        "attempts": 3,
+        "concurrency": 2,
+        "prompt": True,
+        "connected": True,
+    },
+    "xiaohongshu_topic_agent": {
+        "name": "小红书选题Agent",
+        "description": "小红书笔记研究与今日推荐",
+        "engines": ["codex_cli", "kimi_cli"],
+        "engine": "codex_cli",
+        "model": "default_unpinned",
+        "timeout": 600,
+        "attempts": 3,
+        "concurrency": 2,
+        "prompt": True,
+        "connected": True,
+    },
+    "script_agent": {
+        "name": "脚本Agent",
+        "description": "母稿与平台版本生成",
+        "engines": ["codex_cli", "kimi_cli"],
+        "engine": "codex_cli",
+        "model": "default_unpinned",
+        "timeout": 600,
+        "attempts": 3,
+        "concurrency": 2,
+        "prompt": True,
+        "connected": True,
+    },
+    "asset_planning_agent": {
+        "name": "素材规划Agent",
+        "description": "口播与 SRT 分镜规划",
+        "engines": ["codex_cli", "kimi_cli"],
+        "engine": "codex_cli",
+        "model": "default_unpinned",
+        "timeout": 600,
+        "attempts": 3,
+        "concurrency": 2,
+        "prompt": True,
+        "connected": True,
+    },
+    "voice_agent": {
+        "name": "配音Agent",
+        "description": "macOS 系统语音生成",
+        "engines": ["macos_say"],
+        "engine": "macos_say",
+        "model": "system_voice",
+        "timeout": 300,
+        "attempts": 2,
+        "concurrency": 1,
+        "prompt": False,
+        "connected": True,
+    },
+    "clone_agent": {
+        "name": "本人音色Agent",
+        "description": "OpenVoice 本人授权音色克隆",
+        "engines": ["openvoice"],
+        "engine": "openvoice",
+        "model": "v2_zh_cpu",
+        "timeout": 3600,
+        "attempts": 2,
+        "concurrency": 1,
+        "prompt": False,
+        "connected": True,
+    },
+    "caption_agent": {
+        "name": "字幕转写Agent",
+        "description": "faster-whisper 本地字幕",
+        "engines": ["faster_whisper"],
+        "engine": "faster_whisper",
+        "model": "small",
+        "variants": ["small", "base"],
+        "timeout": 3600,
+        "attempts": 2,
+        "concurrency": 1,
+        "prompt": False,
+        "connected": True,
+    },
+    "remotion_agent": {
+        "name": "Remotion视频Agent",
+        "description": "Remotion 与 FFmpeg 视频构建",
+        "engines": ["remotion", "ffmpeg"],
+        "engine": "remotion",
+        "model": "TalkingHead",
+        "timeout": 1800,
+        "attempts": 2,
+        "concurrency": 1,
+        "prompt": False,
+        "connected": True,
+    },
+    "quality_agent": {
+        "name": "合规质检Agent",
+        "description": "自动规格与内容质检",
+        "engines": ["manual"],
+        "engine": "manual",
+        "model": "not_connected",
+        "timeout": 600,
+        "attempts": 1,
+        "concurrency": 1,
+        "prompt": False,
+        "connected": False,
+    },
+    "publish_agent": {
+        "name": "发布助手Agent",
+        "description": "平台字段生成、发布检查、预览填充与人工确认",
+        "engines": ["codex_cli", "kimi_cli", "playwright"],
+        "engine": "codex_cli",
+        "model": "default_unpinned",
+        "timeout": 1800,
+        "attempts": 2,
+        "concurrency": 1,
+        "prompt": True,
+        "connected": True,
+    },
+    "retro_agent": {
+        "name": "发布复盘Agent",
+        "description": "复盘结论与下一轮建议",
+        "engines": ["manual"],
+        "engine": "manual",
+        "model": "not_connected",
+        "timeout": 600,
+        "attempts": 1,
+        "concurrency": 1,
+        "prompt": False,
+        "connected": False,
+    },
+    "analytics_agent": {
+        "name": "数据分析Agent",
+        "description": "账号指标采集与比较",
+        "engines": ["manual"],
+        "engine": "manual",
+        "model": "not_connected",
+        "timeout": 600,
+        "attempts": 1,
+        "concurrency": 1,
+        "prompt": False,
+        "connected": False,
+    },
+    "account_analysis_agent": {
+        "name": "账号分析Agent",
+        "description": "账号日报、表现分析与今日推荐",
+        "engines": ["codex_cli", "kimi_cli"],
+        "engine": "codex_cli",
+        "model": "default_unpinned",
+        "timeout": 600,
+        "attempts": 3,
+        "concurrency": 2,
+        "prompt": True,
+        "connected": True,
+    },
+    "article_agent": {
+        "name": "文章创作Agent",
+        "description": "文章大纲、正文、引用与导出",
+        "engines": ["codex_cli", "kimi_cli"],
+        "engine": "codex_cli",
+        "model": "default_unpinned",
+        "timeout": 600,
+        "attempts": 3,
+        "concurrency": 2,
+        "prompt": True,
+        "connected": True,
+    },
+    "workflow_agent": {
+        "name": "流程监督Agent",
+        "description": "每日调度、提醒与恢复",
+        "engines": ["scheduler"],
+        "engine": "scheduler",
+        "model": "daily",
+        "timeout": 60,
+        "attempts": 3,
+        "concurrency": 1,
+        "prompt": False,
+        "connected": True,
+    },
+    "video_review_agent": {
+        "name": "短视频审核Agent",
+        "description": "批量技术预审与风险证据整理",
+        "engines": ["codex_cli", "kimi_cli"],
+        "engine": "codex_cli",
+        "model": "default_unpinned",
+        "timeout": 600,
+        "attempts": 2,
+        "concurrency": 1,
+        "prompt": True,
+        "connected": True,
+    },
+    "schedule_agent": {
+        "name": "发布调度Agent",
+        "description": "批量定时、间隔与发布队列管理",
+        "engines": ["scheduler"],
+        "engine": "scheduler",
+        "model": "interval_queue",
+        "timeout": 60,
+        "attempts": 3,
+        "concurrency": 1,
+        "prompt": False,
+        "connected": True,
+    },
+    "article_image_agent": {
+        "name": "文章插画Agent",
+        "description": "生成 SVG 矢量插画并由本地 Remotion 输出 PNG",
+        "engines": ["codex_cli", "kimi_cli"],
+        "engine": "kimi_cli",
+        "model": "default_unpinned",
+        "timeout": 600,
+        "attempts": 2,
+        "concurrency": 1,
+        "prompt": True,
+        "connected": True,
+    },
+    "music_composer_agent": {
+        "name": "配乐作曲Agent",
+        "description": "生成可校验音符谱并由本地合成器输出 WAV",
+        "engines": ["codex_cli", "kimi_cli"],
+        "engine": "kimi_cli",
+        "model": "default_unpinned",
+        "timeout": 600,
+        "attempts": 2,
+        "concurrency": 1,
+        "prompt": True,
+        "connected": True,
+    },
+    "visual_analysis_agent": {
+        "name": "视觉分析Agent",
+        "description": "读取真实关键帧并生成逐镜画面说明",
+        "engines": ["codex_cli", "kimi_cli"],
+        "engine": "kimi_cli",
+        "model": "default_unpinned",
+        "timeout": 900,
+        "attempts": 2,
+        "concurrency": 1,
+        "prompt": True,
+        "connected": True,
+    },
+    "audio_separation_agent": {
+        "name": "声音分离规划Agent",
+        "description": "规划分离方案并由本地 Demucs 输出人声与伴奏",
+        "engines": ["codex_cli", "kimi_cli"],
+        "engine": "kimi_cli",
+        "model": "default_unpinned",
+        "timeout": 3600,
+        "attempts": 2,
+        "concurrency": 1,
+        "prompt": True,
+        "connected": True,
+    },
+    "remotion_director_agent": {
+        "name": "Remotion编导Agent",
+        "description": "把文案和真实媒体约束转换为可执行分镜",
+        "engines": ["codex_cli", "kimi_cli"],
+        "engine": "kimi_cli",
+        "model": "default_unpinned",
+        "timeout": 600,
+        "attempts": 2,
+        "concurrency": 1,
+        "prompt": True,
+        "connected": True,
+    },
+    "remotion_code_agent": {
+        "name": "Remotion场景代码Agent",
+        "description": "生成通过安全检查的 Remotion 场景代码",
+        "engines": ["codex_cli", "kimi_cli"],
+        "engine": "kimi_cli",
+        "model": "default_unpinned",
+        "timeout": 900,
+        "attempts": 2,
+        "concurrency": 1,
+        "prompt": True,
+        "connected": True,
+    },
+    "social_data_agent": {
+        "name": "社媒数据整理Agent",
+        "description": "把浏览器读取的真实页面证据整理为结构化数据",
+        "engines": ["codex_cli", "kimi_cli"],
+        "engine": "kimi_cli",
+        "model": "default_unpinned",
+        "timeout": 600,
+        "attempts": 2,
+        "concurrency": 1,
+        "prompt": True,
+        "connected": True,
+    },
 }
 for definition in AGENTS.values():
     if "codex_cli" in definition["engines"]:
         definition["engines"] = ["system", *definition["engines"], "model_api"]
+        definition["engine"] = "kimi_cli"
 
 DEFAULT_PROMPTS = {
     "industry_topic_agent": "优先真实业务、流程改造、验收和可复用方法。",
@@ -41,25 +340,41 @@ DEFAULT_PROMPTS = {
 
 def default_config(agent_id):
     definition = AGENTS[agent_id]
-    return {"enabled": definition["connected"], "engine": definition["engine"], "model": definition["model"],
-            "prompt": DEFAULT_PROMPTS.get(agent_id, ""), "timeout_seconds": definition["timeout"],
-            "max_attempts": definition["attempts"], "concurrency": definition["concurrency"], "custom": {}}
+    return {
+        "enabled": definition["connected"],
+        "engine": definition["engine"],
+        "model": definition["model"],
+        "prompt": DEFAULT_PROMPTS.get(agent_id, ""),
+        "timeout_seconds": definition["timeout"],
+        "max_attempts": definition["attempts"],
+        "concurrency": definition["concurrency"],
+        "custom": {},
+    }
 
 
-def agent_config(db_path, agent_id):
+def agent_config(db_path: Union[str, Path], agent_id: str):
     if agent_id not in AGENTS:
-        raise DomainError("AGENT_NOT_FOUND", "Agent 不存在", 404, "agent_id", "从注册表选择有效 Agent")
+        raise DomainError(
+            "AGENT_NOT_FOUND", "Agent 不存在", 404, "agent_id", "从注册表选择有效 Agent"
+        )
     with connect(db_path, readonly=True) as conn:
-        row = conn.execute("SELECT value FROM settings WHERE key='agent_configs'").fetchone()
+        row = conn.execute(
+            "SELECT value FROM settings WHERE key='agent_configs'"
+        ).fetchone()
     stored = loads(row[0], {}) if row else {}
     config = {**default_config(agent_id), **stored.get(agent_id, {})}
     if "system" in AGENTS[agent_id]["engines"]:
         saved = stored.get(agent_id, {})
         # Existing explicit configurations are preserved until the user selects follow-system.
-        follows = saved.get("follow_system", saved.get("engine", "codex_cli") == "codex_cli" and saved.get("model", "default_unpinned") == "default_unpinned")
+        follows = saved.get(
+            "follow_system",
+            saved.get("engine", "codex_cli") == "codex_cli"
+            and saved.get("model", "default_unpinned") == "default_unpinned",
+        )
         config["follow_system"] = follows
         if follows:
             from content_workbench.providers.system import model_settings
+
             config["engine"] = model_settings(db_path).get("engine", "codex_cli")
     definition = AGENTS[agent_id]
     if config["engine"] not in definition["engines"]:
@@ -69,55 +384,138 @@ def agent_config(db_path, agent_id):
     return config
 
 
-def all_agent_configs(db_path):
+def all_agent_configs(db_path: Union[str, Path]) -> dict:
     return {agent_id: agent_config(db_path, agent_id) for agent_id in AGENTS}
 
 
-def save_agent_config(db_path, agent_id, values):
+def save_agent_config(db_path: Union[str, Path], agent_id: str, values: dict) -> dict:
     definition = AGENTS[agent_id]
     if values.get("reset"):
         updated = default_config(agent_id)
     else:
         current = agent_config(db_path, agent_id)
         updated = dict(current)
-        for key in ("enabled", "engine", "model", "prompt", "timeout_seconds", "max_attempts", "concurrency", "custom"):
+        for key in (
+            "enabled",
+            "engine",
+            "model",
+            "prompt",
+            "timeout_seconds",
+            "max_attempts",
+            "concurrency",
+            "custom",
+        ):
             if key in values:
                 updated[key] = values[key]
         if "system" in definition["engines"] and "engine" in values:
             updated["follow_system"] = values["engine"] == "system"
             if updated["follow_system"]:
                 from content_workbench.providers.system import model_settings
+
                 updated["engine"] = model_settings(db_path).get("engine", "codex_cli")
         if updated["engine"] not in definition["engines"]:
-            raise DomainError("INVALID_AGENT_ENGINE", "该 Agent 不支持这个执行引擎", 422, "engine", "从页面提供的引擎列表选择")
+            raise DomainError(
+                "INVALID_AGENT_ENGINE",
+                "该 Agent 不支持这个执行引擎",
+                422,
+                "engine",
+                "从页面提供的引擎列表选择",
+            )
         if updated["enabled"] and not definition["connected"]:
-            raise DomainError("AGENT_NOT_CONNECTED", "该 Agent 尚未接入，不能启用", 409, "enabled", "先完成对应连接器和真实验收")
+            raise DomainError(
+                "AGENT_NOT_CONNECTED",
+                "该 Agent 尚未接入，不能启用",
+                409,
+                "enabled",
+                "先完成对应连接器和真实验收",
+            )
         if not isinstance(updated["enabled"], bool):
-            raise DomainError("INVALID_AGENT_ENABLED", "启用状态必须是布尔值", 422, "enabled", "使用打开或关闭")
-        if not isinstance(updated["model"], str) or not updated["model"].strip() or len(updated["model"]) > 100:
-            raise DomainError("INVALID_AGENT_MODEL", "模型或变体需为 1～100 字符", 422, "model", "填写已支持的变体")
+            raise DomainError(
+                "INVALID_AGENT_ENABLED",
+                "启用状态必须是布尔值",
+                422,
+                "enabled",
+                "使用打开或关闭",
+            )
+        if (
+            not isinstance(updated["model"], str)
+            or not updated["model"].strip()
+            or len(updated["model"]) > 100
+        ):
+            raise DomainError(
+                "INVALID_AGENT_MODEL",
+                "模型或变体需为 1～100 字符",
+                422,
+                "model",
+                "填写已支持的变体",
+            )
         variants = definition.get("variants")
         if variants and updated["model"] not in variants:
-            raise DomainError("INVALID_AGENT_VARIANT", "不支持的模型变体", 422, "model", "选择 " + " / ".join(variants))
+            raise DomainError(
+                "INVALID_AGENT_VARIANT",
+                "不支持的模型变体",
+                422,
+                "model",
+                "选择 " + " / ".join(variants),
+            )
         if not isinstance(updated["prompt"], str) or len(updated["prompt"]) > 12000:
-            raise DomainError("INVALID_AGENT_PROMPT", "补充提示词不能超过 12000 字符", 422, "prompt", "精简提示词")
-        for key, minimum, maximum in (("timeout_seconds", 30, 3600), ("max_attempts", 1, 5), ("concurrency", 1, 2)):
+            raise DomainError(
+                "INVALID_AGENT_PROMPT",
+                "补充提示词不能超过 12000 字符",
+                422,
+                "prompt",
+                "精简提示词",
+            )
+        for key, minimum, maximum in (
+            ("timeout_seconds", 30, 3600),
+            ("max_attempts", 1, 5),
+            ("concurrency", 1, 2),
+        ):
             value = updated[key]
-            if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
-                raise DomainError("INVALID_AGENT_LIMIT", "{} 超出允许范围".format(key), 422, key,
-                                  "{} 必须在 {}～{} 之间".format(key, minimum, maximum))
-        if not isinstance(updated["custom"], dict) or len(dumps(updated["custom"])) > 4000:
-            raise DomainError("INVALID_AGENT_CUSTOM", "扩展配置无效", 422, "custom", "只提交支持的扩展字段")
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or not minimum <= value <= maximum
+            ):
+                raise DomainError(
+                    "INVALID_AGENT_LIMIT",
+                    f"{key} 超出允许范围",
+                    422,
+                    key,
+                    f"{key} 必须在 {minimum}～{maximum} 之间",
+                )
+        if (
+            not isinstance(updated["custom"], dict)
+            or len(dumps(updated["custom"])) > 4000
+        ):
+            raise DomainError(
+                "INVALID_AGENT_CUSTOM",
+                "扩展配置无效",
+                422,
+                "custom",
+                "只提交支持的扩展字段",
+            )
     with connect(db_path) as conn:
-        row = conn.execute("SELECT value FROM settings WHERE key='agent_configs'").fetchone()
+        row = conn.execute(
+            "SELECT value FROM settings WHERE key='agent_configs'"
+        ).fetchone()
         stored = loads(row[0], {}) if row else {}
         stored[agent_id] = updated
-        conn.execute("INSERT OR REPLACE INTO settings(key,value) VALUES ('agent_configs',?)", (dumps(stored),))
+        conn.execute(
+            "INSERT OR REPLACE INTO settings(key,value) VALUES ('agent_configs',?)",
+            (dumps(stored),),
+        )
     return updated
 
 
-def require_agent_enabled(db_path, agent_id):
+def require_agent_enabled(db_path: Union[str, Path], agent_id: str):
     config = agent_config(db_path, agent_id)
     if not config["enabled"]:
-        raise DomainError("AGENT_DISABLED", AGENTS[agent_id]["name"] + "已停用", 409, "enabled", "到设置页启用该 Agent 后创建新任务")
+        raise DomainError(
+            "AGENT_DISABLED",
+            AGENTS[agent_id]["name"] + "已停用",
+            409,
+            "enabled",
+            "到设置页启用该 Agent 后创建新任务",
+        )
     return config

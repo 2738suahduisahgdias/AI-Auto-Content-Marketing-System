@@ -1,26 +1,50 @@
-import json
+#!/usr/bin/env python3
 import importlib.util
+import json
+import os
 import sys
 import tempfile
 from pathlib import Path
-from content_workbench.storage.db import PROJECT_ROOT
 
 from content_workbench.agents.registry import require_agent_enabled
 from content_workbench.domain.errors import DomainError
 from content_workbench.jobs.worker import UnknownRemote
-from content_workbench.providers.local import LocalExecutors
+from content_workbench.media.tools import bundled_python
+from content_workbench.storage.db import PROJECT_ROOT
+
 from .knowledge import publish_knowledge
 from .schemas import PLATFORM_NAMES
 
 
 def browser_python(root):
+    if os.environ.get("CONTENT_AGENT_SLIM") == "1":
+        if importlib.util.find_spec("playwright") is not None:
+            return sys.executable
+        raise DomainError(
+            "BROWSER_RUNTIME_MISSING",
+            "精简版缺少主服务浏览器驱动，请更新客户端",
+            503,
+            "browser",
+            "安装包含 Playwright 1.60 驱动的新版客户端",
+        )
+    if os.environ.get("CONTENT_AGENT_DESKTOP") == "1":
+        return str(bundled_python())
     environment = Path(root) / ".venv-topics"
     windows = environment / "Scripts/python.exe"
     linux = environment / "bin/python"
-    if windows.is_file(): return str(windows)
-    if linux.is_file(): return str(linux)
-    if importlib.util.find_spec("playwright") is not None: return sys.executable
-    raise DomainError("BROWSER_RUNTIME_MISSING", "当前客户端缺少浏览器运行依赖", 503, "browser", "安装包含浏览器依赖的客户端版本")
+    if windows.is_file():
+        return str(windows)
+    if linux.is_file():
+        return str(linux)
+    if importlib.util.find_spec("playwright") is not None:
+        return sys.executable
+    raise DomainError(
+        "BROWSER_RUNTIME_MISSING",
+        "当前客户端缺少浏览器运行依赖",
+        503,
+        "browser",
+        "安装包含浏览器依赖的客户端版本",
+    )
 
 
 class PublishingExecutors:
@@ -29,48 +53,104 @@ class PublishingExecutors:
         self.root = service.root
 
     def mapping(self):
-        return {"publish.fields": self.generate_fields, "publish.prepare": self.prepare, "publish.execute": self.execute,
-                "publish.login": self.login, "publish.verify": self.verify}
+        return {
+            "publish.fields": self.generate_fields,
+            "publish.prepare": self.prepare,
+            "publish.execute": self.execute,
+            "publish.login": self.login,
+            "publish.verify": self.verify,
+        }
 
     @staticmethod
     def validate_generated_fields(kind, platforms, payload):
         raw = payload.get("platforms") if isinstance(payload, dict) else None
         if not isinstance(raw, dict):
-            raise DomainError("MODEL_SCHEMA_INVALID", "发布 Agent 未返回 platforms 字段对象", 502, "platforms", "重试生成；仍失败时人工填写")
+            raise DomainError(
+                "MODEL_SCHEMA_INVALID",
+                "发布 Agent 未返回 platforms 字段对象",
+                502,
+                "platforms",
+                "重试生成；仍失败时人工填写",
+            )
         result = {}
         for platform in platforms:
             fields = raw.get(platform)
             if not isinstance(fields, dict):
-                raise DomainError("MODEL_SCHEMA_INVALID", PLATFORM_NAMES[platform] + "缺少字段对象", 502, platform, "重试生成该平台或人工填写")
-            contract = publish_knowledge(platform=platform, content_kind=kind)["platforms"][0]["content_types"][0]
-            generated_names = {definition["name"] for definition in contract["fields"] if definition["agent_generated"]}
+                raise DomainError(
+                    "MODEL_SCHEMA_INVALID",
+                    PLATFORM_NAMES[platform] + "缺少字段对象",
+                    502,
+                    platform,
+                    "重试生成该平台或人工填写",
+                )
+            contract = publish_knowledge(platform=platform, content_kind=kind)[
+                "platforms"
+            ][0]["content_types"][0]
+            generated_names = {
+                definition["name"]
+                for definition in contract["fields"]
+                if definition["agent_generated"]
+            }
             output = {}
             for definition in contract["fields"]:
                 name = definition["name"]
                 if name not in generated_names or name not in fields:
                     if name in generated_names and definition["required"]:
-                        raise DomainError("PUBLISH_GENERATED_FIELD_REQUIRED", PLATFORM_NAMES[platform] + "缺少必填字段 " + name,
-                                          502, platform + "." + name, "重试生成或人工填写该字段")
+                        raise DomainError(
+                            "PUBLISH_GENERATED_FIELD_REQUIRED",
+                            PLATFORM_NAMES[platform] + "缺少必填字段 " + name,
+                            502,
+                            platform + "." + name,
+                            "重试生成或人工填写该字段",
+                        )
                     continue
                 value = fields[name]
                 if not isinstance(value, str):
-                    raise DomainError("PUBLISH_GENERATED_FIELD_INVALID", PLATFORM_NAMES[platform] + "的 " + name + " 必须是文本",
-                                      502, platform + "." + name, "重试生成或人工填写该字段")
+                    raise DomainError(
+                        "PUBLISH_GENERATED_FIELD_INVALID",
+                        PLATFORM_NAMES[platform] + "的 " + name + " 必须是文本",
+                        502,
+                        platform + "." + name,
+                        "重试生成或人工填写该字段",
+                    )
                 value = value.strip()
                 if definition["required"] and not value:
-                    raise DomainError("PUBLISH_GENERATED_FIELD_REQUIRED", PLATFORM_NAMES[platform] + "的 " + name + " 不能为空",
-                                      502, platform + "." + name, "重试生成或人工填写该字段")
+                    raise DomainError(
+                        "PUBLISH_GENERATED_FIELD_REQUIRED",
+                        PLATFORM_NAMES[platform] + "的 " + name + " 不能为空",
+                        502,
+                        platform + "." + name,
+                        "重试生成或人工填写该字段",
+                    )
                 if definition["max_length"] and len(value) > definition["max_length"]:
-                    raise DomainError("PUBLISH_GENERATED_FIELD_TOO_LONG",
-                                      "{}的 {} 不能超过 {} 字，当前 {} 字".format(PLATFORM_NAMES[platform], name, definition["max_length"], len(value)),
-                                      502, platform + "." + name, "缩短该字段后保存，或重新生成")
+                    raise DomainError(
+                        "PUBLISH_GENERATED_FIELD_TOO_LONG",
+                        "{}的 {} 不能超过 {} 字，当前 {} 字".format(
+                            PLATFORM_NAMES[platform],
+                            name,
+                            definition["max_length"],
+                            len(value),
+                        ),
+                        502,
+                        platform + "." + name,
+                        "缩短该字段后保存，或重新生成",
+                    )
                 output[name] = value
             for definition in contract["fields"]:
                 if definition.get("combined_with"):
-                    total = len(output.get(definition["combined_with"], "")) + len(output.get(definition["name"], "")) + 1
+                    total = (
+                        len(output.get(definition["combined_with"], ""))
+                        + len(output.get(definition["name"], ""))
+                        + 1
+                    )
                     if total > definition["combined_max"]:
-                        raise DomainError("PUBLISH_GENERATED_FIELD_TOO_LONG", PLATFORM_NAMES[platform] + "的描述与话题合计超长",
-                                          502, platform + "." + definition["name"], "缩短描述或话题后重试")
+                        raise DomainError(
+                            "PUBLISH_GENERATED_FIELD_TOO_LONG",
+                            PLATFORM_NAMES[platform] + "的描述与话题合计超长",
+                            502,
+                            platform + "." + definition["name"],
+                            "缩短描述或话题后重试",
+                        )
             result[platform] = output
         return result
 
@@ -86,37 +166,83 @@ class PublishingExecutors:
                 continue
             content = event.get("content")
             if isinstance(content, list):
-                content = "".join(part.get("text", "") for part in content if isinstance(part, dict))
+                content = "".join(
+                    part.get("text", "") for part in content if isinstance(part, dict)
+                )
             elif isinstance(content, dict):
                 content = content.get("text", "")
             if isinstance(content, str) and content.strip():
                 contents.append(content.strip())
         if not contents:
-            raise DomainError("MODEL_EMPTY_RESPONSE", "发布 Agent 未返回文本", 502, "provider", "检查 Kimi CLI 登录和输出协议")
+            raise DomainError(
+                "MODEL_EMPTY_RESPONSE",
+                "发布 Agent 未返回文本",
+                502,
+                "provider",
+                "检查 Kimi CLI 登录和输出协议",
+            )
         try:
             return json.loads(contents[-1])
         except json.JSONDecodeError:
-            raise DomainError("MODEL_SCHEMA_INVALID", "发布 Agent 未返回合法 JSON", 502, "provider", "重试生成；仍失败时人工填写")
+            raise DomainError(
+                "MODEL_SCHEMA_INVALID",
+                "发布 Agent 未返回合法 JSON",
+                502,
+                "provider",
+                "重试生成；仍失败时人工填写",
+            )
 
     def generate_fields(self, job, context):
         config = require_agent_enabled(self.service.db_path, "publish_agent")
         data = job["input"]
         kind = data["content_kind"]
         platforms = data["platforms"]
-        source = self.service.source(kind, data["source_id"], data.get("source_file_id"))
-        contracts = {platform: publish_knowledge(platform=platform, content_kind=kind)["platforms"][0] for platform in platforms}
-        prompt = json.dumps({"operation": "publish.fields", "source": {"title": source["title"],
-                             "text": source.get("body") if kind == "article" else source.get("description")},
-                             "platforms": platforms, "contracts": contracts, "instructions": data.get("prompt", ""),
-                             "agent_supplement": config["prompt"]}, ensure_ascii=False)
+        source = self.service.source(
+            kind, data["source_id"], data.get("source_file_id")
+        )
+        contracts = {
+            platform: publish_knowledge(platform=platform, content_kind=kind)[
+                "platforms"
+            ][0]
+            for platform in platforms
+        }
+        prompt = json.dumps(
+            {
+                "operation": "publish.fields",
+                "source": {
+                    "title": source["title"],
+                    "text": source.get("body")
+                    if kind == "article"
+                    else source.get("description"),
+                },
+                "platforms": platforms,
+                "contracts": contracts,
+                "instructions": data.get("prompt", ""),
+                "agent_supplement": config["prompt"],
+            },
+            ensure_ascii=False,
+        )
         context.progress("model_generate", 0.15)
         agent = PROJECT_ROOT / "agents" / "publish-fields-agent.md"
         from content_workbench.providers.system import provider_for
+
         payload = provider_for(self.root, config["engine"]).complete_json(
-            prompt, context, agent, timeout=config["timeout_seconds"], stage=config["engine"])
+            prompt,
+            context,
+            agent,
+            timeout=config["timeout_seconds"],
+            stage=config["engine"],
+            model=config["model"],
+        )
         provider = config["engine"]
         fields = self.validate_generated_fields(kind, platforms, payload)
-        return {"platforms": fields, "provider": provider, "model": "unpinned", "auto_saved": False, "auto_published": False}
+        return {
+            "platforms": fields,
+            "provider": provider,
+            "model": "unpinned",
+            "auto_saved": False,
+            "auto_published": False,
+        }
 
     def profile(self, platform):
         if platform in ("douyin", "xiaohongshu"):
@@ -126,31 +252,81 @@ class PublishingExecutors:
     def run(self, context, action, platform, payload=None):
         config = require_agent_enabled(self.service.db_path, "publish_agent")
         with tempfile.TemporaryDirectory(prefix="publishing-job-") as directory:
-            use_bridge = action in ("prepare", "execute") and (platform in ("wechat_channels", "wechat_official_account") or (platform == "xiaohongshu" and payload and (payload.get("source", {}).get("article_images") or payload.get("source", {}).get("article_pages"))))
-            if action == "prepare" and platform in ("douyin", "xiaohongshu") and payload and payload.get("source", {}).get("absolute_video_path"):
+            from content_workbench.accounts.dedicated_browser import enabled
+
+            use_bridge = (
+                not enabled()
+                and action in ("prepare", "execute")
+                and (
+                    platform in ("wechat_channels", "wechat_official_account")
+                    or (
+                        platform == "xiaohongshu"
+                        and payload
+                        and (
+                            payload.get("source", {}).get("article_images")
+                            or payload.get("source", {}).get("article_pages")
+                        )
+                    )
+                )
+            )
+            if (
+                not enabled()
+                and action == "prepare"
+                and platform in ("douyin", "xiaohongshu")
+                and payload
+                and payload.get("source", {}).get("absolute_video_path")
+            ):
                 use_bridge = True
             worker = "webbridge_worker.py" if use_bridge else "browser_worker.py"
             python = sys.executable if use_bridge else browser_python(self.root)
-            arguments = [python, str(PROJECT_ROOT / "content_workbench/publishing" / worker),
-                         "--action", action, "--platform", platform]
+            arguments = [
+                python,
+                str(PROJECT_ROOT / "content_workbench/publishing" / worker),
+                "--action",
+                action,
+                "--platform",
+                platform,
+            ]
             if not use_bridge:
                 arguments += ["--profile", str(self.profile(platform))]
             if payload is not None:
                 path = Path(directory) / "payload.json"
-                path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+                path.write_text(
+                    json.dumps(payload, ensure_ascii=False), encoding="utf-8"
+                )
                 arguments += ["--payload-file", str(path)]
-            stdout, _ = context.run_process(arguments, timeout=config["timeout_seconds"], stage=action + ":" + platform, cwd=self.root)
+            stdout, _ = context.run_process(
+                arguments,
+                timeout=config["timeout_seconds"],
+                stage=action + ":" + platform,
+                cwd=self.root,
+            )
         try:
             return json.loads(stdout.strip().splitlines()[-1])
         except (json.JSONDecodeError, IndexError):
-            raise DomainError("PUBLISH_WORKER_PROTOCOL_ERROR", "发布浏览器没有返回有效结果", 502, platform, "查看 data/server.log 中对应发布阶段")
+            raise DomainError(
+                "PUBLISH_WORKER_PROTOCOL_ERROR",
+                "发布浏览器没有返回有效结果",
+                502,
+                platform,
+                "查看 data/server.log 中对应发布阶段",
+            )
 
     def prepare(self, job, context):
         try:
             return self._prepare(job, context)
         except Exception as error:
             if getattr(error, "code", None) != "FENCING_REJECTED":
-                self.service.set_target_result(job["input"]["target_id"], "failed", error={"code":getattr(error,"code","PREPARE_FAILED"), "message":str(error), "action":"检查错误后重试，或复制内容手动发布"}, job_id=job["id"])
+                self.service.set_target_result(
+                    job["input"]["target_id"],
+                    "failed",
+                    error={
+                        "code": getattr(error, "code", "PREPARE_FAILED"),
+                        "message": str(error),
+                        "action": "检查错误后重试，或复制内容手动发布",
+                    },
+                    job_id=job["id"],
+                )
             raise
 
     def _prepare(self, job, context):
@@ -161,17 +337,47 @@ class PublishingExecutors:
             raise DomainError("FENCING_REJECTED", "发布任务已被替换", 409)
         source = self.service.assert_current(batch)
         if target["status"] == "published":
-            raise DomainError("PUBLISH_ALREADY_RECORDED", "该平台已经发布，不能重复预览执行", 409, "platform", "核对平台后台")
+            raise DomainError(
+                "PUBLISH_ALREADY_RECORDED",
+                "该平台已经发布，不能重复预览执行",
+                409,
+                "platform",
+                "核对平台后台",
+            )
         platform = target["platform"]
-        payload = self.service.resolve_assets(target["payload"], platform, batch["content_kind"])
-        result = self.run(context, "prepare", platform, {"source": source, "payload": payload, "target_id": target["id"]})
-        if result.get("status") == "preview_ready" and (source.get("article_images") or source.get("article_pages")) and not result.get("article_images_verified"):
-            raise DomainError("ARTICLE_IMAGES_NOT_VERIFIED", "平台未回读确认配图，不能标记预填成功", 502)
+        payload = self.service.resolve_assets(
+            target["payload"], platform, batch["content_kind"]
+        )
+        result = self.run(
+            context,
+            "prepare",
+            platform,
+            {"source": source, "payload": payload, "target_id": target["id"]},
+        )
+        if (
+            result.get("status") == "preview_ready"
+            and (source.get("article_images") or source.get("article_pages"))
+            and not result.get("article_images_verified")
+        ):
+            raise DomainError(
+                "ARTICLE_IMAGES_NOT_VERIFIED",
+                "平台未回读确认配图，不能标记预填成功",
+                502,
+            )
         if result.get("status") == "preview_ready" and result.get("fields_verified"):
-            self.service.set_target_result(target["id"], "ready", result, job_id=job["id"])
-            return {"target_id": target["id"], "platform": platform, "status": "ready", "auto_published": False}
+            self.service.set_target_result(
+                target["id"], "ready", result, job_id=job["id"]
+            )
+            return {
+                "target_id": target["id"],
+                "platform": platform,
+                "status": "ready",
+                "auto_published": False,
+            }
         error = self.error(platform, "prepare", result)
-        self.service.set_target_result(target["id"], "failed", result, error.as_dict(), job_id=job["id"])
+        self.service.set_target_result(
+            target["id"], "failed", result, error.as_dict(), job_id=job["id"]
+        )
         raise error
 
     def execute(self, job, context):
@@ -181,52 +387,147 @@ class PublishingExecutors:
         if target.get("job_id") != job["id"]:
             raise DomainError("FENCING_REJECTED", "发布任务已被替换", 409)
         if not batch.get("confirmed_at") or target["status"] != "publishing":
-            raise DomainError("PUBLISH_CONFIRMATION_REQUIRED", "缺少有效的一键发布确认", 409, "confirmed_at", "先完成预览并由用户确认")
+            raise DomainError(
+                "PUBLISH_CONFIRMATION_REQUIRED",
+                "缺少有效的一键发布确认",
+                409,
+                "confirmed_at",
+                "先完成预览并由用户确认",
+            )
         source = self.service.assert_current(batch)
         platform = target["platform"]
-        payload = self.service.resolve_assets(target["payload"], platform, batch["content_kind"])
-        result = self.run(context, "execute", platform, {"source": source, "payload": payload, "target_id": target["id"]})
+        payload = self.service.resolve_assets(
+            target["payload"], platform, batch["content_kind"]
+        )
+        result = self.run(
+            context,
+            "execute",
+            platform,
+            {"source": source, "payload": payload, "target_id": target["id"]},
+        )
         if result.get("status") == "published" and result.get("published_evidence"):
-            self.service.set_target_result(target["id"], "published", result, job_id=job["id"], external_url=result.get("url"))
-            return {"target_id": target["id"], "platform": platform, "status": "published", "url": result.get("url")}
+            self.service.set_target_result(
+                target["id"],
+                "published",
+                result,
+                job_id=job["id"],
+                external_url=result.get("url"),
+            )
+            return {
+                "target_id": target["id"],
+                "platform": platform,
+                "status": "published",
+                "url": result.get("url"),
+            }
         if result.get("status") == "unknown_remote":
-            error = {"code": "UNKNOWN_REMOTE", "message": PLATFORM_NAMES[platform] + "点击后的结果无法确认", "action": "打开平台后台核对，禁止直接重试", "retryable": False}
-            self.service.set_target_result(target["id"], "unknown_remote", result, error, job_id=job["id"])
+            error = {
+                "code": "UNKNOWN_REMOTE",
+                "message": PLATFORM_NAMES[platform] + "点击后的结果无法确认",
+                "action": "打开平台后台核对，禁止直接重试",
+                "retryable": False,
+            }
+            self.service.set_target_result(
+                target["id"], "unknown_remote", result, error, job_id=job["id"]
+            )
             raise UnknownRemote(error["message"])
         error = self.error(platform, "execute", result)
-        self.service.set_target_result(target["id"], "failed", result, error.as_dict(), job_id=job["id"])
+        self.service.set_target_result(
+            target["id"], "failed", result, error.as_dict(), job_id=job["id"]
+        )
         raise error
 
     def verify(self, job, context):
         batch, target = self.service.target(job["input"]["target_id"])
         source = self.service.assert_current(batch)
         platform = target["platform"]
-        payload = self.service.resolve_assets(target["payload"], platform, batch["content_kind"])
-        result = self.run(context, "verify", platform, {"source": source, "payload": payload, "target_id": target["id"]})
+        payload = self.service.resolve_assets(
+            target["payload"], platform, batch["content_kind"]
+        )
+        result = self.run(
+            context,
+            "verify",
+            platform,
+            {"source": source, "payload": payload, "target_id": target["id"]},
+        )
         if result.get("status") == "published" and result.get("published_evidence"):
-            self.service.set_target_result(target["id"], "published", result, job_id=job["id"], external_url=result.get("url"))
-            return {"target_id": target["id"], "platform": platform, "status": "published", "url": result.get("url")}
-        self.service.set_target_result(target["id"], "unknown_remote", result,
-                                       {"code": "PUBLISH_NOT_VERIFIED", "message": result.get("error", "后台未核验到发布结果")}, job_id=job["id"])
-        return {"target_id": target["id"], "platform": platform, "status": result.get("status", "not_found")}
+            self.service.set_target_result(
+                target["id"],
+                "published",
+                result,
+                job_id=job["id"],
+                external_url=result.get("url"),
+            )
+            return {
+                "target_id": target["id"],
+                "platform": platform,
+                "status": "published",
+                "url": result.get("url"),
+            }
+        self.service.set_target_result(
+            target["id"],
+            "unknown_remote",
+            result,
+            {
+                "code": "PUBLISH_NOT_VERIFIED",
+                "message": result.get("error", "后台未核验到发布结果"),
+            },
+            job_id=job["id"],
+        )
+        return {
+            "target_id": target["id"],
+            "platform": platform,
+            "status": result.get("status", "not_found"),
+        }
 
     def login(self, job, context):
         platform = job["input"].get("platform")
         if platform not in PLATFORM_NAMES:
-            raise DomainError("PUBLISH_PLATFORM_INVALID", "发布平台无效", 422, "platform", "使用页面提供的平台登录入口")
-        if platform in ("wechat_channels", "wechat_official_account"):
-            from .webbridge_worker import Bridge
-            url = "https://channels.weixin.qq.com/platform/post/create" if platform == "wechat_channels" else "https://mp.weixin.qq.com/"
-            Bridge().call("navigate", {"url": url, "newTab": True, "group_title": "发布预览验证"})
-            return {"status": "browser_opened", "transport": "webbridge", "login_verified": False,
-                    "next_action": "在 Chrome 的发布预览验证标签组中登录，再重新生成预览"}
-        return self.run(context, "login", platform)
+            raise DomainError(
+                "PUBLISH_PLATFORM_INVALID",
+                "发布平台无效",
+                422,
+                "platform",
+                "使用页面提供的平台登录入口",
+            )
+        from content_workbench.accounts.dedicated_browser import enabled
+
+        if enabled():
+            return self.run(context, "login", platform)
+        from .webbridge_worker import Bridge
+
+        urls = {
+            "douyin": "https://creator.douyin.com/creator-micro/content/upload",
+            "xiaohongshu": "https://creator.xiaohongshu.com/",
+            "wechat_channels": "https://channels.weixin.qq.com/platform/post/create",
+            "wechat_official_account": "https://mp.weixin.qq.com/",
+        }
+        Bridge().call(
+            "navigate",
+            {"url": urls[platform], "newTab": True, "group_title": "发布预览验证"},
+        )
+        return {
+            "status": "browser_opened",
+            "transport": "webbridge",
+            "login_verified": False,
+            "next_action": "在 Chrome 的发布预览验证标签组中登录，再重新生成预览",
+        }
 
     @staticmethod
     def error(platform, stage, result):
         status = result.get("status")
-        message = result.get("error") or result.get("message") or "浏览器没有完成发布步骤"
+        message = (
+            result.get("error") or result.get("message") or "浏览器没有完成发布步骤"
+        )
         code = "LOGIN_REQUIRED" if status == "login_required" else "PUBLISH_STEP_FAILED"
-        action = result.get("action") or ("在发布中心打开对应平台登录页面，登录后重试" if code == "LOGIN_REQUIRED" else "检查{}、{}和平台页面变化后重试".format(PLATFORM_NAMES[platform], stage))
-        return DomainError(code, PLATFORM_NAMES[platform] + "：" + message, 409 if code == "LOGIN_REQUIRED" else 502,
-                           result.get("field") or platform, action)
+        action = result.get("action") or (
+            "在发布中心打开对应平台登录页面，登录后重试"
+            if code == "LOGIN_REQUIRED"
+            else f"检查{PLATFORM_NAMES[platform]}、{stage}和平台页面变化后重试"
+        )
+        return DomainError(
+            code,
+            PLATFORM_NAMES[platform] + "：" + message,
+            409 if code == "LOGIN_REQUIRED" else 502,
+            result.get("field") or platform,
+            action,
+        )

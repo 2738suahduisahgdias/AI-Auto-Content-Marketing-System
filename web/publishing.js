@@ -1,4 +1,4 @@
-Object.assign(state, { publishing: { articleBatch: null, videoBatch: null, articleSource: null, videoSource: null, videoId: null, busy: false, coverUploading: false } });
+Object.assign(state, { publishing: { articleBatch: null, videoBatch: null, articleSource: null, videoSource: null, videoId: null, busy: false, coverUploading: false, queue: [], queueError: "" } });
 const publishingStatusNames = { draft: "待预览", preparing: "预览执行中", ready: "待确认", publishing: "发布执行中", published: "已发布", failed: "失败", unknown_remote: "待人工核对" };
 function publishingSource(kind) {
   if (kind === "article") {
@@ -10,7 +10,7 @@ function publishingSource(kind) {
   const task = approvedVideos().find(item => item.content_id === state.publishing.videoId) || approvedVideos()[0];
   if (!task) return null;
   state.publishing.videoId = task.content_id;
-  return { id: task.content_id, title: task.title, body: task.publications?.douyin?.description || task.scripts?.douyin || task.scripts?.master || task.title, hash: task.updated_at };
+  return { id: task.content_id, title: task.title, body: task.publications?.douyin?.description || task.scripts?.douyin || task.scripts?.master || task.description || task.title, hash: task.updated_at };
 }
 async function loadPublishingBatch(kind, render = true) {
   const source = publishingSource(kind);
@@ -54,7 +54,7 @@ function publishingBatchActions(kind, batch) {
 function renderPublishing() {
   const source = publishingSource("video");
   const batch = state.publishing.videoBatch;
-  $("#publish").innerHTML = `<div class="workspace-intro"><div><span class="eyebrow">视频发布Agent · 独立视频任务</span><h2>一次确认，多平台发布视频</h2><p>只使用人工批准的 MP4。先上传并核验预览，再由你确认公开；每个平台独立记录结果。</p></div><span class="badge orange">预览不等于已发布</span></div><article class="card publishing-source"><div class="field"><label for="publishing-video-task">已批准的视频任务</label><select id="publishing-video-task"><option value="">请选择</option>${approvedVideos().map(task => `<option value="${task.content_id}" ${task.content_id === state.publishing.videoId ? "selected" : ""}>${esc(task.title)} · ${esc(task.content_id)}</option>`).join("")}</select></div>${source ? `<p class="muted">${esc(source.title)} · 不会使用文章正文、音频或 SRT 代替成片</p>` : `<div class="empty">没有已批准的视频。先在视频任务完成成片、质检与人工最终审核。</div>`}</article>${source ? `<form id="video-publish-batch-form"><div class="publishing-targets">${["douyin", "xiaohongshu", "wechat_channels"].map(platform => publishingTarget("video", platform, source)).join("")}</div><button class="button primary" type="submit">保存视频发布批次</button></form>${publishingBatchActions("video", batch)}` : ""}${batch?.load_error ? `<div class="settings-error">${esc(batch.load_error)}</div>` : ""}<details class="card manual-panel"><summary><strong>旧版手动发布与复盘</strong><span class="muted"> 保留真实链接和分时段数据记录</span></summary><div class="task-list">${(state.data?.tasks || []).filter(task => ["approved", "published", "analyzed"].includes(task.state)).map(taskRow).join("") || `<p class="muted">暂无进入发布阶段的视频任务。</p>`}</div></details>`;
+  $("#publish").innerHTML = `<div class="workspace-intro"><div><span class="eyebrow">视频发布Agent · 独立视频任务</span><h2>一次确认，多平台发布视频</h2><p>只使用人工批准的 MP4。先上传并核验预览，再由你确认公开；每个平台独立记录结果。</p></div><span class="badge orange">预览不等于已发布</span></div>${state.publishing.queueError ? `<div class="settings-error">新审核成果读取失败：${esc(state.publishing.queueError)}</div>` : ""}<article class="card publishing-source"><div class="field"><label for="publishing-video-task">已批准的视频任务</label><select id="publishing-video-task"><option value="">请选择</option>${approvedVideos().map(task => `<option value="${task.content_id}" ${task.content_id === state.publishing.videoId ? "selected" : ""}>${esc(task.title)} · ${esc(task.content_id)}</option>`).join("")}</select></div>${source ? `<p class="muted">${esc(source.title)} · 不会使用文章正文、音频或 SRT 代替成片</p>` : `<div class="empty">没有已批准的视频。先在视频任务完成成片、质检与人工最终审核。</div>`}</article>${source ? `<form id="video-publish-batch-form"><div class="publishing-targets">${["douyin", "xiaohongshu", "wechat_channels"].map(platform => publishingTarget("video", platform, source)).join("")}</div><button class="button primary" type="submit">保存视频发布批次</button></form>${publishingBatchActions("video", batch)}` : ""}${batch?.load_error ? `<div class="settings-error">${esc(batch.load_error)}</div>` : ""}<details class="card manual-panel"><summary><strong>旧版手动发布与复盘</strong><span class="muted"> 保留真实链接和分时段数据记录</span></summary><div class="task-list">${(state.data?.tasks || []).filter(task => ["approved", "published", "analyzed"].includes(task.state)).map(taskRow).join("") || `<p class="muted">暂无进入发布阶段的视频任务。</p>`}</div></details>`;
 }
 function renderArticlePublishing() {
   const container = $(".article-editor");
@@ -99,6 +99,14 @@ renderArticles = function() { baseRenderArticlesForPublishing(); renderArticlePu
 const baseRefreshWorkspacesForPublishing = refreshWorkspaces;
 refreshWorkspaces = async function(render = true) {
   await baseRefreshWorkspacesForPublishing(render);
+  try {
+    const data = await api("/api/publishing/queue");
+    state.publishing.queue = data.items || [];
+    state.publishing.queueError = "";
+  } catch (error) {
+    state.publishing.queue = [];
+    state.publishing.queueError = error.message;
+  }
   await Promise.all([loadPublishingBatch("article", false), loadPublishingBatch("video", false)]);
   if (render) { renderPublishing(); renderArticlePublishing(); }
 };

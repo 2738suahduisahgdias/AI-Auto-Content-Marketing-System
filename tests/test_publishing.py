@@ -30,8 +30,23 @@ class PublishingCase(unittest.TestCase):
         self.wb = Workbench(self.db, self.root)
         self.service = PublishingService(self.db, self.root)
         image = self.root / "cover.png"
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "color=c=white:s=900x383",
-                        "-frames:v", "1", str(image)], check=True, capture_output=True)
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=c=white:s=900x383",
+                "-frames:v",
+                "1",
+                str(image),
+            ],
+            check=True,
+            capture_output=True,
+        )
         self.cover = self.wb.register_asset(image, {"kind": "cover"}, "owned")
         self.article = self.make_article()
         self.video = self.make_video()
@@ -40,50 +55,122 @@ class PublishingCase(unittest.TestCase):
         self.temp.cleanup()
 
     def make_article(self):
-        item = self.wb.create_item("article", "wechat_official_account", "已批准文章", {"text": "测试需求"})
-        self.wb.save_revision(item["id"], "draft", {"text": "真实正文", "format": "markdown"}, item["version"])
+        item = self.wb.create_item(
+            "article", "wechat_official_account", "已批准文章", {"text": "测试需求"}
+        )
+        self.wb.save_revision(
+            item["id"],
+            "draft",
+            {"text": "真实正文", "format": "markdown"},
+            item["version"],
+        )
         item = self.wb.get_item(item["id"])
         draft = item["active_revisions"]["draft"]
-        item = self.wb.approve(item["id"], draft, item["manifest"]["hash"], kind="article")
+        item = self.wb.approve(
+            item["id"], draft, item["manifest"]["hash"], kind="article"
+        )
         return item
 
     def make_video(self):
         path = self.root / "renders/test/video.mp4"
         path.parent.mkdir(parents=True)
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "color=c=black:s=360x640:d=1",
-                        "-c:v", "libx264", "-pix_fmt", "yuv420p", str(path)], check=True, capture_output=True)
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=c=black:s=360x640:d=1",
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                str(path),
+            ],
+            check=True,
+            capture_output=True,
+        )
         with connect(self.db) as conn:
-            conn.execute("INSERT INTO tasks VALUES ('video-1','已批准视频','approved','{}','2026-10-27')")
-            conn.execute("INSERT INTO files(content_id,kind,relative_path) VALUES ('video-1','video','renders/test/video.mp4')")
+            conn.execute(
+                "INSERT INTO tasks VALUES ('video-1','已批准视频','approved','{}','2026-10-27')"
+            )
+            conn.execute(
+                "INSERT INTO files(content_id,kind,relative_path) VALUES ('video-1','video','renders/test/video.mp4')"
+            )
         return "video-1"
 
     def article_targets(self):
         return [
-            {"platform": "wechat_official_account", "payload": {"title": "标题", "author": "老刘", "summary": "摘要", "body": "真实正文", "cover_asset_id": self.cover}},
-            {"platform": "xiaohongshu", "payload": {"title": "小红书标题", "body": "真实正文"}},
+            {
+                "platform": "wechat_official_account",
+                "payload": {
+                    "title": "标题",
+                    "author": "老刘",
+                    "summary": "摘要",
+                    "body": "真实正文",
+                    "cover_asset_id": self.cover,
+                },
+            },
+            {
+                "platform": "xiaohongshu",
+                "payload": {"title": "小红书标题", "body": "真实正文"},
+            },
         ]
 
     def video_targets(self):
-        return [{"platform": "douyin", "payload": {"title": "视频标题", "description": "视频简介", "tags": "#AI"}}]
+        return [
+            {
+                "platform": "douyin",
+                "payload": {
+                    "title": "视频标题",
+                    "description": "视频简介",
+                    "tags": "#AI",
+                },
+            }
+        ]
 
     def test_bootstrap_scopes_batch_to_requested_file(self):
         batch = self.service.create_batch("video", self.video, self.video_targets())
         file_id = batch["source_file_id"]
-        self.assertEqual(batch["id"], self.service.bootstrap("video", self.video, str(file_id))["batch"]["id"])
-        self.assertIsNone(self.service.bootstrap("video", self.video, str(file_id + 100))["batch"])
-        job = self.service.generate_fields("video", self.video, ["douyin"], source_file_id=file_id)
+        self.assertEqual(
+            batch["id"],
+            self.service.bootstrap("video", self.video, str(file_id))["batch"]["id"],
+        )
+        self.assertIsNone(
+            self.service.bootstrap("video", self.video, str(file_id + 100))["batch"]
+        )
+        job = self.service.generate_fields(
+            "video", self.video, ["douyin"], source_file_id=file_id
+        )
         self.assertEqual(file_id, job["input"]["source_file_id"])
-        self.assertEqual(job["id"], self.service.bootstrap("video", self.video, str(file_id))["field_jobs"][0]["id"])
-        self.assertEqual([], self.service.bootstrap("video", self.video, str(file_id + 100))["field_jobs"])
+        self.assertEqual(
+            job["id"],
+            self.service.bootstrap("video", self.video, str(file_id))["field_jobs"][0][
+                "id"
+            ],
+        )
+        self.assertEqual(
+            [],
+            self.service.bootstrap("video", self.video, str(file_id + 100))[
+                "field_jobs"
+            ],
+        )
         with self.assertRaises(DomainError):
             self.service.bootstrap("video", self.video, "invalid")
 
     def test_article_batch_is_independent_and_validates_fields(self):
-        batch = self.service.create_batch("article", self.article["id"], self.article_targets())
+        batch = self.service.create_batch(
+            "article", self.article["id"], self.article_targets()
+        )
         self.assertEqual("draft", batch["status"])
         self.assertEqual(2, len(batch["targets"]))
         with self.assertRaises(DomainError) as caught:
-            self.service.create_batch("article", self.article["id"], self.video_targets())
+            self.service.create_batch(
+                "article", self.article["id"], self.video_targets()
+            )
         self.assertEqual("PUBLISH_CONTENT_PLATFORM_MISMATCH", caught.exception.code)
         invalid = self.article_targets()
         invalid[0]["payload"]["title"] = "长" * 65
@@ -92,31 +179,54 @@ class PublishingCase(unittest.TestCase):
         self.assertEqual("PUBLISH_FIELD_TOO_LONG", caught.exception.code)
 
     def test_prepare_confirm_and_duplicate_protection(self):
-        batch = self.service.create_batch("article", self.article["id"], self.article_targets())
+        batch = self.service.create_batch(
+            "article", self.article["id"], self.article_targets()
+        )
         with self.assertRaises(DomainError):
             self.service.confirm(batch["id"], batch["source_hash"])
-        with mock.patch.object(self.service.jobs, "enqueue", side_effect=lambda kind, data, aggregate, *args, **kwargs: {"id": "job-" + kind, "kind": kind}):
+        with mock.patch.object(
+            self.service.jobs,
+            "enqueue",
+            side_effect=lambda kind, data, aggregate, *args, **kwargs: {
+                "id": "job-" + kind,
+                "kind": kind,
+            },
+        ):
             jobs = self.service.prepare(batch["id"], None)
             self.assertEqual(2, len(jobs))
             for target in self.service.get_batch(batch["id"])["targets"]:
-                self.service.set_target_result(target["id"], "ready", {"fields_verified": ["title", "body"]})
+                self.service.set_target_result(
+                    target["id"], "ready", {"fields_verified": ["title", "body"]}
+                )
             jobs = self.service.confirm(batch["id"], batch["source_hash"])
             self.assertEqual(2, len(jobs))
         confirmed = self.service.get_batch(batch["id"])
         self.assertIsNotNone(confirmed["confirmed_at"])
-        self.assertTrue(all(target["status"] == "publishing" for target in confirmed["targets"]))
+        self.assertTrue(
+            all(target["status"] == "publishing" for target in confirmed["targets"])
+        )
         for target in confirmed["targets"]:
-            self.service.set_target_result(target["id"], "published", {"published_evidence": "success"})
+            self.service.set_target_result(
+                target["id"], "published", {"published_evidence": "success"}
+            )
         self.assertEqual("published", self.service.get_batch(batch["id"])["status"])
         with self.assertRaises(DomainError) as caught:
-            self.service.create_batch("article", self.article["id"], self.article_targets())
+            self.service.create_batch(
+                "article", self.article["id"], self.article_targets()
+            )
         self.assertEqual("PUBLISH_ALREADY_RECORDED", caught.exception.code)
 
     def test_content_change_invalidates_old_preview(self):
-        batch = self.service.create_batch("article", self.article["id"], self.article_targets())
+        batch = self.service.create_batch(
+            "article", self.article["id"], self.article_targets()
+        )
         target = batch["targets"][0]
-        self.service.set_target_result(target["id"], "ready", {"fields_verified": ["title"]})
-        self.wb.save_revision(self.article["id"], "draft", {"text": "新版本"}, self.article["version"])
+        self.service.set_target_result(
+            target["id"], "ready", {"fields_verified": ["title"]}
+        )
+        self.wb.save_revision(
+            self.article["id"], "draft", {"text": "新版本"}, self.article["version"]
+        )
         with self.assertRaises(DomainError):
             self.service.confirm(batch["id"], batch["source_hash"])
 
@@ -124,7 +234,9 @@ class PublishingCase(unittest.TestCase):
         batch = self.service.create_batch("video", self.video, self.video_targets())
         target = batch["targets"][0]
         self.assertEqual("video", batch["content_kind"])
-        self.service.set_target_result(target["id"], "unknown_remote", {}, {"code": "UNKNOWN_REMOTE"})
+        self.service.set_target_result(
+            target["id"], "unknown_remote", {}, {"code": "UNKNOWN_REMOTE"}
+        )
         with self.assertRaises(DomainError) as caught:
             self.service.retry(target["id"])
         self.assertEqual("PUBLISH_RETRY_BLOCKED", caught.exception.code)
@@ -135,41 +247,58 @@ class PublishingCase(unittest.TestCase):
         second = self.service.prepare(batch["id"], [])
         self.assertEqual([j["id"] for j in first], [j["id"] for j in second])
         with self.assertRaises(DomainError):
-            self.service.set_target_result(batch["targets"][0]["id"], "ready", job_id="old-job")
+            self.service.set_target_result(
+                batch["targets"][0]["id"], "ready", job_id="old-job"
+            )
 
     def test_failed_executor_updates_target(self):
         batch = self.service.create_batch("video", self.video, self.video_targets())
         job = self.service.prepare(batch["id"], [batch["targets"][0]["platform"]])[0]
         executor = PublishingExecutors(self.service)
-        with mock.patch.object(executor, "run", side_effect=DomainError("OFFLINE", "浏览器离线", 503)):
-            with self.assertRaises(DomainError):executor.prepare(job, mock.Mock())
-        self.assertEqual(self.service.get_batch(batch["id"])["targets"][0]["status"], "failed")
+        with mock.patch.object(
+            executor, "run", side_effect=DomainError("OFFLINE", "浏览器离线", 503)
+        ), self.assertRaises(DomainError):
+            executor.prepare(job, mock.Mock())
+        self.assertEqual(
+            self.service.get_batch(batch["id"])["targets"][0]["status"], "failed"
+        )
 
     def test_manual_retry_never_enqueues(self):
         batch = self.service.create_batch("video", self.video, self.video_targets())
         target = batch["targets"][0]
         payload = dict(target["payload"], manual_transfer=True)
         with self.service.conn() as conn:
-            conn.execute("UPDATE publish_targets SET payload_json=? WHERE id=?", (json.dumps(payload),target["id"]))
-        with mock.patch.object(self.service.jobs,"enqueue") as enqueue:
-            with self.assertRaises(DomainError):self.service.retry(target["id"])
+            conn.execute(
+                "UPDATE publish_targets SET payload_json=? WHERE id=?",
+                (json.dumps(payload), target["id"]),
+            )
+        with mock.patch.object(self.service.jobs, "enqueue") as enqueue:
+            with self.assertRaises(DomainError):
+                self.service.retry(target["id"])
             enqueue.assert_not_called()
 
     def test_enqueue_state_update_rolls_back_together(self):
         batch = self.service.create_batch("video", self.video, self.video_targets())
         original = self.service.jobs.enqueue
+
         def crash(*args, **kwargs):
             original(*args, **kwargs)
             raise RuntimeError("crash before target update")
-        with mock.patch.object(self.service.jobs,"enqueue",side_effect=crash):
-            with self.assertRaises(RuntimeError):self.service.prepare(batch["id"], [])
-        self.assertEqual(self.service.get_batch(batch["id"])["targets"][0]["status"], "draft")
+
+        with mock.patch.object(self.service.jobs, "enqueue", side_effect=crash):
+            with self.assertRaises(RuntimeError):
+                self.service.prepare(batch["id"], [])
+        self.assertEqual(
+            self.service.get_batch(batch["id"])["targets"][0]["status"], "draft"
+        )
         self.assertEqual(self.service.jobs.list(), [])
 
     def test_same_batch_is_reused_without_losing_ready_preview(self):
         batch = self.service.create_batch("video", self.video, self.video_targets())
         target = batch["targets"][0]
-        self.service.set_target_result(target["id"], "ready", {"fields_verified": ["title"]})
+        self.service.set_target_result(
+            target["id"], "ready", {"fields_verified": ["title"]}
+        )
         repeated = self.service.create_batch("video", self.video, self.video_targets())
         self.assertEqual(batch["id"], repeated["id"])
         self.assertEqual("ready", repeated["status"])
@@ -178,17 +307,32 @@ class PublishingCase(unittest.TestCase):
     def test_failed_target_can_prepare_again(self):
         batch = self.service.create_batch("video", self.video, self.video_targets())
         target = batch["targets"][0]
-        self.service.set_target_result(target["id"], "failed", {}, {"code": "LOGIN_REQUIRED"})
-        with mock.patch.object(self.service.jobs, "enqueue", return_value={"id": "job-retry", "kind": "publish.prepare"}):
+        self.service.set_target_result(
+            target["id"], "failed", {}, {"code": "LOGIN_REQUIRED"}
+        )
+        with mock.patch.object(
+            self.service.jobs,
+            "enqueue",
+            return_value={"id": "job-retry", "kind": "publish.prepare"},
+        ):
             job = self.service.retry(target["id"])
         self.assertEqual("job-retry", job["id"])
         self.assertEqual("preparing", self.service.target(target["id"])[1]["status"])
 
     def test_executor_prepare_never_marks_published(self):
-        batch = self.service.create_batch("article", self.article["id"], self.article_targets())
+        batch = self.service.create_batch(
+            "article", self.article["id"], self.article_targets()
+        )
         target = batch["targets"][0]
         executor = PublishingExecutors(self.service)
-        with mock.patch.object(executor, "run", return_value={"status": "preview_ready", "fields_verified": ["title", "body"]}) as run:
+        with mock.patch.object(
+            executor,
+            "run",
+            return_value={
+                "status": "preview_ready",
+                "fields_verified": ["title", "body"],
+            },
+        ) as run:
             job = self.service.prepare(batch["id"], [target["platform"]])[0]
             result = executor.prepare(job, mock.Mock())
         self.assertEqual("ready", result["status"])
@@ -200,16 +344,27 @@ class PublishingCase(unittest.TestCase):
     def test_executor_unknown_remote_requires_manual_reconciliation(self):
         batch = self.service.create_batch("video", self.video, self.video_targets())
         target = batch["targets"][0]
-        self.service.set_target_result(target["id"], "ready", {"fields_verified": ["title"]})
+        self.service.set_target_result(
+            target["id"], "ready", {"fields_verified": ["title"]}
+        )
         confirmed_job = self.service.confirm(batch["id"], batch["source_hash"])[0]
         executor = PublishingExecutors(self.service)
-        with mock.patch.object(executor, "run", return_value={"status": "unknown_remote", "error": "结果未知"}):
-            with self.assertRaises(UnknownRemote):
-                executor.execute(confirmed_job, mock.Mock())
-        self.assertEqual("unknown_remote", self.service.target(target["id"])[1]["status"])
+        with mock.patch.object(
+            executor,
+            "run",
+            return_value={"status": "unknown_remote", "error": "结果未知"},
+        ), self.assertRaises(UnknownRemote):
+            executor.execute(confirmed_job, mock.Mock())
+        self.assertEqual(
+            "unknown_remote", self.service.target(target["id"])[1]["status"]
+        )
         with self.assertRaises(DomainError):
             self.service.reconcile(target["id"], "已发布")
-        result = self.service.reconcile(target["id"], "平台视频管理列表显示本条内容于今天发布", "https://example.com/published")
+        result = self.service.reconcile(
+            target["id"],
+            "平台视频管理列表显示本条内容于今天发布",
+            "https://example.com/published",
+        )
         self.assertEqual("published", result["status"])
         self.assertEqual("https://example.com/published", result["external_url"])
 
@@ -218,41 +373,103 @@ class PublishingCase(unittest.TestCase):
         target = batch["targets"][0]
         self.service.set_target_result(target["id"], "unknown_remote", {})
         executor = PublishingExecutors(self.service)
-        with mock.patch.object(executor, "run", return_value={"status": "published", "published_evidence": "笔记管理存在标题", "url": "https://example.com/note"}):
+        with mock.patch.object(
+            executor,
+            "run",
+            return_value={
+                "status": "published",
+                "published_evidence": "笔记管理存在标题",
+                "url": "https://example.com/note",
+            },
+        ):
             result = executor.verify(self.service.verify(target["id"]), mock.Mock())
         self.assertEqual("published", result["status"])
         self.assertEqual("published", self.service.target(target["id"])[1]["status"])
 
     def test_retrospective_contains_only_verified_records_and_boundaries(self):
-        article = self.service.create_batch("article", self.article["id"], self.article_targets())
+        article = self.service.create_batch(
+            "article", self.article["id"], self.article_targets()
+        )
         video = self.service.create_batch("video", self.video, self.video_targets())
         published = article["targets"][0]
-        self.service.set_target_result(published["id"], "published", {"published_evidence": "公众号首页已发表", "reconciled_at": "2026-10-28T01:00:00Z"})
+        self.service.set_target_result(
+            published["id"],
+            "published",
+            {
+                "published_evidence": "公众号首页已发表",
+                "reconciled_at": "2026-10-28T01:00:00Z",
+            },
+        )
         self.service.set_target_result(video["targets"][0]["id"], "unknown_remote", {})
         data = self.service.retrospective()
         self.assertEqual(1, data["total_published"])
-        self.assertEqual({"douyin", "xiaohongshu", "wechat_channels", "wechat_official_account"}, set(data["platforms"]))
+        self.assertEqual(
+            {"douyin", "xiaohongshu", "wechat_channels", "wechat_official_account"},
+            set(data["platforms"]),
+        )
         item = data["platforms"]["wechat_official_account"]["items"][0]
         self.assertEqual("标题", item["title"])
         self.assertEqual("article", item["content_kind"])
         self.assertEqual("2026-10-28T01:00:00Z", item["verified_at"])
         self.assertEqual([], data["platforms"]["douyin"]["items"])
-        self.assertIn("暂不能判断传播效果", data["platforms"]["douyin"]["data_boundary"])
-        self.assertIn("不是平台效果结论", data["platforms"]["xiaohongshu"]["suggestion_kind"])
+        self.assertIn(
+            "暂不能判断传播效果", data["platforms"]["douyin"]["data_boundary"]
+        )
+        self.assertIn(
+            "不是平台效果结论", data["platforms"]["xiaohongshu"]["suggestion_kind"]
+        )
 
     def test_field_generation_returns_only_editable_text_without_publishing(self):
-        job = self.service.generate_fields("article", self.article["id"], ["wechat_official_account"], "面向企业主", "generate-request")
+        job = self.service.generate_fields(
+            "article",
+            self.article["id"],
+            ["wechat_official_account"],
+            "面向企业主",
+            "generate-request",
+        )
         self.assertEqual("publish.fields", job["kind"])
         self.assertEqual("cloud_text", job["resource_key"])
-        self.assertEqual(job["id"], self.service.bootstrap("article", self.article["id"])["field_jobs"][0]["id"])
-        model_fields = {"title": "生成标题", "body": "生成正文", "author": "老刘", "summary": "生成摘要",
-                        "cover_asset_id": "模型不能指定封面", "original": True}
-        stdout = json.dumps({"type": "assistant", "content": json.dumps({"platforms": {"wechat_official_account": model_fields}}, ensure_ascii=False)})
+        self.assertEqual(
+            job["id"],
+            self.service.bootstrap("article", self.article["id"])["field_jobs"][0][
+                "id"
+            ],
+        )
+        model_fields = {
+            "title": "生成标题",
+            "body": "生成正文",
+            "author": "老刘",
+            "summary": "生成摘要",
+            "cover_asset_id": "模型不能指定封面",
+            "original": True,
+        }
+        stdout = json.dumps(
+            {
+                "type": "assistant",
+                "content": json.dumps(
+                    {"platforms": {"wechat_official_account": model_fields}},
+                    ensure_ascii=False,
+                ),
+            }
+        )
         context = mock.Mock()
         context.run_process.return_value = (stdout, "")
-        config = {"engine":"kimi_cli", "prompt": "保留事实", "timeout_seconds": 600}
-        with mock.patch("content_workbench.publishing.executors.require_agent_enabled", return_value=config), \
-                mock.patch("content_workbench.providers.local.LocalExecutors.kimi", return_value="/fake/kimi"):
+        config = {
+            "engine": "kimi_cli",
+            "model": "default_unpinned",
+            "prompt": "保留事实",
+            "timeout_seconds": 600,
+        }
+        with (
+            mock.patch(
+                "content_workbench.publishing.executors.require_agent_enabled",
+                return_value=config,
+            ),
+            mock.patch(
+                "content_workbench.providers.local.LocalExecutors.kimi",
+                return_value="/fake/kimi",
+            ),
+        ):
             result = PublishingExecutors(self.service).generate_fields(job, context)
         generated = result["platforms"]["wechat_official_account"]
         self.assertEqual("生成标题", generated["title"])
@@ -260,10 +477,14 @@ class PublishingCase(unittest.TestCase):
         self.assertNotIn("original", generated)
         self.assertFalse(result["auto_saved"])
         self.assertFalse(result["auto_published"])
-        self.assertIsNone(self.service.bootstrap("article", self.article["id"])["batch"])
+        self.assertIsNone(
+            self.service.bootstrap("article", self.article["id"])["batch"]
+        )
 
     def test_generated_fields_enforce_platform_limits(self):
-        payload = {"platforms": {"douyin": {"title": "长" * 301, "description": "简介"}}}
+        payload = {
+            "platforms": {"douyin": {"title": "长" * 301, "description": "简介"}}
+        }
         with self.assertRaises(DomainError) as caught:
             PublishingExecutors.validate_generated_fields("video", ["douyin"], payload)
         self.assertEqual("PUBLISH_GENERATED_FIELD_TOO_LONG", caught.exception.code)
@@ -273,58 +494,139 @@ class PublishingCase(unittest.TestCase):
 
     def test_platform_specific_limits_and_long_article_description(self):
         from content_workbench.publishing.schemas import validate_payload
+
         for platform, kind, payload, field in [
             ("douyin", "video", {"title": "长" * 31, "description": "简介"}, "title"),
-            ("xiaohongshu", "video", {"title": "长" * 21, "description": "正文"}, "title"),
-            ("wechat_channels", "video", {"short_title": "长" * 17, "description": "描述"}, "short_title"),
+            (
+                "xiaohongshu",
+                "video",
+                {"title": "长" * 21, "description": "正文"},
+                "title",
+            ),
+            (
+                "wechat_channels",
+                "video",
+                {"short_title": "长" * 17, "description": "描述"},
+                "short_title",
+            ),
         ]:
             with self.assertRaises(DomainError) as caught:
                 validate_payload(kind, platform, payload)
             self.assertEqual(field, caught.exception.field)
-        article = validate_payload("article", "xiaohongshu", {"title": "长文标题", "body": "长文正文", "description": "独立描述"})
+        article = validate_payload(
+            "article",
+            "xiaohongshu",
+            {"title": "长文标题", "body": "长文正文", "description": "独立描述"},
+        )
         self.assertEqual("长文正文", article["body"])
         self.assertEqual("独立描述", article["description"])
         with self.assertRaises(DomainError) as caught:
-            validate_payload("article", "wechat_official_account", {"title": "标题", "body": "正文", "cover_asset_id": self.cover,
-                                                                     "original": False, "reward_enabled": True})
+            validate_payload(
+                "article",
+                "wechat_official_account",
+                {
+                    "title": "标题",
+                    "body": "正文",
+                    "cover_asset_id": self.cover,
+                    "original": False,
+                    "reward_enabled": True,
+                },
+            )
         self.assertEqual("PUBLISH_FIELD_DEPENDENCY", caught.exception.code)
         with self.assertRaises(DomainError) as caught:
-            self.service.create_batch("video", self.video, [{"platform": "wechat_channels", "payload": {
-                "short_title": "短标题", "description": "描述", "original": True}}])
+            self.service.create_batch(
+                "video",
+                self.video,
+                [
+                    {
+                        "platform": "wechat_channels",
+                        "payload": {
+                            "short_title": "短标题",
+                            "description": "描述",
+                            "original": True,
+                        },
+                    }
+                ],
+            )
         self.assertEqual("PUBLISH_ORIGINAL_DURATION_CONFLICT", caught.exception.code)
 
     def test_unsupported_nondefault_fields_block_preview(self):
         from content_workbench.publishing.coverage import unsupported_payload_field
+
         supported = {"title", "author", "summary", "body", "cover_asset_id"}
-        payload = {"title": "标题", "body": "正文", "cover_asset_id": self.cover, "original": True}
-        error = unsupported_payload_field("wechat_official_account", "article", payload, supported)
+        payload = {
+            "title": "标题",
+            "body": "正文",
+            "cover_asset_id": self.cover,
+            "original": True,
+        }
+        error = unsupported_payload_field(
+            "wechat_official_account", "article", payload, supported
+        )
         self.assertEqual("original", error["field"])
         self.assertIn("不能静默忽略", error["error"])
         payload["original"] = False
-        self.assertIsNone(unsupported_payload_field("wechat_official_account", "article", payload, supported))
+        self.assertIsNone(
+            unsupported_payload_field(
+                "wechat_official_account", "article", payload, supported
+            )
+        )
 
     def test_browser_python_uses_windows_scripts_environment(self):
         from content_workbench.publishing.executors import browser_python
+
         with tempfile.TemporaryDirectory(prefix="browser-python-") as directory:
             root = Path(directory)
             linux = root / ".venv-topics/bin/python"
-            linux.parent.mkdir(parents=True); linux.touch()
+            linux.parent.mkdir(parents=True)
+            linux.touch()
             self.assertEqual(str(linux), browser_python(root))
             windows = root / ".venv-topics/Scripts/python.exe"
             windows.parent.mkdir(parents=True)
             windows.touch()
             self.assertEqual(str(windows), browser_python(root))
 
+    def test_all_platform_logins_use_existing_webbridge(self):
+        executor = PublishingExecutors(self.service)
+        urls = {
+            "douyin": "https://creator.douyin.com/creator-micro/content/upload",
+            "xiaohongshu": "https://creator.xiaohongshu.com/",
+            "wechat_channels": "https://channels.weixin.qq.com/platform/post/create",
+            "wechat_official_account": "https://mp.weixin.qq.com/",
+        }
+        with (
+            mock.patch(
+                "content_workbench.publishing.webbridge_worker.Bridge"
+            ) as bridge_type,
+            mock.patch.object(executor, "run") as legacy_run,
+        ):
+            for platform, url in urls.items():
+                result = executor.login({"input": {"platform": platform}}, mock.Mock())
+                self.assertEqual("webbridge", result["transport"])
+                bridge_type.return_value.call.assert_called_with(
+                    "navigate",
+                    {"url": url, "newTab": True, "group_title": "发布预览验证"},
+                )
+            legacy_run.assert_not_called()
+
     def test_publish_knowledge_matches_actual_validation_contract(self):
-        official = publish_knowledge(platform="wechat_official_account", content_kind="article")["platforms"][0]
-        fields = {field["name"]: field for field in official["content_types"][0]["fields"]}
+        official = publish_knowledge(
+            platform="wechat_official_account", content_kind="article"
+        )["platforms"][0]
+        fields = {
+            field["name"]: field for field in official["content_types"][0]["fields"]
+        }
         self.assertEqual(64, fields["title"]["max_length"])
         self.assertIsNone(fields["body"]["max_length"])
         self.assertTrue(fields["cover_asset_id"]["required"])
         self.assertEqual(8, fields["author"]["max_length"])
         self.assertEqual(120, fields["summary"]["max_length"])
-        video = publish_knowledge(platform="douyin", content_kind="video")["platforms"][0]
-        video_fields = {field["name"]: field for field in video["content_types"][0]["fields"]}
+        video = publish_knowledge(platform="douyin", content_kind="video")["platforms"][
+            0
+        ]
+        video_fields = {
+            field["name"]: field for field in video["content_types"][0]["fields"]
+        }
         self.assertEqual(30, video_fields["title"]["max_length"])
         self.assertEqual(1000, video_fields["description"]["max_length"])
         self.assertTrue(video_fields["video_path"]["required"])

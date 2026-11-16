@@ -2,20 +2,20 @@
 
 :root {
   --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
-  --paper: #f9f8f6;
+  --paper: #f6f5f1;
   --panel: #ffffff;
-  --ink: #29241f;
-  --muted: #746a60;
-  --line: #e7e0d7;
-  --line-strong: #cdbda8;
-  --surface-soft: #f5f1eb;
-  --surface-hover: #faf4eb;
-  --accent: #b85b0b;
-  --accent-dark: #914407;
-  --accent-soft: #fff1df;
-  --gold: #a68a59;
-  --gold-soft: #f6f0e3;
-  --focus-ring: #b85b0b33;
+  --ink: #242421;
+  --muted: #716f68;
+  --line: #e3e1da;
+  --line-strong: #c9c5bb;
+  --surface-soft: #f1f0eb;
+  --surface-hover: #f8f7f3;
+  --accent: #bd4935;
+  --accent-dark: #923324;
+  --accent-soft: #f9eae5;
+  --gold: #8d8578;
+  --gold-soft: #f0eee7;
+  --focus-ring: #bd493533;
   --blue: var(--accent);
   --blue-soft: var(--accent-soft);
   --shadow: 0 3px 14px #30201007;
@@ -41,3 +41,11 @@
 
 .settings-onboarding{margin:4px 0 0 18px;padding-left:7px;border-left:1px solid var(--line-strong)}
 .settings-onboarding .nav-link{min-height:36px;font-size:12px}
+
+.slim-dependencies{margin:28px 36px 0;padding:24px 26px;border:1px solid var(--line-strong);border-radius:12px;background:var(--panel)}
+.slim-dependencies-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:24px}.slim-dependencies-heading h2{font-size:22px}.slim-dependencies-heading p:not(.eyebrow){max-width:850px;margin-top:8px;color:var(--muted);font-size:12px;line-height:1.8}
+.slim-dependencies-progress{display:grid;grid-template-columns:120px 1fr;align-items:center;gap:16px;margin:20px 0 14px;color:var(--muted);font-size:11px}.slim-dependencies-progress .progress{height:7px}
+.slim-dependencies-items{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 28px;margin-bottom:16px}.slim-dependencies-items>div{display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--line);font-size:12px}.slim-dependencies-items small{display:block;color:var(--muted);font-size:10px}.slim-dependencies-items strong{font-size:11px;font-weight:500;white-space:nowrap}.slim-dependencies-items .slim-dependency-failed strong{color:var(--red)}
+.slim-dependencies-error{max-height:150px;overflow:auto;margin:12px 0;padding:12px;background:var(--accent-soft);color:var(--red);font-size:11px;white-space:pre-wrap;word-break:break-word}.slim-dependencies>.button-row{margin-top:16px}
+@media(max-width:1100px){.slim-dependencies{margin:24px 24px 0}.slim-dependencies-items{grid-template-columns:1fr}}
+@media(max-width:760px){.slim-dependencies{margin:18px 15px 0;padding:20px}.slim-dependencies-heading{gap:8px}.slim-dependencies-progress{grid-template-columns:1fr;gap:8px}}

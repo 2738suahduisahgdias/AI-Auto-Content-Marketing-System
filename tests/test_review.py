@@ -18,7 +18,9 @@ class Context:
         pass
 
     def run_process(self, arguments, timeout=600, stage=None, cwd=None):
-        result = subprocess.run(arguments, cwd=cwd, capture_output=True, text=True, timeout=timeout)
+        result = subprocess.run(
+            arguments, cwd=cwd, capture_output=True, text=True, timeout=timeout
+        )
         if result.returncode:
             raise RuntimeError(result.stderr[-500:])
         return result.stdout, result.stderr
@@ -31,7 +33,9 @@ class ReviewCase(unittest.TestCase):
         self.db = self.root / "test.db"
         with connect(self.db) as conn:
             expand_schema(conn)
-            conn.execute("CREATE TABLE settings(key TEXT PRIMARY KEY,value TEXT NOT NULL)")
+            conn.execute(
+                "CREATE TABLE settings(key TEXT PRIMARY KEY,value TEXT NOT NULL)"
+            )
         self.service = ReviewService(self.db, self.root)
         self.folder = self.root / "A"
         self.folder.mkdir()
@@ -43,9 +47,33 @@ class ReviewCase(unittest.TestCase):
         self.temp.cleanup()
 
     def make_video(self, path):
-        subprocess.run([shutil.which("ffmpeg"), "-v", "error", "-y", "-f", "lavfi", "-i", "color=c=blue:s=160x160:d=2",
-                        "-f", "lavfi", "-i", "sine=frequency=440:duration=2", "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                        "-c:a", "aac", "-movflags", "+faststart", str(path)], check=True, timeout=30)
+        subprocess.run(
+            [
+                shutil.which("ffmpeg"),
+                "-v",
+                "error",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=c=blue:s=160x160:d=2",
+                "-f",
+                "lavfi",
+                "-i",
+                "sine=frequency=440:duration=2",
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                "-movflags",
+                "+faststart",
+                str(path),
+            ],
+            check=True,
+            timeout=30,
+        )
 
     def test_batch_scan_decision_and_publish_source(self):
         original_hash = file_hash(self.video)
@@ -54,12 +82,16 @@ class ReviewCase(unittest.TestCase):
         with self.assertRaises(DomainError):
             self.service.source_for_publish(batch["items"][0]["id"])
         self.service.start(batch["id"])
-        ReviewExecutors(self.service).scan({"input": {"batch_id": batch["id"]}}, Context())
+        ReviewExecutors(self.service).scan(
+            {"input": {"batch_id": batch["id"]}}, Context()
+        )
         item = self.service.get_batch(batch["id"])["items"][0]
         self.assertTrue(item["report"]["safe_transcode_candidate"]["eligible"])
         executor = ReviewExecutors(self.service)
         executor.repair({"id": "repair-1", "input": {"item_id": item["id"]}}, Context())
-        first_candidate = self.service.get_batch(batch["id"])["items"][0]["candidate_path"]
+        first_candidate = self.service.get_batch(batch["id"])["items"][0][
+            "candidate_path"
+        ]
         executor.repair({"id": "repair-2", "input": {"item_id": item["id"]}}, Context())
         item = self.service.get_batch(batch["id"])["items"][0]
         self.assertNotEqual(first_candidate, item["candidate_path"])
@@ -74,20 +106,65 @@ class ReviewCase(unittest.TestCase):
         source = self.service.source_for_publish(item["id"])
         self.assertEqual("video", source["kind"])
         self.assertEqual("sample", source["title"])
-        publishing_source = PublishingService(self.db, self.root).source("video", item["id"])
+        publishing_source = PublishingService(self.db, self.root).source(
+            "video", item["id"]
+        )
         self.assertEqual(output, publishing_source["absolute_video_path"])
         self.assertEqual(output, self.service.decide(item["id"], "approved"))
 
     def test_ai_risk_is_scoped_evidence(self):
         batch = self.service.create_batch(self.folder, self.rules)
-        ReviewExecutors(self.service).scan({"input": {"batch_id": batch["id"]}}, Context())
+        ReviewExecutors(self.service).scan(
+            {"input": {"batch_id": batch["id"]}}, Context()
+        )
         item = batch["items"][0]
-        payload = {"items": [{"item_id": item["id"], "evidence_scope": "只有技术报告", "risks": [{"category": "exaggeration", "severity": "warning", "evidence": "示例", "reason": "待核查", "action": "修改"}]}]}
-        stream = json.dumps({"type": "assistant", "content": json.dumps(payload, ensure_ascii=False)}) + "\n"
+        payload = {
+            "items": [
+                {
+                    "item_id": item["id"],
+                    "evidence_scope": "只有技术报告",
+                    "risks": [
+                        {
+                            "category": "exaggeration",
+                            "severity": "warning",
+                            "evidence": "示例",
+                            "reason": "待核查",
+                            "action": "修改",
+                        }
+                    ],
+                }
+            ]
+        }
+        stream = (
+            json.dumps(
+                {
+                    "type": "assistant",
+                    "content": json.dumps(payload, ensure_ascii=False),
+                }
+            )
+            + "\n"
+        )
         context = mock.Mock()
         context.run_process.return_value = (stream, "")
-        with mock.patch("content_workbench.providers.text.CodexCLIProvider.complete_json", return_value=payload) as provider:
-            result = ReviewExecutors(self.service).ai({"input": {"batch_id": batch["id"]}}, context)
+        config = {
+            "engine": "codex_cli",
+            "model": "default_unpinned",
+            "prompt": "",
+            "timeout_seconds": 600,
+        }
+        with (
+            mock.patch(
+                "content_workbench.review.executors.require_agent_enabled",
+                return_value=config,
+            ),
+            mock.patch(
+                "content_workbench.providers.text.CodexCLIProvider.complete_json",
+                return_value=payload,
+            ) as provider,
+        ):
+            result = ReviewExecutors(self.service).ai(
+                {"input": {"batch_id": batch["id"]}}, context
+            )
         provider.assert_called_once()
         self.assertEqual(1, result["items"])
         risk = self.service.get_batch(batch["id"])["items"][0]["ai_risk"]
@@ -98,7 +175,9 @@ class ReviewCase(unittest.TestCase):
         with self.assertRaises(DomainError):
             self.service.create_batch(self.folder / "missing", self.rules)
         with self.assertRaises(DomainError):
-            self.service.create_batch(self.folder, {**self.rules, "min_duration": 10, "max_duration": 2})
+            self.service.create_batch(
+                self.folder, {**self.rules, "min_duration": 10, "max_duration": 2}
+            )
 
 
 if __name__ == "__main__":

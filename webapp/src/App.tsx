@@ -9,6 +9,9 @@ const Topics = lazy(() => import("@/pages/Topics"));
 const Articles = lazy(() => import("@/pages/Articles"));
 const YingxuVideoWorkspace = lazy(() => import("./migration/YingxuVideoWorkspace"));
 const Tasks = lazy(() => import("@/pages/Tasks"));
+const VideoProjectHome = lazy(() => import("@/pages/videoProjects/VideoProjectHome"));
+const OriginalProject = lazy(() => import("@/pages/videoProjects/OriginalProject"));
+const BenchmarkProject = lazy(() => import("@/pages/videoProjects/BenchmarkProject"));
 const Review = lazy(() => import("@/pages/Review"));
 const Publish = lazy(() => import("@/pages/Publish"));
 const Knowledge = lazy(() => import("@/pages/Knowledge"));
@@ -25,7 +28,14 @@ export default function App({migratedVideo=false}:{migratedVideo?:boolean}) {
     <Route path="/topics/:source" element={<Topics />} />
     <Route path="/accounts/:view?" element={<Navigate to="/" replace />} />
     <Route path="/articles/:id?" element={<Articles />} />
-    <Route path="/tasks/:id?" element={migratedVideo ? <YingxuVideoWorkspace /> : <Tasks />} />
+    <Route path="/projects" element={<VideoProjectHome />} />
+    <Route path="/projects/original" element={<OriginalProject />} />
+    <Route path="/projects/original/:id" element={<OriginalProject />} />
+    <Route path="/projects/benchmark" element={<BenchmarkProject />} />
+    <Route path="/projects/benchmark/:id" element={<BenchmarkProject />} />
+    <Route path="/tasks" element={<VideoProjectHome />} />
+    <Route path="/tasks/:id" element={<OriginalProject />} />
+    <Route path="/tasks/:id/editor" element={migratedVideo ? <YingxuVideoWorkspace /> : <Tasks />} />
     <Route path="/review" element={<Review />} />
     <Route path="/publish" element={<Publish />} />
     <Route path="/knowledge" element={<Knowledge />} />
