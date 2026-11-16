@@ -428,7 +428,10 @@
       "完整后端在 Python 3.12 + OpenSSL 3 下 434 项通过、1 项跳过；完整前端并行轮次 124 项通过、1 项高负载超时，单 worker 复验 44 个文件、125 项全部通过；worker 覆盖率 91%。",
       "最终精简 DMG 的原生窗口完成真实转写 job_5011282586ed4cffb913，66 个词/片段；模型就绪后转写约 10 秒。",
       "精简版主服务 66954 与 worker 67213 均退出，运行后签名有效；DMG VALID，SHA-256 ff9f5acfbea9ddf1d4cf6dd2f8876069249cf0a55f0f40a335538ba2f49a5c0e。",
-      "桌面入口、构建元数据及转写相关 27 项测试通过。"
+      "桌面入口、构建元数据及转写相关 27 项测试通过。",
+      "完整后端在 Python 3.12 + OpenSSL 3 下 434 项通过、1 项跳过；完整前端并行轮次 124 项通过、1 项高负载超时，最终单 worker 复验 45 个文件、127 项全部通过；worker 覆盖率 91%。",
+      "全量 APP 真实任务 job_403b7b1e1e89421689d8 生成 66 个词/片段，实际转写进度达到 91.6%；主服务 17017 与 worker 18514 均退出，运行后签名有效。",
+      "GitHub 提交 39d22d8799d6e9e2d1afe57317f6ca65794c47e4 已推送到 continue-from-fd9e2785，远端哈希核对一致。"
     ],
     "unverified": [
       "长音频、大量并发、其他硬件性能和安装版覆盖升级未验证。",
@@ -502,6 +505,44 @@
       "content_workbench/topics/executors.py",
       "tests/test_kimi_browser_collection.py",
       "webapp/src/components/DownloadProbeModal.tsx"
+    ]
+  },
+  {
+    "id": "2026-11-16-transcript-and-benchmark-subtitles",
+    "date": "2026-11-16",
+    "title": "原创转写修复与对标画面字幕",
+    "summary": "原创词级时间码改用短术语提示和稳定识别参数；对标移除使用边界，并在无音轨时以 RapidOCR 读取真实画面字幕。\n\n补充：补充最终全量回归结果。",
+    "changes": [
+      "P10-C04 使用 beam_size=5 与 200 字符内开头语境、品牌热词，worker 支持 initial_prompt/hotwords，避免长提示位置编码错误。",
+      "P11-C01 新建和重新拆解不再要求使用边界；旧字段保留但不展示、不拦截。",
+      "P11-C02 无音轨时对真实关键帧运行 RapidOCR，分别展示旁白与画面字幕，并保存置信度、状态和错误。",
+      "保留原项目、素材、旧字幕和版本；新转写与报告以新文件保存。"
+    ],
+    "verification": [
+      "原创 job_fd041159c8c746e68a79 成功，503 个词／片段；页面显示正确 Claude 和连贯中文，不再是旧版乱码。",
+      "静音项目 20261116-002 无使用边界完成创建；RapidOCR 真实读取“真实画面字幕”，置信度 99.88%，页面显示无音轨 · 画面字幕。",
+      "原创相关 8 项、视频后端 13 项与 20 个子测试、视频前端 17 项和生产构建通过；worker 覆盖率 91%。",
+      "全量后端 436 项通过、1 项跳过；Ruff 与 Python 语法检查通过。",
+      "全量前端 45 个测试文件、129 项全部通过；全量后端 436 项通过、1 项跳过。"
+    ],
+    "unverified": [
+      "Whisper 仍可能误识别品牌、数字、口音和中英文混排，结果必须人工校对。",
+      "RapidOCR 按场景中间帧读取，不等于连续逐字字幕，不保证每个镜头全部文字被识别。",
+      "未重新打包 DMG 或验证安装版、其他机器和公开发布。"
+    ],
+    "files": [
+      "app.py",
+      "workers/whisperx_worker.py",
+      "content_workbench/topics/ocr_worker.py",
+      "webapp/src/pages/videoProjects/BenchmarkProject.tsx",
+      "webapp/src/pages/videoProjects/useVideoProject.ts",
+      "tests/test_project_transcript.py",
+      "tests/test_whisperx_worker.py",
+      "tests/test_video_projects.py",
+      "webapp/src/pages/videoProjects/VideoProjects.test.tsx",
+      "evidence/transcript-short-prompt.png",
+      "evidence/benchmark-ocr-subtitles.png",
+      "iterations/2026-11-16-transcript-and-benchmark-subtitles.md"
     ]
   }
 ]

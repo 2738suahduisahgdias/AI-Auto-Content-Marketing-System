@@ -32,6 +32,43 @@ class ProjectTranscriptCase(unittest.TestCase):
         self.assertEqual(result["source_file_id"], 7)
         self.assertEqual(result["duration_seconds"], 1.25)
 
+    def test_transcript_prompt_is_short_and_contains_domain_terms(self):
+        from app import transcript_prompt
+
+        task = {
+            "title": "制造业 AI",
+            "source": {
+                "yingxu": {
+                    "snapshot": {
+                        "manuscript": {
+                            "title": "Claude for Manufacturing",
+                            "text": "报价和质检。Claude、Team、Enterprise、Autodesk Fusion、Infor、Microsoft 365、Oracle NetSuite。",
+                        }
+                    }
+                }
+            },
+        }
+        prompt = transcript_prompt(task)
+        self.assertLessEqual(len(prompt), 200)
+        self.assertIn("Claude", prompt)
+        self.assertIn("Infor", prompt)
+        self.assertIn("报价和质检", prompt)
+
+    def test_whisper_server_sends_manuscript_prompt_to_worker(self):
+        from app import WhisperServer
+
+        process = mock.Mock()
+        process.poll.return_value = None
+        server = WhisperServer.__new__(WhisperServer)
+        server.process = process
+        server.lock = mock.MagicMock()
+        server.events = queue.Queue()
+        server.events.put({"type": "result"})
+        with mock.patch("app.probe_media", return_value={"duration_seconds": 1.0}):
+            server.request("voice.wav", "out.srt", 1, mock.Mock(), "定稿 Claude")
+        request = json.loads(process.stdin.write.call_args.args[0])
+        self.assertEqual("定稿 Claude", request["initial_prompt"])
+
     def test_whisper_server_stop_closes_process(self):
         from app import WhisperServer
 

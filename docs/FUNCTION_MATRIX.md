@@ -117,7 +117,7 @@
 | 原创 | AI 文案候选区 | 按方向生成／改写、候选编辑、采用或保留当前文案 | 无文案时生成，有文案时改写；候选不自动覆盖，采用时保留非空历史版本 | POST `/yingxu-script-candidate`；明确传递 operation、direction、current_text、target_platforms、aspect；历史存入 `manuscript.versions` |
 | 原创 | 文案创作卡 | 确认方案，进入视频生成 | 校验正式文案、平台和画幅后创建／保存并进入旁白；方向不是手写路径必填项 | `/api/tasks` + `/yingxu`；`useVideoProject` 本机草稿和 revision CAS |
 | 原创 | 旁白与时长卡 | 上传真人旁白 | 上传真实音频并显示文件和时长 | POST `/yingxu-files?kind=audio`；`stream_upload` 限制非空／500MB；FFprobe 媒体信息 |
-| 原创 | 旁白与时长卡 | 生成词级时间码 | 后台对旁白生成逐词文本和起止秒数，显示真实阶段、百分比和已用时间；同模型进程复用 | POST `/transcript` → `wb_jobs.project_transcript`；GET `/transcript-jobs/:id`；faster-whisper `--serve` 常驻 worker，按真实分段上报；词级结果写入 snapshot |
+| 原创 | 旁白与时长卡 | 生成词级时间码 | 后台对旁白生成逐词文本和起止秒数，显示真实阶段、百分比和已用时间；同模型进程复用；短术语提示改善中文和品牌识别 | POST `/transcript` → `wb_jobs.project_transcript`；GET `/transcript-jobs/:id`；faster-whisper `--serve` 常驻 worker，`beam_size=5` + 200 字符内开头语境与品牌术语 hotwords；词级结果写入 snapshot，仍需人工校对 |
 | 原创 | 旁白与时长卡 | 词语、开始、结束 | 只读查看转写与同步时间 | `snapshot.transcript.words`；不允许前端手改 |
 | 原创 | 旁白与时长卡 | AI 修改旁白、分段试听 | 两个按钮均明确未接入 | 无后端调用；禁用控件，不计为可用能力 |
 | 原创 | 旁白与时长卡 | 确认旁白与时长 | 转写有效后进入音乐 | `voiceFileId + transcript.words + !transcriptStale` 前端门槛；保存 `/yingxu` |
@@ -130,9 +130,9 @@
 | 原创 | 镜头详情弹窗 | AI 生成版本选择 | 在真实 AI 候选间切换 | `aiCandidateFileIds + fileId + source=ai_video`；本地 `files` 记录 |
 | 原创 | 镜头详情弹窗 | 保存本镜、确认本镜 | 保存不等于确认；有画面或有效 Remotion 代码后才能确认 | `shot.confirmed` + `shot.fileId/source`；`useVideoProject.save` revision |
 | 对标 `/projects/benchmark[/:id]` | 提供参考卡 | 选择参考视频 | 上传真实参考，显示名称与大小 | POST `/yingxu-files?kind=video`；`stream_upload` + FFprobe；不用演示视频 |
-| 对标 | 提供参考卡 | 使用边界、关注重点 | 使用边界必填；关注重点指导拆解并形成标题候选 | POST `/api/tasks {source_type:benchmark}`；`source_json.usage_boundary/focus` |
-| 对标 | 提供参考卡 | 查看拆解报告 | 创建项目并执行真实场景拆分和整片转写 | POST `/benchmark-analyze` → `app.py analyze_benchmark`；FFmpeg `scene=0.25` 场景检测 + Whisper base 整片转写 + 真实关键帧 |
-| 对标 | 拆解报告卡 | 原视频、时间码、逐镜说明 | 保留原片时间码、文本和画面对照 | `benchmark_report` + `shots.original_start/end_seconds` + `keyframe_file_id` |
+| 对标 | 提供参考卡 | 关注重点（可选） | 指导拆解并形成标题候选；不要求使用边界 | POST `/api/tasks {source_type:benchmark}`；`source_json.focus` |
+| 对标 | 提供参考卡 | 查看拆解报告 | 创建项目并执行真实场景拆分、转写或画面字幕识别 | POST `/benchmark-analyze` → `app.py analyze_benchmark`；FFmpeg `scene=0.25` 场景检测 + Whisper base 整片转写 + 真实关键帧；无音轨时 RapidOCR 读取画面文字 |
+| 对标 | 拆解报告卡 | 原视频、时间码、逐镜说明、画面字幕 | 保留原片时间码、文本和画面对照；旁白与画面字幕分开显示 | `benchmark_report` + `shots.original_start/end_seconds` + `keyframe_file_id` + `subtitle_text/subtitle_status` |
 | 对标 | 拆解报告卡 | 用 Kimi 分析关键帧 | 根据实际帧补充视觉分析 | POST `/benchmark-visual-analysis` → 视觉分析 Agent 读取真实图片；不虚构不可见信息 |
 | 对标 | 拆解报告卡 | 报告备注、导出报告 | 保存人工备注并导出真实报告 | snapshot `benchmark_notes`；本地下载当前报告 JSON／文档 |
 | 对标 | 逐镜替换卡 | 选择分镜、逐镜编辑 | 多镜选择或打开单镜处理 | React `checked/selected`；`shotReady` 统一校验 |

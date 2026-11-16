@@ -115,6 +115,55 @@ class VideoProjectCase(unittest.TestCase):
             self.assertIn("keyframe_file_id", shot)
             self.assertIn("visual_observation", shot)
 
+    def test_benchmark_without_boundary_uses_ocr_subtitles_when_no_audio(self):
+        media = self.root / "silent.mp4"
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=c=red:s=360x640:d=1",
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                str(media),
+            ],
+            check=True,
+            capture_output=True,
+        )
+        task = app.create_task({"title": "无音轨对标", "source_type": "benchmark"})
+        with (
+            mock.patch("app.resolved_task_file", return_value=media),
+            mock.patch("app.run_whisperx") as transcribe,
+            mock.patch(
+                "app.run_process",
+                return_value=(
+                    '[{"frame":"scene-01.png","text":"真实画面字幕","confidence":96.0}]',
+                    "",
+                ),
+            ) as ocr,
+            media.open("rb") as handle,
+        ):
+            file = app.upload_file(
+                task, "video", media.name, (handle, media.stat().st_size), studio=True
+            )
+            task["files"].append(file)
+            result = app.analyze_benchmark(task, {"file_id": file["id"]})
+        snapshot = result["source"]["yingxu"]["snapshot"]
+        report = snapshot["benchmark_report"]
+        self.assertEqual("", report["usage_boundary"])
+        self.assertEqual("not_applicable", report["transcript_status"])
+        self.assertEqual("succeeded", report["subtitle_status"])
+        self.assertEqual("真实画面字幕", snapshot["shots"][0]["subtitle_text"])
+        self.assertEqual("", snapshot["shots"][0]["text"])
+        transcribe.assert_not_called()
+        self.assertIn("scene-*.png", ocr.call_args.args[0])
+
     def test_music_adapt_creates_distinct_real_audio_version(self):
         source = self.root / "music.wav"
         subprocess.run(

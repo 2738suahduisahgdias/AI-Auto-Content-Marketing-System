@@ -1990,11 +1990,13 @@ class WhisperServer:
         for _ in self.process.stderr:
             pass
 
-    def request(self, audio_path, output, timeout, progress):
+    def request(self, audio_path, output, timeout, progress, initial_prompt=None):
         with self.lock:
             if self.process.poll() is not None:
                 self.start()
             request = {"audio": str(audio_path), "output": str(output)}
+            if initial_prompt:
+                request["initial_prompt"] = initial_prompt
             self.process.stdin.write(json.dumps(request, ensure_ascii=False) + "\n")
             self.process.stdin.flush()
             duration = probe_media(audio_path, "audio")["duration_seconds"]
@@ -2069,7 +2071,9 @@ def stop_whisper_servers() -> None:
         server.stop()
 
 
-def run_whisperx(audio_path, model, directory, timeout=3600, progress=None):
+def run_whisperx(
+    audio_path, model, directory, timeout=3600, progress=None, initial_prompt=None
+):
     load_media_tools()
     if not WHISPERX_PYTHON.is_file() or not os.access(WHISPERX_PYTHON, os.X_OK):
         raise ApiError(
@@ -2082,7 +2086,11 @@ def run_whisperx(audio_path, model, directory, timeout=3600, progress=None):
         raise ApiError(503, "WhisperX 工作脚本缺失")
     output = directory / "whisperx.srt"
     whisper_server(model).request(
-        audio_path, output, timeout, progress or (lambda stage, value: None)
+        audio_path,
+        output,
+        timeout,
+        progress or (lambda stage, value: None),
+        initial_prompt,
     )
     info = probe_media(output, "srt")
     words_path = output.with_suffix(".words.json")
@@ -2104,6 +2112,14 @@ def test_whisperx():
     return media_ai_status()
 
 
+def transcript_prompt(task):
+    snapshot = task.get("source", {}).get("yingxu", {}).get("snapshot", {})
+    manuscript = snapshot.get("manuscript", {})
+    text = str(manuscript.get("text") or task.get("scripts", {}).get("master") or "")
+    terms = list(dict.fromkeys(re.findall(r"[A-Za-z][A-Za-z0-9]*", text)))
+    return "，".join(part for part in [text[:60], *terms] if part)[:200]
+
+
 def transcribe_audio(task, payload, context=None):
     config = agent_runtime("caption_agent")
     if task.get("source", {}).get("project_type") not in ("original", "benchmark"):
@@ -2121,6 +2137,7 @@ def transcribe_audio(task, payload, context=None):
             conn, task["content_id"], payload.get("file_id"), "audio"
         )
     audio_path = task_file_path(audio_row)
+    initial_prompt = transcript_prompt(task)
     try:
         with tempfile.TemporaryDirectory(prefix="whisperx-task-") as directory:
             srt, info = run_whisperx(
@@ -2129,6 +2146,7 @@ def transcribe_audio(task, payload, context=None):
                 Path(directory),
                 config["timeout_seconds"],
                 context.progress if context else None,
+                initial_prompt,
             )
             timestamp = now()
             final_directory = ROOT / "subtitles" / task["content_id"]
@@ -2369,8 +2387,6 @@ def adapt_project_music(task, payload):
 def analyze_benchmark(task, payload):
     file_row = get_task_file_from_task(task, payload.get("file_id"), "video")
     usage_boundary = str(payload.get("usage_boundary", "")).strip()
-    if not usage_boundary:
-        raise ApiError(400, "请填写参考视频来源与使用边界", "usage_boundary")
     source = resolved_task_file(file_row)
     info = probe_media(source, "video")
     duration = float(info["duration_seconds"])
@@ -2470,6 +2486,47 @@ def analyze_benchmark(task, payload):
                 "original_end_seconds": round(end, 3),
             }
         )
+    subtitle_status = "not_applicable" if audio_present else "unavailable"
+    subtitle_error = ""
+    if not audio_present:
+        from content_workbench.media.tools import ocr_python
+
+        try:
+            python = ocr_python(ROOT)
+            worker = PROJECT_ROOT / "content_workbench/topics/ocr_worker.py"
+            if not python.is_file() or not worker.is_file():
+                raise ApiError(503, "RapidOCR 本地环境未完成")
+            stdout, _ = run_process(
+                [
+                    str(python),
+                    str(worker),
+                    "--frames",
+                    str(report_directory),
+                    "--pattern",
+                    "scene-*.png",
+                ],
+                900,
+                MAX_CLI_OUTPUT,
+                "RapidOCR 读取无音轨画面字幕",
+            )
+            ocr_results = {item["frame"]: item for item in json.loads(stdout)}
+            for shot in shots:
+                frame_name = "scene-{:02d}.png".format(
+                    int(shot["id"].rsplit("-", 1)[1])
+                )
+                evidence = ocr_results.get(frame_name, {})
+                shot["subtitle_text"] = evidence.get("text", "")
+                shot["subtitle_confidence"] = evidence.get("confidence", 0)
+                shot["subtitle_source"] = "rapidocr"
+            subtitle_status = (
+                "succeeded" if any(shot["subtitle_text"] for shot in shots) else "empty"
+            )
+        except (ApiError, json.JSONDecodeError) as error:
+            subtitle_error = (
+                error.message
+                if isinstance(error, ApiError)
+                else "RapidOCR 返回了无效结果"
+            )
     snapshot = {
         **task.get("source", {}).get("yingxu", {}).get("snapshot", {}),
         "shots": shots,
@@ -2482,6 +2539,8 @@ def analyze_benchmark(task, payload):
             "duration_seconds": duration,
             "transcript_status": transcript_status,
             "transcript_error": transcript_error,
+            "subtitle_status": subtitle_status,
+            "subtitle_error": subtitle_error,
             "scene_detection": "ffmpeg_scene_0.25",
         },
     }

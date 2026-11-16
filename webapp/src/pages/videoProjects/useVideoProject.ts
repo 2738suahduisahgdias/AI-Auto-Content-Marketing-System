@@ -34,6 +34,8 @@ export interface ProjectShot {
   original_end_seconds?: number;
   source_start_seconds?: number;
   visual_observation?: string;
+  subtitle_text?: string;
+  subtitle_confidence?: number;
   audio_source?: "original" | "replace" | "mute";
   confirmed?: boolean;
   duration_choice?: "original" | "new";

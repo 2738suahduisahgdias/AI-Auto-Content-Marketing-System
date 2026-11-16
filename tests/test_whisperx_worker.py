@@ -168,8 +168,10 @@ class WhisperXWorkerCase(unittest.TestCase):
             ):
                 runpy.run_path("workers/whisperx_worker.py", run_name="__main__")
             self.assertEqual(5, calls[0]["beam_size"])
-            self.assertEqual("定稿 Claude for Manufacturing", calls[0]["initial_prompt"])
-            self.assertNotIn("hotwords", calls[0])
+            self.assertEqual(
+                "定稿 Claude for Manufacturing", calls[0]["initial_prompt"]
+            )
+            self.assertEqual("定稿 Claude for Manufacturing", calls[0]["hotwords"])
 
 
 if __name__ == "__main__":

@@ -12,36 +12,36 @@ type SnapshotUpdate = (patch: Partial<ProjectSnapshot>) => void;
 
 interface BenchmarkReport {
   source_file_id: number;
-  usage_boundary: string;
   focus?: string;
   duration_seconds: number;
   transcript_status: "succeeded" | "not_applicable" | "unavailable";
   transcript_error?: string;
+  subtitle_status?: "succeeded" | "empty" | "unavailable" | "not_applicable";
+  subtitle_error?: string;
   scene_detection: string;
 }
 
-async function analyzeReference(task: Task, file: File, usageBoundary: string, focus: string) {
+async function analyzeReference(task: Task, file: File, focus: string) {
   const uploaded = await uploadProjectFile(task, file, "video");
-  return api<Task>(`/api/tasks/${task.content_id}/benchmark-analyze`, jsonOptions("POST", { file_id: uploaded.id, usage_boundary: usageBoundary, focus }));
+  return api<Task>(`/api/tasks/${task.content_id}/benchmark-analyze`, jsonOptions("POST", { file_id: uploaded.id, focus }));
 }
 
 export function CreateBenchmark({ onCreated }: { onCreated: (task: Task) => void }) {
   const { refresh } = useApp();
-  const [usage, setUsage] = useState("");
   const [focus, setFocus] = useState("");
   const [file, setFile] = useState<File>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function create() {
-    if (!usage.trim() || !file) { setError("请选择真实参考视频，并填写素材来源与使用边界"); return; }
+    if (!file) { setError("请选择真实参考视频"); return; }
     setBusy(true); setError("");
     try {
       const task = await api<Task>("/api/tasks", jsonOptions("POST", {
-        title: focus.trim().slice(0, 60) || usage.trim().slice(0, 60) || "对标项目",
-        source_type: "benchmark", usage_boundary: usage.trim(), focus: focus.trim(),
+        title: focus.trim().slice(0, 60) || file.name.replace(/\.[^.]+$/, "").slice(0, 60) || "对标项目",
+        source_type: "benchmark", focus: focus.trim(),
       }));
-      const analyzed = await analyzeReference(task, file, usage.trim(), focus.trim());
+      const analyzed = await analyzeReference(task, file, focus.trim());
       await refresh();
       onCreated(analyzed);
     } catch (cause) { setError(cause instanceof Error ? `${cause.message}。若项目已创建，可从项目首页继续，不会丢失已上传文件。` : "创建或拆解失败"); }
@@ -49,12 +49,11 @@ export function CreateBenchmark({ onCreated }: { onCreated: (task: Task) => void
   }
 
   return <Card>
-    <div className="card-head"><div><h2>提供参考视频 <Help title="对标的起点"><p>输入参考视频：确认素材来源与使用边界。</p><p>还原逐镜分镜：保留时间码和关键帧。</p><p>获得拆解报告：可独立完成，不必制作视频。</p></Help></h2><p className="sub">先分析原视频，报告可独立完成。</p></div><Badge>当前步骤</Badge></div>
+    <div className="card-head"><div><h2>提供参考视频 <Help title="对标的起点"><p>输入参考视频：选择需要拆解的视频。</p><p>还原逐镜分镜：保留时间码和关键帧。</p><p>获得拆解报告：可独立完成，不必制作视频。</p></Help></h2><p className="sub">先分析原视频，报告可独立完成。</p></div><Badge>当前步骤</Badge></div>
     <UploadPanel label="选择参考视频" accept="video/*" disabled={busy} onFile={setFile} />
     {file && <p className="sub">{file.name} · {(file.size / 1024 / 1024).toFixed(2)} MB</p>}
-    <div className="video-project-field"><label className="video-project-field-label" htmlFor="benchmark-usage">使用边界 <span className="video-project-required">*</span></label><input id="benchmark-usage" className="input" value={usage} onChange={event => setUsage(event.target.value)} placeholder="说明视频来源及允许的使用范围" /></div>
     <div className="video-project-field"><label className="video-project-field-label" htmlFor="benchmark-focus">关注重点 <span className="quiet">可选</span></label><input id="benchmark-focus" className="input" value={focus} onChange={event => setFocus(event.target.value)} placeholder="例如：叙事结构、镜头节奏、声音" /></div>
-    <div className="video-project-note">报告会真实切分场景、提取关键帧并尝试整片转写。没有音轨会标为不适用；可在报告中用 Kimi 分析关键帧，无法确认的信息仍需人工补充。</div>
+    <div className="video-project-note">报告会真实切分场景、提取关键帧并尝试整片转写。没有音轨时读取画面字幕；可在报告中用 Kimi 分析关键帧，无法确认的信息仍需人工补充。</div>
     {error && <p className="video-project-error" role="alert">{error}</p>}
     <Button variant="primary" disabled={busy} onClick={() => void create()}>{busy ? "正在上传并真实拆解…" : "查看拆解报告 →"}</Button>
   </Card>;
@@ -68,10 +67,9 @@ function ReferenceStage({ task, snapshot, update, adoptTask, onNext }: { task: T
   const reference = (task.files as ProjectFile[]).find(file => file.id === report?.source_file_id);
 
   async function uploadAndAnalyze(file: File) {
-    if (!snapshot.usage_boundary?.trim()) { setError("请先填写素材来源与使用边界"); return; }
     setBusy(true); setError("");
     try {
-      const result = await analyzeReference(task, file, snapshot.usage_boundary!.trim(), String(report?.focus || snapshot.focus || ""));
+      const result = await analyzeReference(task, file, String(report?.focus || snapshot.focus || ""));
       await refresh();
       adoptTask(result);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "拆解失败"); }
@@ -79,11 +77,10 @@ function ReferenceStage({ task, snapshot, update, adoptTask, onNext }: { task: T
   }
 
   return <Card>
-    <div className="card-head"><div><h2>提供参考视频 <Help title="对标的起点"><p>输入参考视频：确认素材来源与使用边界。</p><p>还原逐镜分镜：保留时间码和关键帧。</p><p>获得拆解报告：可独立完成，不必制作视频。</p></Help></h2><p className="sub">先分析原视频，报告可独立完成。</p></div><Badge>{report ? "已有报告" : "当前步骤"}</Badge></div>
+    <div className="card-head"><div><h2>提供参考视频 <Help title="对标的起点"><p>输入参考视频：选择需要拆解的视频。</p><p>还原逐镜分镜：保留时间码和关键帧。</p><p>获得拆解报告：可独立完成，不必制作视频。</p></Help></h2><p className="sub">先分析原视频，报告可独立完成。</p></div><Badge>{report ? "已有报告" : "当前步骤"}</Badge></div>
     {reference && <div className="video-project-media"><video controls src={reference.url} aria-label="当前参考视频" /><MediaSummary file={reference} /></div>}
-    <div className="video-project-field"><label className="video-project-field-label" htmlFor="existing-usage">使用边界 <span className="video-project-required">*</span></label><input id="existing-usage" className="input" value={snapshot.usage_boundary || ""} onChange={event => update({ usage_boundary: event.target.value, finalApprovedFileId: undefined })} placeholder="说明视频来源及允许的使用范围" /></div>
     <div className="video-project-field"><label className="video-project-field-label" htmlFor="existing-focus">关注重点 <span className="quiet">可选</span></label><input id="existing-focus" className="input" value={report?.focus || snapshot.focus || ""} onChange={event => update({ focus: event.target.value })} placeholder="例如：叙事结构、镜头节奏、声音" /></div>
-    <div className="video-project-note">当前分析在本机完成，不向外部视觉模型发送素材。分析不等于获得原片复用授权。</div>
+    <div className="video-project-note">当前分析在本机完成，不向外部视觉模型发送素材。</div>
     <UploadPanel label={reference ? "上传新参考并重新拆解" : "选择参考视频"} accept="video/*" disabled={busy} onFile={file => void uploadAndAnalyze(file)} />
     {busy && <p role="status">正在真实切分场景、提取关键帧并转写整片语音；请不要关闭页面。</p>}
     {error && <p className="video-project-error" role="alert">{error}</p>}
@@ -132,13 +129,13 @@ export function ReportStage({ task, snapshot, update, onBack, onNext }: { task: 
   if (!report || !reference) return <Card><Empty title="还没有可查看的拆解报告" description="返回上一步上传真实参考视频。" action={<Button onClick={onBack}>返回提供参考</Button>} /></Card>;
   return <>
     <Card>
-      <div className="card-head"><div><h2>拆解报告 <Help title="证据与限制"><p>完整视频：点击镜头定位原片。</p><p>逐镜说明：时间码与画面特征。</p><p>缺失信息：不可获取的数据不虚构。</p></Help></h2><p className="sub">完整视频与逐镜说明；点击镜头跳转对应时间。</p></div><Badge tone={report.transcript_status === "succeeded" ? "green" : "orange"}>{report.transcript_status === "succeeded" ? "转写成功" : report.transcript_status === "not_applicable" ? "无音轨 · 不适用" : "转写不可用"}</Badge></div>
+      <div className="card-head"><div><h2>拆解报告 <Help title="证据与限制"><p>完整视频：点击镜头定位原片。</p><p>逐镜说明：时间码与画面特征。</p><p>缺失信息：不可获取的数据不虚构。</p></Help></h2><p className="sub">完整视频与逐镜说明；点击镜头跳转对应时间。</p></div><Badge tone={report.transcript_status === "succeeded" || report.subtitle_status === "succeeded" ? "green" : "orange"}>{report.transcript_status === "succeeded" ? "转写成功" : report.subtitle_status === "succeeded" ? "无音轨 · 画面字幕" : report.transcript_status === "not_applicable" ? "无音轨 · 不适用" : "转写不可用"}</Badge></div>
       <div className="video-project-original"><strong>完整参考视频</strong><div className="video-project-media"><video ref={player} controls src={reference.url} aria-label="拆解报告完整视频" /></div><p className="sub">{snapshot.shots.length} 镜 · {report.duration_seconds.toFixed(2)} 秒 · 整片转写 {snapshot.transcript_runs || 0} 次；点击下方镜头跳转并播放。</p></div>
-      <div className="video-project-note"><strong>使用边界</strong><p>{report.usage_boundary}</p>{report.focus && <p>关注重点：{report.focus}</p>}<p>{report.transcript_status === "unavailable" ? `转写未完成：${report.transcript_error || "原因待确认"}` : report.transcript_status === "not_applicable" ? "参考视频没有音轨，不生成虚构旁白。" : "转写文本按词级时间与镜头范围对应。"}</p></div>
+      <div className="video-project-note"><strong>报告说明</strong>{report.focus && <p>关注重点：{report.focus}</p>}<p>{report.transcript_status === "unavailable" ? `转写未完成：${report.transcript_error || "原因待确认"}` : report.transcript_status === "not_applicable" ? "参考视频没有音轨，旁白不适用；画面文字通过 RapidOCR 读取，不等同于口播。" : "转写文本按词级时间与镜头范围对应。"}</p>{report.subtitle_error && <p>画面字幕读取未完成：{report.subtitle_error}</p>}</div>
       <h3>逐镜说明</h3><div className="video-project-shot-grid">{snapshot.shots.map((shot, index) => <article className="video-project-shot" key={shot.id || index} role="button" tabIndex={0} aria-label={`镜头 ${index + 1}，跳转到 ${shot.original_start_seconds ?? 0} 秒`} onClick={() => playShot(shot)} onKeyDown={event => { if (event.key === "Enter" && event.target === event.currentTarget) playShot(shot); }}>
         {shot.keyframe_file_id && <img src={`/api/files/${shot.keyframe_file_id}/media`} alt={`镜头 ${index + 1} 真实关键帧`} />}
         <strong>{shot.title || `镜头 ${index + 1}`} · {shot.original_start_seconds ?? 0}–{shot.original_end_seconds ?? shot.duration} 秒</strong>
-        <small>画面特征：{shot.visual_observation || "待人工补充"}</small><small>镜头说明：{shot.desc || "待人工补充"}</small><small>旁白：{shot.text || (report.transcript_status === "not_applicable" ? "不适用" : "未识别到文本，待核实")}</small>
+        <small>画面特征：{shot.visual_observation || "待人工补充"}</small><small>镜头说明：{shot.desc || "待人工补充"}</small><small>旁白：{shot.text || (report.transcript_status === "not_applicable" ? "不适用" : "未识别到文本，待核实")}</small>{report.transcript_status === "not_applicable" && <small>画面字幕：{shot.subtitle_text || "未识别到画面文字"}</small>}
         <details onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}><summary>编辑本镜说明</summary><textarea className="textarea" aria-label={`镜头 ${index + 1} 报告说明`} value={shot.desc} onChange={event => update({ shots: snapshot.shots.map((item, position) => position === index ? { ...item, desc: event.target.value } : item) })} /></details>
       </article>)}</div>
       {error && <p className="video-project-error" role="alert">{error}</p>}

@@ -7,7 +7,7 @@ import { AppShell } from "../../components/AppShell";
 import VideoProjectHome from "./VideoProjectHome";
 import OriginalProject, { CreateOriginal, NarrationStage } from "./OriginalProject";
 import { MusicStage, SampleStage } from "./ProjectShared";
-import { ReportStage, ShotEditor } from "./BenchmarkProject";
+import { CreateBenchmark, ReportStage, ShotEditor } from "./BenchmarkProject";
 import { projectType, sampleApproved, shotReady, type ProjectFile, type ProjectSnapshot } from "./useVideoProject";
 
 const state = vi.hoisted(() => ({
@@ -230,6 +230,27 @@ describe("词级时间码后台进度", () => {
 });
 
 describe("对标报告与逐镜版本", () => {
+  it("新建对标不要求使用边界", () => {
+    render(<CreateBenchmark onCreated={vi.fn()} />);
+    expect(screen.queryByLabelText(/使用边界/)).not.toBeInTheDocument();
+    expect(screen.getByText("选择参考视频")).toBeInTheDocument();
+  });
+
+  it("无音轨时展示真实画面字幕而不是未识别旁白", () => {
+    const reference = makeFile(1);
+    const snapshot = makeSnapshot({
+      workflow_stage: 1,
+      transcript_runs: 0,
+      benchmark_report: { source_file_id: 1, duration_seconds: 8, transcript_status: "not_applicable", subtitle_status: "succeeded", scene_detection: "ffmpeg_scene_0.25" },
+      shots: [{ id: "scene-1", title: "镜头 01", text: "", subtitle_text: "真实画面字幕", desc: "人工说明", visual_observation: "真实关键帧", duration: 2, source: "reference", original_start_seconds: 0, original_end_seconds: 2 }],
+    });
+    render(<ReportStage task={makeTask({ files: [reference] })} snapshot={snapshot} update={vi.fn()} onBack={vi.fn()} onNext={vi.fn()} />);
+    expect(screen.getByText("画面字幕：真实画面字幕")).toBeInTheDocument();
+    expect(screen.getByText("旁白：不适用")).toBeInTheDocument();
+    expect(screen.queryByText(/未识别到文本/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/使用边界/)).not.toBeInTheDocument();
+  });
+
   it("点击报告卡片跳转到该镜真实开始时间", async () => {
     const play = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(HTMLMediaElement.prototype, "play", { configurable: true, value: play });

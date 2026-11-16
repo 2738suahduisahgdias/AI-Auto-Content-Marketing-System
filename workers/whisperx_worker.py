@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import argparse
 import json
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional, TextIO
+from typing import TextIO
 
 from faster_whisper import WhisperModel
 
@@ -24,17 +27,20 @@ def transcribe_audio_file(
     model: object,
     audio_path: Path,
     output_path: Path,
-    progress: Optional[Callable[[str, dict], None]] = None,
+    progress: Callable[[str, dict], None] | None = None,
+    initial_prompt: str | None = None,
 ) -> None:
     if progress:
         progress("transcribing", {"completed_seconds": 0.0})
     segments, _ = model.transcribe(
         str(audio_path),
         language="zh",
-        beam_size=1,
+        beam_size=5,
         vad_filter=False,
         word_timestamps=True,
         condition_on_previous_text=False,
+        initial_prompt=initial_prompt or None,
+        hotwords=initial_prompt or None,
     )
     lines = []
     words = []
@@ -90,6 +96,7 @@ def serve(model_name: str, input_stream: TextIO, output_stream: TextIO) -> None:
                 lambda stage, payload: emit(
                     output_stream, "progress", {"stage": stage, **payload}
                 ),
+                request.get("initial_prompt"),
             )
             emit(output_stream, "progress", {"stage": "writing"})
             emit(
@@ -107,6 +114,7 @@ def main():
     parser.add_argument("--output")
     parser.add_argument("--model", default="base")
     parser.add_argument("--language", default="zh")
+    parser.add_argument("--initial-prompt")
     parser.add_argument("--chunk-seconds", type=int, default=30)
     parser.add_argument("--serve", action="store_true")
     args = parser.parse_args()
@@ -122,10 +130,12 @@ def main():
     segments, _ = model.transcribe(
         str(audio_path),
         language=args.language,
-        beam_size=1,
+        beam_size=5,
         vad_filter=False,
         word_timestamps=True,
         condition_on_previous_text=False,
+        initial_prompt=args.initial_prompt or None,
+        hotwords=args.initial_prompt or None,
     )
     lines = []
     words = []

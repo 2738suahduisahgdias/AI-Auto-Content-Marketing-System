@@ -114,6 +114,15 @@
     "title": "小红书真实视频与图文下载验收",
     "summary": "修复 Python 3.9 兼容和探测终态丢失，使用固定 Chrome 读取实际媒体并完成一个真实视频与一组真实图文的下载、路径和系统操作验收。",
     "record": "iterations/2026-11-16-xiaohongshu-download-acceptance.md",
+    "current": false
+  },
+  {
+    "version": "v0.14.0",
+    "id": "2026-11-16-transcript-and-benchmark-subtitles",
+    "date": "2026-11-16",
+    "title": "原创转写修复与对标画面字幕",
+    "summary": "原创词级时间码改用短术语提示和稳定识别参数；对标移除使用边界，并在无音轨时以 RapidOCR 读取真实画面字幕。",
+    "record": "iterations/2026-11-16-transcript-and-benchmark-subtitles.md",
     "current": true
   }
 ]

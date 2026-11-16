@@ -1976,8 +1976,8 @@
             },
             {
               "element": "生成词级时间码",
-              "description": "后台对旁白生成逐词文本和起止秒数，显示真实阶段、百分比和已用时间；同模型进程复用",
-              "technology": "POST `/transcript` → `wb_jobs.project_transcript`；GET `/transcript-jobs/:id`；faster-whisper `--serve` 常驻 worker，按真实分段上报；词级结果写入 snapshot",
+              "description": "后台对旁白生成逐词文本和起止秒数，显示真实阶段、百分比和已用时间；同模型进程复用；短术语提示改善中文和品牌识别",
+              "technology": "POST `/transcript` → `wb_jobs.project_transcript`；GET `/transcript-jobs/:id`；faster-whisper `--serve` 常驻 worker，`beam_size=5` + 200 字符内开头语境与品牌术语 hotwords；词级结果写入 snapshot，仍需人工校对",
               "id": "P10-C04-F02"
             },
             {
@@ -2243,7 +2243,7 @@
         {
           "order": 2,
           "card": "拆解报告卡",
-          "task": "保留原片时间码、文本和画面对照"
+          "task": "保留原片时间码、文本和画面对照；旁白与画面字幕分开显示"
         },
         {
           "order": 3,
@@ -2293,15 +2293,15 @@
               "id": "P11-C01-F01"
             },
             {
-              "element": "使用边界、关注重点",
-              "description": "使用边界必填；关注重点指导拆解并形成标题候选",
-              "technology": "POST `/api/tasks {source_type:benchmark}`；`source_json.usage_boundary/focus`",
+              "element": "关注重点（可选）",
+              "description": "指导拆解并形成标题候选；不要求使用边界",
+              "technology": "POST `/api/tasks {source_type:benchmark}`；`source_json.focus`",
               "id": "P11-C01-F02"
             },
             {
               "element": "查看拆解报告",
-              "description": "创建项目并执行真实场景拆分和整片转写",
-              "technology": "POST `/benchmark-analyze` → `app.py analyze_benchmark`；FFmpeg `scene=0.25` 场景检测 + Whisper base 整片转写 + 真实关键帧",
+              "description": "创建项目并执行真实场景拆分、转写或画面字幕识别",
+              "technology": "POST `/benchmark-analyze` → `app.py analyze_benchmark`；FFmpeg `scene=0.25` 场景检测 + Whisper base 整片转写 + 真实关键帧；无音轨时 RapidOCR 读取画面文字",
               "id": "P11-C01-F03"
             }
           ]
@@ -2311,9 +2311,9 @@
           "title": "拆解报告卡",
           "rows": [
             {
-              "element": "原视频、时间码、逐镜说明",
-              "description": "保留原片时间码、文本和画面对照",
-              "technology": "`benchmark_report` + `shots.original_start/end_seconds` + `keyframe_file_id`",
+              "element": "原视频、时间码、逐镜说明、画面字幕",
+              "description": "保留原片时间码、文本和画面对照；旁白与画面字幕分开显示",
+              "technology": "`benchmark_report` + `shots.original_start/end_seconds` + `keyframe_file_id` + `subtitle_text/subtitle_status`",
               "id": "P11-C02-F01"
             },
             {
