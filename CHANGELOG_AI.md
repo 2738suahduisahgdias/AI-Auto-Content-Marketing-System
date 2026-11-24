@@ -6,6 +6,7 @@
 - 抖音、小红书登录改用确定性 Playwright 路径，抖音 worker 通过 `python -m` 从项目根执行；热点、收藏和详情采集仍保留 Kimi，未宣称恢复。
 - 小红书真实任务已 `succeeded` 且 `login_verified=true`；抖音真实任务已稳定进入 `waiting_for_user_login`，待本人扫码。直接 `login_required` 检查后专用 Chrome 仍保持同一进程。
 - 最终相关 83 项 unittest 通过。详见 `docs/modules/integrations.md` 的补充记录。
+- GitHub 提交 `333735a64e5d6de5179257b8bee7b4a68f3095b0` 已推送到 `continue-from-fd9e2785`，仅包含本次预览修复与开发记录。
 
 ## 2026-11-24 · 预览平台登录与共享浏览器恢复
 
