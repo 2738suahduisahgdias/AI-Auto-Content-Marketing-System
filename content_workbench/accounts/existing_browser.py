@@ -1,6 +1,7 @@
 import json
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 from content_workbench.accounts.exports import number
 from content_workbench.accounts.platform_worker import (
@@ -709,6 +710,10 @@ def run(action, **kwargs):
         from content_workbench.accounts.local_browser import LocalBrowser
         from content_workbench.storage.db import ROOT
 
-        with LocalBrowser(ROOT / "data/topic-browser-profile") as bridge:
-            return run_with_bridge(bridge, action, **kwargs)
+        def call() -> dict:
+            with LocalBrowser(ROOT / "data/topic-browser-profile") as bridge:
+                return run_with_bridge(bridge, action, **kwargs)
+
+        with ThreadPoolExecutor(max_workers=1, thread_name_prefix="yingxu-browser") as executor:
+            return executor.submit(call).result()
     return run_with_bridge(Bridge(), action, **kwargs)

@@ -123,6 +123,33 @@
     "title": "原创转写修复与对标画面字幕",
     "summary": "原创词级时间码改用短术语提示和稳定识别参数；对标移除使用边界，并在无音轨时以 RapidOCR 读取真实画面字幕。",
     "record": "iterations/2026-11-16-transcript-and-benchmark-subtitles.md",
+    "current": false
+  },
+  {
+    "version": "v0.15.0",
+    "id": "2026-11-24-preview-apfs-model-io-recovery",
+    "date": "2026-11-24",
+    "title": "8847 预览数据库迁移与模型连接恢复",
+    "summary": "将隔离预览数据库从 exFAT 在线备份到独立 APFS 工作区，修复模型测试中的 SQLite I/O 错误，并固化默认启动路径与旧目录回滚方式。",
+    "record": "iterations/2026-11-24-preview-apfs-model-io-recovery.md",
+    "current": false
+  },
+  {
+    "version": "v0.16.0",
+    "id": "2026-11-24-preview-login-shared-browser-worker",
+    "date": "2026-11-24",
+    "title": "预览平台登录与共享浏览器恢复",
+    "summary": "修复预览登录任务无执行器、共享 Chrome 未启用及临时路径检查结束关窗的问题，恢复四平台共用的登录窗口。",
+    "record": "iterations/2026-11-24-preview-login-shared-browser-worker.md",
+    "current": false
+  },
+  {
+    "version": "v0.17.0",
+    "id": "2026-11-24-preview-login-runtime-recovery",
+    "date": "2026-11-24",
+    "title": "登录运行时与真实抖音／小红书任务修复",
+    "summary": "修复预览登录的解释器、事件循环和模块调用问题，抖音与小红书登录改为确定性 Playwright 路径，真实任务分别进入成功与等待本人登录状态。",
+    "record": "iterations/2026-11-24-preview-login-runtime-recovery.md",
     "current": true
   }
 ]

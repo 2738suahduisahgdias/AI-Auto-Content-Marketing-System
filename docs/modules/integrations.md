@@ -55,3 +55,22 @@
 - 已验证：前端 43 个文件、109 项测试和生产构建通过；22 个主要路由在隔离工作区完成渲染盘点。
 - 已验证：后端共 394 项，392 项通过、1 项跳过；`test_codex_missing_binary_is_unavailable` 仍因仓库旧数据库 disk I/O error 失败，未修改旧库，不宣称全绿。
 - 待确认：新专用窗口的真实平台登录、上传读回、安装版覆盖升级及干净客户 Mac。当前源码修改尚未重新打包或覆盖安装版。
+
+
+## 2026-11-24 · 预览登录 worker 与共享 Chrome 修复
+
+- 8847/8876 预览启动缺少 `YINGXU_DEDICATED_CHROME=1`，登录流程可能退回临时 Playwright 或旧 WebBridge；临时路径结束会关闭 context。预览后端现在强制启用共享专用 Chrome，正式 8848 配置不变。
+- 预览 worker 复用现有执行器，注册并允许 `accounts.login`、`topics.login`、`topics.xhs_login`，不再让平台登录任务永久停在 `queued`。
+- 真实页面启动专用 Chrome 后，Playwright 断开仍保留 `127.0.0.1:9223`；依次打开小红书、抖音、视频号和公众号并执行登录判断后，仍为同一个 Chrome PID 76123。未通过登录判断的页面也没有触发关窗。
+- 旧 `topics.login` 已被 worker 接管并进入 `running`；其后的 `accounts.login` 仍按浏览器资源锁排队。浏览器可用不等于四个账号已登录，本人扫码、二次验证、字段和上传读回仍需分别验收。
+- 回归：`test_reliability_repairs` 14 项、`test_dedicated_browser` 与 `test_browser_connection` 11 项、账号采集与 Kimi 浏览器相关 37 项，共 62 项 unittest 通过。未执行 pytest/Ruff，原因同环境工具缺失记录。
+
+
+## 2026-11-24 · 登录运行时补充修复与真实任务结果
+
+- 预览后端改用现有 `playwright_python()` 选择解释器，避免系统 Python 缺少 Playwright；`existing_browser` 的同步本地浏览器调用移到独立新线程，避开 worker 线程中的事件循环。
+- 抖音 `topics.login` 改用 `browser_worker` 确定性检查，小红书 `topics.xhs_login` 改用共享 `existing_browser`。热点、收藏和详情采集仍保留 Kimi 路径，本次没有宣称这些采集已恢复。
+- `browser_worker` 改为从项目根目录通过 `python -m content_workbench.topics.browser_worker` 调用，避免直接文件执行时找不到项目包。
+- 真实小红书任务 `job_089d1d79789f4d299e79` 为 `succeeded`，返回 `login_verified=true`。真实抖音任务 `job_4b944e82fa844d6b922b` 为 `running/waiting_for_user_login`，不再出现 Kimi 空响应、模块导入或 Sync API 错误；本人登录尚待完成。
+- 直接执行 1 秒抖音登录检查返回 `login_required` 后，9223 仍由同一 Chrome PID 76123 监听。窗口保留不等于账号已登录。
+- 最终相关 83 项 unittest 在 Python 3.12 下通过；`datetime.UTC` 测试不使用系统 3.9 运行。pytest/Ruff 仍不可用。

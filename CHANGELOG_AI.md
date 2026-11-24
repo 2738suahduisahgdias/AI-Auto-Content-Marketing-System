@@ -1,5 +1,26 @@
 # AI 迭代记录
 
+## 2026-11-24 · 登录运行时与真实抖音／小红书任务修复
+
+- 预览后端复用 `playwright_python()` 选择隔离解释器；本地同步 Playwright 调用移到独立线程，修复缺少模块和事件循环冲突。
+- 抖音、小红书登录改用确定性 Playwright 路径，抖音 worker 通过 `python -m` 从项目根执行；热点、收藏和详情采集仍保留 Kimi，未宣称恢复。
+- 小红书真实任务已 `succeeded` 且 `login_verified=true`；抖音真实任务已稳定进入 `waiting_for_user_login`，待本人扫码。直接 `login_required` 检查后专用 Chrome 仍保持同一进程。
+- 最终相关 83 项 unittest 通过。详见 `docs/modules/integrations.md` 的补充记录。
+
+## 2026-11-24 · 预览平台登录与共享浏览器恢复
+
+- 8847 预览后端强制启用 `YINGXU_DEDICATED_CHROME=1`，登录检查不再退回检查完即关闭的临时浏览器路径；正式 8848 不变。
+- 预览 worker 注册并允许 `accounts.login`、`topics.login`、`topics.xhs_login`，旧抖音登录任务已被接管，后续账号登录按浏览器资源锁排队。
+- 四个平台页面均实际打开并执行登录判断；未通过判断的页面也没有关窗，Playwright 断开后仍是同一 Chrome PID 76123。未宣称四个账号已登录或上传已验收。
+- 新增共享环境和登录 worker 回归；相关 62 项 unittest 通过。详见 `docs/modules/integrations.md`。
+
+## 2026-11-24 · 8847 预览数据库迁移与模型连接恢复
+
+- 8847/8876 隔离预览的模型测试因 exFAT 工作区出现 SQLite `disk I/O error`；通过 SQLite 在线备份迁移到独立 APFS 工作区，旧预览库和正式 8848 数据均未覆盖。
+- 新旧库 67 张表行数一致，目标库 `integrity_check = ok`、外键错误 0；系统默认模型与脚本 Agent 真实 Kimi CLI 测试均返回 200 并显示成功。
+- `scripts/start-migration-demo.py` 在 APFS 预览库存在时默认使用它，`YINGXU_PREVIEW_ROOT` 仍可覆盖回滚；新增路径选择回归测试，相关 unittest 文件 12 项通过。默认命令真实重启后再次完成模型连接测试。
+- 当前预览路径、日志和回滚限制见 `docs/APFS_MIGRATION.md`。未验证长期高并发、安装版或其他电脑；本机没有可用 pytest/Ruff，未声称执行这两项检查。
+
 ## 2026-11-16 · 原创转写修复与对标画面字幕
 
 - 原创词级时间码使用 `beam_size=5` 和 200 字符内短术语提示，避免长提示触发模型位置编码上限；真实页面不再显示旧版乱码，结果仍需人工校对。

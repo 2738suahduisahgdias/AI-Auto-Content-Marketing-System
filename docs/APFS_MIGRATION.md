@@ -58,3 +58,41 @@ bash scripts/start.sh
 - 继续观察 `data/server.log`（若后续配置持久日志）或服务输出，重点检查 `disk I/O error`。
 - 不为掩盖错误而重复写、清空 WAL 或删除旧库。
 - 如果再次出现持续错误，停止写入并保留当前 APFS 库与回滚备份，再排查磁盘和进程。
+
+
+## 2026-11-24 · 8847 隔离预览迁移与模型 I/O 修复
+
+本次只处理 `http://127.0.0.1:8847/demo/` 及其 `8876` API，不修改正式 8848 工作区。旧日志在模型保存后的测试阶段出现 `sqlite3.OperationalError: disk I/O error`；当时预览库位于 exFAT 的 Samsung_T5，完整性只读检查为 `ok`，因此没有把故障写成数据库损坏或硬盘物理损坏。
+
+### 当前路径与回滚
+
+- 当前预览工作区（APFS）：`/Volumes/EXTERNAL_USB/kimi/storage/YingxuPreviewWorkspace/migration-preview`
+- 当前日志：`/Volumes/EXTERNAL_USB/kimi/storage/YingxuPreviewWorkspace/migration-preview/server.log`
+- 原预览工作区（保留）：`/Volumes/Samsung_T5/kimicode/AI-Auto-Content-Marketing-System/runtime/migration-preview`
+- 正式 8848 与既有 `YingxuDevWorkspace` 未修改。
+
+`scripts/start-migration-demo.py` 现在优先使用显式 `YINGXU_PREVIEW_ROOT`；未设置时，如果上述 APFS 数据库存在则默认使用 APFS，否则沿用原路径。正常启动：
+
+```bash
+python3 scripts/start-migration-demo.py
+```
+
+停止当前预览 API 后，可显式启动到旧目录：
+
+```bash
+YINGXU_PREVIEW_ROOT="/Volumes/Samsung_T5/kimicode/AI-Auto-Content-Marketing-System/runtime/migration-preview" \
+python3 scripts/start-migration-demo.py
+```
+
+旧目录只代表迁移时点，不包含迁移后的新写入。回滚前如需保留新数据，应先另行在线备份当前 APFS 库；不要删除 WAL/SHM 或直接覆盖数据库。
+
+### 迁移与真实验证
+
+- 正常停止旧 `8876` 进程后，使用 SQLite `Connection.backup()` 在线备份，不复制运行中的 WAL/SHM。
+- 新旧库 67 张业务表行数全部一致；目标库 `integrity_check = ok`、`foreign_key_check` 错误 0，授权 `license/state.json` 保留。
+- 页面“保存并测试连接”实际调用成功，显示 `连接测试通过 · kimi_cli`；`POST /api/agents/system-model/test` 为 200。
+- 页面“测试本地连接”实际调用成功，显示脚本生成能力已验证；`POST /api/ai/test` 为 200。
+- 使用不带环境变量的默认命令再次真实重启，随后系统默认模型测试再次通过；新请求只写入 APFS 日志。
+- 路径选择覆盖环境变量优先、APFS 存在和旧路径回退；`tests.test_reliability_repairs` 共 12 项通过。
+
+本次未验证长期高并发稳定性、安装版、其他电脑或物理硬盘健康。本机及现有虚拟环境没有 pytest/Ruff，离线缓存也无 Ruff，未声称运行这两项检查。

@@ -1,3 +1,4 @@
+import importlib.util
 import io
 import sqlite3
 import tempfile
@@ -97,6 +98,74 @@ class Repairs(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 stream_upload(io.BytesIO(b"new"), 3, path)
             self.assertEqual(path.read_bytes(), b"original")
+
+    def test_migration_preview_prefers_apfs_and_honors_override(self) -> None:
+        script = Path(__file__).resolve().parents[1] / "scripts/start-migration-demo.py"
+        spec = importlib.util.spec_from_file_location("start_migration_demo", script)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            repo = root / "project"
+            repo.mkdir()
+            apfs = root / "apfs/migration-preview"
+            fallback = (repo.parents[1] / "runtime/migration-preview").resolve()
+            self.assertEqual(module.preview_root(repo, {}, apfs), fallback)
+            (apfs / "data").mkdir(parents=True)
+            (apfs / "data/content-agent.db").touch()
+            self.assertEqual(module.preview_root(repo, {}, apfs), apfs.resolve())
+            override = root / "override"
+            self.assertEqual(
+                module.preview_root(repo, {"YINGXU_PREVIEW_ROOT": str(override)}, apfs),
+                override.resolve(),
+            )
+
+    def test_migration_preview_forces_shared_browser_environment(self) -> None:
+        script = Path(__file__).resolve().parents[1] / "scripts/start-migration-demo.py"
+        spec = importlib.util.spec_from_file_location("start_migration_demo", script)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as folder:
+            preview = Path(folder) / "migration-preview"
+            environment = module.preview_environment(
+                preview,
+                {"YINGXU_DEDICATED_CHROME": "0"},
+            )
+        self.assertEqual(environment["YINGXU_DEDICATED_CHROME"], "1")
+        self.assertEqual(environment["CONTENT_AGENT_ROOT"], str(preview))
+        self.assertEqual(
+            environment["CONTENT_AGENT_DB"],
+            str(preview / "data/content-agent.db"),
+        )
+
+    def test_migration_preview_uses_playwright_python(self) -> None:
+        script = Path(__file__).resolve().parents[1] / "scripts/start-migration-demo.py"
+        spec = importlib.util.spec_from_file_location("start_migration_demo", script)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        binary = Path("/tmp/preview-python")
+        with patch.object(module, "playwright_python", return_value=binary):
+            self.assertEqual(module.preview_python(Path("/tmp/project")), str(binary))
+        with patch.object(module, "playwright_python", return_value=None):
+            with self.assertRaisesRegex(SystemExit, "Playwright"):
+                module.preview_python(Path("/tmp/project"))
+
+    def test_migration_preview_registers_login_workers(self) -> None:
+        script = Path(__file__).resolve().parents[1] / "scripts/run-migration-preview.py"
+        spec = importlib.util.spec_from_file_location("run_migration_preview", script)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        for kind in ("accounts.login", "topics.login", "topics.xhs_login"):
+            self.assertIn(kind, module.PREVIEW_EXECUTOR_KINDS)
+            self.assertIn(kind, module.PREVIEW_WORKER_KINDS)
 
     def test_disconnected_mutating_request_does_not_write_another_error(self):
         import app

@@ -1,12 +1,60 @@
-import os
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import importlib
 import importlib.util
+import os
 import platform
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
 from content_workbench.accounts.snapshot_rules import snapshot_has_data
 from content_workbench.storage.db import PROJECT_ROOT, connect, loads
+
+
+def playwright_python(root: Path) -> Path | None:
+    root = Path(root)
+    slim = os.environ.get("CONTENT_AGENT_SLIM") == "1"
+    desktop = os.environ.get("CONTENT_AGENT_DESKTOP") == "1"
+    if slim or desktop:
+        try:
+            importlib.import_module("playwright.sync_api")
+        except (ImportError, OSError):
+            if slim:
+                return None
+        else:
+            return Path(sys.executable)
+    if slim:
+        return None
+    candidates = []
+    if desktop:
+        candidates.append(PROJECT_ROOT / "python/bin/python3.9")
+    else:
+        for base in (root, PROJECT_ROOT):
+            environment = base / ".venv-topics"
+            candidates.extend((environment / "Scripts/python.exe", environment / "bin/python"))
+        candidates.append(Path(sys.executable))
+    checked = set()
+    for candidate in candidates:
+        if candidate in checked:
+            continue
+        checked.add(candidate)
+        if not candidate.is_file() or not os.access(candidate, os.X_OK):
+            continue
+        try:
+            result = subprocess.run(
+                [str(candidate), "-c", "from playwright.sync_api import sync_playwright"],
+                capture_output=True,
+                check=False,
+                timeout=15,
+            )
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if result.returncode == 0:
+            return candidate
+    return None
 
 
 def chrome_candidates():

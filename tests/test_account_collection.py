@@ -1,4 +1,7 @@
+import asyncio
+import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -13,6 +16,7 @@ from content_workbench.accounts.existing_browser import (
     data_period,
     douyin_content_metrics,
     metric,
+    run as run_existing_browser,
     verified,
     xhs_card_title,
 )
@@ -280,6 +284,27 @@ class AccountCollectionCase(unittest.TestCase):
         self.assertIn("STRUCTURE_CHANGED", data["error_types"])
         self.assertEqual("STRUCTURE_CHANGED", error_type("strict mode violation"))
         self.assertEqual("LOGIN_REQUIRED", error_type("需要扫码登录"))
+
+    def test_local_browser_runs_outside_asyncio_loop(self) -> None:
+        bridge = mock.Mock()
+        local = mock.MagicMock()
+        local.__enter__.return_value = bridge
+        caller = threading.get_ident()
+        browser_module = mock.Mock()
+        browser_module.LocalBrowser = mock.Mock(return_value=local)
+        with (
+            mock.patch.dict("os.environ", {"YINGXU_DEDICATED_CHROME": "1"}, clear=True),
+            mock.patch.dict(sys.modules, {"content_workbench.accounts.local_browser": browser_module}),
+            mock.patch(
+                "content_workbench.accounts.existing_browser.run_with_bridge",
+                side_effect=lambda _bridge, _action, **_kwargs: {"thread": threading.get_ident()},
+            ),
+        ):
+            async def invoke() -> dict:
+                return run_existing_browser("xiaohongshu_login")
+
+            result = asyncio.run(invoke())
+        self.assertNotEqual(result["thread"], caller)
 
     def test_ontology_supports_agent_filters_and_verification_boundaries(self):
         entities = collection_ontology()["entities"]

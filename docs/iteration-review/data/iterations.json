@@ -544,5 +544,95 @@
       "evidence/benchmark-ocr-subtitles.png",
       "iterations/2026-11-16-transcript-and-benchmark-subtitles.md"
     ]
+  },
+  {
+    "id": "2026-11-24-preview-apfs-model-io-recovery",
+    "date": "2026-11-24",
+    "title": "8847 预览数据库迁移与模型连接恢复",
+    "summary": "将隔离预览数据库从 exFAT 在线备份到独立 APFS 工作区，修复模型测试中的 SQLite I/O 错误，并固化默认启动路径与旧目录回滚方式。",
+    "changes": [
+      "8847/8876 预览库迁移到 /Volumes/EXTERNAL_USB/kimi/storage/YingxuPreviewWorkspace/migration-preview，旧库和正式 8848 未覆盖。",
+      "scripts/start-migration-demo.py 在 APFS 预览库存在时默认使用它，YINGXU_PREVIEW_ROOT 仍可覆盖。",
+      "新增路径选择回归测试，并在 docs/APFS_MIGRATION.md 记录验证、日志和回滚边界。"
+    ],
+    "verification": [
+      "新旧库 67 张表行数一致，目标库 integrity_check 为 ok、外键错误 0。",
+      "系统默认模型和脚本 Agent 均实际调用 Kimi CLI 成功，对应 POST 接口均为 200。",
+      "不带环境变量的默认命令真实重启后再次完成模型测试；相关 unittest 文件 12 项通过。"
+    ],
+    "unverified": [
+      "未验证长期高并发、安装版、其他电脑或物理硬盘健康。",
+      "本机没有可用 pytest/Ruff，未声称执行这两项检查。",
+      "旧目录不包含迁移后的新写入，回滚前需另行备份 APFS 新数据。"
+    ],
+    "files": [
+      "scripts/start-migration-demo.py",
+      "tests/test_reliability_repairs.py",
+      "docs/APFS_MIGRATION.md",
+      "CHANGELOG_AI.md",
+      "docs/iteration-review/iterations/2026-11-24-preview-apfs-model-io-recovery.md"
+    ]
+  },
+  {
+    "id": "2026-11-24-preview-login-shared-browser-worker",
+    "date": "2026-11-24",
+    "title": "预览平台登录与共享浏览器恢复",
+    "summary": "修复预览登录任务无执行器、共享 Chrome 未启用及临时路径检查结束关窗的问题，恢复四平台共用的登录窗口。",
+    "changes": [
+      "预览后端强制启用 YINGXU_DEDICATED_CHROME=1，正式 8848 不变。",
+      "预览 worker 注册并允许 accounts.login、topics.login、topics.xhs_login。",
+      "新增共享环境和登录 worker 回归测试，并更新接入模块记录。"
+    ],
+    "verification": [
+      "旧 topics.login 已 running，后续账号登录按浏览器资源锁排队。",
+      "四个平台页面均实际打开并执行登录判断，未通过判断的页面也未关窗，最后仍是同一 Chrome PID 76123。",
+      "相关 62 项 unittest 通过。"
+    ],
+    "unverified": [
+      "未宣称四个账号已登录；本人扫码、二次验证、字段和上传读回仍需分别验收。",
+      "后续 accounts.login 尚未轮到执行。",
+      "未验证安装版或其他电脑；pytest/Ruff 不可用。"
+    ],
+    "files": [
+      "scripts/start-migration-demo.py",
+      "scripts/run-migration-preview.py",
+      "tests/test_reliability_repairs.py",
+      "docs/modules/integrations.md",
+      "CHANGELOG_AI.md",
+      "docs/iteration-review/iterations/2026-11-24-preview-login-shared-browser-worker.md"
+    ]
+  },
+  {
+    "id": "2026-11-24-preview-login-runtime-recovery",
+    "date": "2026-11-24",
+    "title": "登录运行时与真实抖音／小红书任务修复",
+    "summary": "修复预览登录的解释器、事件循环和模块调用问题，抖音与小红书登录改为确定性 Playwright 路径，真实任务分别进入成功与等待本人登录状态。",
+    "changes": [
+      "预览后端复用 playwright_python() 选择隔离解释器，本地同步浏览器调用移到独立新线程。",
+      "抖音 topics.login 使用 browser_worker，小红书 topics.xhs_login 使用共享 existing_browser；采集仍保留 Kimi。",
+      "browser_worker 从项目根目录以 python -m 调用，修复模块导入路径。"
+    ],
+    "verification": [
+      "小红书任务 job_089d1d79789f4d299e79 为 succeeded，login_verified=true。",
+      "抖音任务 job_4b944e82fa844d6b922b 为 running/waiting_for_user_login，不再发生 Kimi 空响应、模块导入或 Sync API 错误。",
+      "直接 login_required 检查后 9223 仍由同一 Chrome PID 76123 监听；相关 83 项 unittest 通过。"
+    ],
+    "unverified": [
+      "抖音本人扫码和登录成功尚未完成，当前只是正确等待。",
+      "热点、收藏和详情仍走 Kimi，本次未验证这些采集，也未处理其动态工具加载问题。",
+      "小红书全量同步、四个账号全部登录、上传读回、安装版和其他电脑未验证；pytest/Ruff 不可用。"
+    ],
+    "files": [
+      "scripts/start-migration-demo.py",
+      "scripts/run-migration-preview.py",
+      "content_workbench/accounts/existing_browser.py",
+      "content_workbench/topics/executors.py",
+      "tests/test_reliability_repairs.py",
+      "tests/test_account_collection.py",
+      "tests/test_topics.py",
+      "docs/modules/integrations.md",
+      "CHANGELOG_AI.md",
+      "docs/iteration-review/iterations/2026-11-24-preview-login-runtime-recovery.md"
+    ]
   }
 ]

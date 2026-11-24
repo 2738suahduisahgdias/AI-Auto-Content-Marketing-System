@@ -50,7 +50,7 @@ class TopicExecutors:
         wait_seconds=30,
     ):
         config = require_agent_enabled(self.service.db_path, "hotspot_agent")
-        if action in ("hot", "favorites", "login", "details"):
+        if action in ("hot", "favorites", "details"):
             from content_workbench.topics.kimi_browser import KimiBrowserCollector
 
             context.progress(stage, None)
@@ -63,7 +63,8 @@ class TopicExecutors:
             python = Path(sys.executable)
         arguments = [
             str(python),
-            str(PROJECT_ROOT / "content_workbench/topics/browser_worker.py"),
+            "-m",
+            "content_workbench.topics.browser_worker",
             "--action",
             action,
             "--profile",
@@ -83,7 +84,7 @@ class TopicExecutors:
             arguments,
             timeout=min(config["timeout_seconds"], max(120, wait_seconds + 120)),
             stage=stage,
-            cwd=self.root,
+            cwd=PROJECT_ROOT,
         )
         try:
             result = json.loads(stdout.strip().splitlines()[-1])
@@ -447,9 +448,17 @@ class TopicExecutors:
 
     def xhs_login(self, job, context):
         require_agent_enabled(self.service.db_path, "hotspot_agent")
-        from content_workbench.topics.xiaohongshu_browser import XHSBrowserCollector
+        from content_workbench.accounts.existing_browser import run as run_existing_browser
 
-        result = XHSBrowserCollector(self.root, context).login()
+        result = run_existing_browser("xhs_personal_login")
+        if not result.get("login_verified"):
+            raise DomainError(
+                "LOGIN_REQUIRED",
+                result.get("error") or "小红书登录尚未确认",
+                409,
+                "browser",
+                result.get("action") or "在专用 Chrome 完成本人登录后重试，窗口和旧数据保留",
+            )
         account_id = self.service.ensure_account(platform="xiaohongshu")
         with self.service.conn() as conn:
             conn.execute(

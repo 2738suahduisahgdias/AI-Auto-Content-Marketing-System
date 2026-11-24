@@ -1,6 +1,6 @@
 # 映序开发版本索引
 
-当前文档版本：v0.14.0。功能基线：26 个页面单元、316 条功能说明。
+当前文档版本：v0.17.0。功能基线：26 个页面单元、316 条功能说明。
 
 版本号仅用于开发文档和功能迭代，不代表安装包、DMG 或正式发行版本。每次先读取并对比现有记录，再合并新事实，不覆盖历史。
 
@@ -19,7 +19,10 @@
 | v0.11.0 | 2026-11-15 | 小红书四类选题策略与真实素材下载 | [查看记录](#iteration-2026-11-15-xiaohongshu-topic-strategies) |
 | v0.12.0 | 2026-11-15 | 词级时间码后台进度与模型复用 | [查看记录](iterations/2026-11-15-transcript-progress.md) |
 | v0.13.0 | 2026-11-16 | 小红书真实视频与图文下载验收 | [查看记录](iterations/2026-11-16-xiaohongshu-download-acceptance.md) |
-| v0.14.0（当前） | 2026-11-16 | 原创转写修复与对标画面字幕 | [查看记录](iterations/2026-11-16-transcript-and-benchmark-subtitles.md) |
+| v0.14.0 | 2026-11-16 | 原创转写修复与对标画面字幕 | [查看记录](iterations/2026-11-16-transcript-and-benchmark-subtitles.md) |
+| v0.15.0 | 2026-11-24 | 8847 预览数据库迁移与模型连接恢复 | [查看记录](iterations/2026-11-24-preview-apfs-model-io-recovery.md) |
+| v0.16.0 | 2026-11-24 | 预览平台登录与共享浏览器恢复 | [查看记录](iterations/2026-11-24-preview-login-shared-browser-worker.md) |
+| v0.17.0（当前） | 2026-11-24 | 登录运行时与真实抖音／小红书任务修复 | [查看记录](iterations/2026-11-24-preview-login-runtime-recovery.md) |
 
 ## 后续维护
 

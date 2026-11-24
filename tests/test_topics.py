@@ -137,7 +137,34 @@ class TopicCase(unittest.TestCase):
         after = datetime(2026, 10, 26, 1, 0, tzinfo=UTC)
         self.assertEqual("2026-10-27T01:00:00.000Z", next_due("09:00", after))
 
-    def test_xhs_login_uses_kimi_collector_without_playwright_bridge(self):
+    def test_douyin_login_uses_playwright_worker(self):
+        from content_workbench.topics.executors import TopicExecutors
+
+        executor = TopicExecutors(self.service)
+        context = mock.Mock()
+        context.run_process.return_value = ('{"status":"ready"}', "")
+        with (
+            mock.patch(
+                "content_workbench.topics.executors.require_agent_enabled",
+                return_value={"timeout_seconds": 600},
+            ),
+            mock.patch(
+                "content_workbench.topics.kimi_browser.KimiBrowserCollector.collect"
+            ) as collector,
+        ):
+            result = executor.login({"input": {}}, context)
+        self.assertEqual(result["status"], "ready")
+        arguments = context.run_process.call_args.args[0]
+        self.assertEqual(arguments[1], "-m")
+        self.assertEqual(arguments[2], "content_workbench.topics.browser_worker")
+        self.assertEqual(arguments[arguments.index("--action") + 1], "login")
+        self.assertEqual(
+            context.run_process.call_args.kwargs["cwd"],
+            Path(__file__).resolve().parents[1],
+        )
+        collector.assert_not_called()
+
+    def test_xhs_login_uses_shared_playwright_browser(self):
         from content_workbench.topics.executors import TopicExecutors
 
         executor = TopicExecutors(self.service)
@@ -146,19 +173,17 @@ class TopicCase(unittest.TestCase):
                 "content_workbench.topics.xiaohongshu_browser.XHSBrowserCollector"
             ) as collector,
             mock.patch(
-                "content_workbench.accounts.existing_browser.run"
-            ) as old_browser,
+                "content_workbench.accounts.existing_browser.run",
+                return_value={"status": "ok", "login_verified": True},
+            ) as browser,
             mock.patch.object(
                 executor, "xhs_sync", return_value={"status": "succeeded"}
             ),
         ):
-            collector.return_value.login.return_value = {
-                "status": "ok",
-                "login_verified": True,
-            }
             result = executor.xhs_login({"input": {}}, DummyContext())
         self.assertTrue(result["login"]["login_verified"])
-        old_browser.assert_not_called()
+        browser.assert_called_once_with("xhs_personal_login")
+        collector.assert_not_called()
 
     def test_xhs_collections_sync_once_and_recommend_real_sources(self):
         from content_workbench.topics.executors import TopicExecutors
